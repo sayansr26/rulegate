@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_LINT_CONFIG } from '../src/model/lint.js';
 import { MemoryFileSystem } from '../src/io/memory.js';
 import { serializeCanonical, serializeMcpServers } from '../src/model/serialize.js';
 import { parse } from '../src/parse/index.js';
@@ -67,6 +68,7 @@ const model: Canonical = {
     tools: [{ id: 'claude-code', enabled: true, options: {}, source: { file: MANIFEST_PATH } }],
     options: DEFAULT_MANIFEST_OPTIONS,
     canonicalSources: [],
+    lint: DEFAULT_LINT_CONFIG,
     source: { file: MANIFEST_PATH },
   },
   rules: [],

@@ -75,6 +75,15 @@ options:
   ignore: []
 
 canonicalSources: []
+
+lint:
+  rules:
+    oversized-file: error
+    stale-path: warn
+  ignore:
+    - 'fixtures/**'
+  tokenBudget:
+    claude-code: 20000
 ```
 
 | Key                | Type     | Required | Default | Meaning                                                                               | Error when wrong     |
@@ -85,6 +94,7 @@ canonicalSources: []
 | `options.backup`   | boolean  | no       | `true`  | Copy originals to `.rulegate/backup/` before overwriting or deleting.                 | `E_MANIFEST_INVALID` |
 | `options.ignore`   | string[] | no       | `[]`    | Repo-relative globs `doctor` does not treat as instruction files. See below.          | `E_MANIFEST_INVALID` |
 | `canonicalSources` | string[] | no       | `[]`    | Repo-relative paths that are canonical _input_. No adapter may write to them. See §8. | `E_MANIFEST_INVALID` |
+| `lint`             | mapping  | no       | `{}`    | Configuration for `rulegate lint`. See §4.2. Renders nothing.                         | `E_MANIFEST_INVALID` |
 
 `options.ignore` is narrower than its name suggests, and deliberately so. It suppresses one
 thing: `doctor`'s scan for files that have the _shape_ of a tool instruction file and sit
@@ -128,6 +138,41 @@ enumerates every known id in its hint, so `rulegate sync` always tells you the t
 An id for an adapter that does not exist yet is `E_UNKNOWN_TOOL` even with
 `enabled: false`, because the manifest is validated before anything is generated. Declare
 a tool when its adapter lands, not before.
+
+### 4.2 `lint` — normative
+
+Read by `rulegate lint` and by nothing else. **No adapter sees it and no renderer
+consumes it**, so adding, changing or removing keys here changes no generated artifact
+and cannot make `check` fail. That is what lets a repository tune or silence the linter
+without touching its tool configs.
+
+| Key                | Type     | Required | Default | Meaning                                                                  |
+| ------------------ | -------- | -------- | ------- | ------------------------------------------------------------------------ |
+| `lint.rules`       | mapping  | no       | `{}`    | Rule id → `error`, `warn` or `off`, overriding that rule's default.      |
+| `lint.ignore`      | string[] | no       | `[]`    | Repo-relative globs no finding may be reported against.                  |
+| `lint.tokenBudget` | mapping  | no       | `{}`    | Tool id → the estimated-token budget its loaded context must stay under. |
+
+**Severities are validated; rule ids are not.** One of `error`, `warn`, `off` — anything
+else is `E_MANIFEST_INVALID`, because a typo silently reading as "the default" is the
+misconfiguration nobody ever notices. Rule _ids_ are accepted as written: the manifest
+reader has no rule registry, and giving it one would mean changing the parser every time
+a rule is added. `rulegate lint` names an id that no rule answers to, which is the one
+place both halves of the question are known.
+
+`lint.ignore` is **not** `options.ignore`. The two will often list the same fixture
+directories, but `options.ignore` stops a file being treated as an instruction file at
+all, for `doctor`'s orphan scan; `lint.ignore` suppresses _findings_ about files that
+genuinely are instruction files. A finding with no path — an unknown rule id, for
+instance — is never suppressed by a path glob, and a finding spanning several paths is
+suppressed only when every one of them is ignored.
+
+`lint.tokenBudget` has **no default and no fallback**. `AdapterDocs.limits` cannot
+supply one: it is a _byte_ cap (Codex's `project_doc_max_bytes` is bytes), and the
+offline estimator must not leak into a check it cannot answer. A tool absent from this
+map has no budget and the `token-budget` rule stays silent for it. Values must be
+positive integers. Only files with `role: 'instructions'` count toward the total, the
+same set `doctor` charges for — settings and permissions files are configuration, not
+context.
 
 ## 5. `rules/*.md`
 

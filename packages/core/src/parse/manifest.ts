@@ -7,6 +7,13 @@ import {
   type ManifestOptions,
   type ToolConfig,
 } from '../model/canonical.js';
+import {
+  DEFAULT_LINT_CONFIG,
+  isLintSeverity,
+  LINT_SEVERITIES,
+  type LintConfig,
+  type LintSeverity,
+} from '../model/lint.js';
 import { MANIFEST_PATH } from '../model/paths.js';
 import { parseYaml } from './yaml.js';
 import { Validator } from './validate.js';
@@ -33,6 +40,7 @@ export function parseManifest(raw: string, file = MANIFEST_PATH): ParsedManifest
   const tools = parseTools(v, v.get(map, 'tools'), file);
   const options = parseOptions(v, v.get(map, 'options'));
   const canonicalSources = v.stringArray(v.get(map, 'canonicalSources'), 'canonicalSources');
+  const lint = parseLint(v, v.get(map, 'lint'));
 
   return {
     manifest: {
@@ -40,6 +48,7 @@ export function parseManifest(raw: string, file = MANIFEST_PATH): ParsedManifest
       tools,
       options,
       canonicalSources,
+      lint,
       source: { file },
     },
     errors: v.errors,
@@ -110,12 +119,70 @@ function parseOptions(v: Validator, node: Node | undefined): ManifestOptions {
   };
 }
 
+/**
+ * The `lint:` block. Absent means defaults, which is every rule at its own severity.
+ *
+ * Rule *ids* are deliberately not checked here — the parser has no registry, so it would
+ * have to be handed one, and a manifest reader that knows the rule set is a manifest
+ * reader that changes whenever a rule is added. The engine reports unknown ids instead.
+ * Severities are checked, because the set of three is fixed and a typo silently reading
+ * as "default" is exactly the misconfiguration that never gets noticed.
+ */
+function parseLint(v: Validator, node: Node | undefined): LintConfig {
+  const map = v.asMap(node, 'lint');
+  if (map === undefined) return DEFAULT_LINT_CONFIG;
+
+  const rulesNode = v.asMap(v.get(map, 'rules'), 'lint.rules');
+  const rules: Record<string, LintSeverity> = {};
+  for (const key of v.keys(rulesNode)) {
+    const field = `lint.rules.${key}`;
+    const raw = v.string(v.get(rulesNode, key), field);
+    if (raw === undefined) continue;
+    if (!isLintSeverity(raw)) {
+      v.fail(
+        v.get(rulesNode, key),
+        field,
+        `\`${field}\` must be one of ${LINT_SEVERITIES.join(', ')}, got "${raw}"`,
+        `e.g. \`${field}: warn\``,
+      );
+      continue;
+    }
+    rules[key] = raw;
+  }
+
+  const budgetNode = v.asMap(v.get(map, 'tokenBudget'), 'lint.tokenBudget');
+  const tokenBudget: Record<string, number> = {};
+  for (const key of v.keys(budgetNode)) {
+    const field = `lint.tokenBudget.${key}`;
+    const raw = v.get(budgetNode, key);
+    if (raw === undefined) continue;
+    // Whether `v.integer` complained is read off the error list rather than from a
+    // sentinel return: every sentinel here is a number a user could legitimately type,
+    // so `-1` would mean both "already reported" and "the author wrote -1".
+    const before = v.errors.length;
+    const budget = v.integer(raw, field, 0);
+    if (v.errors.length > before) continue;
+    if (budget <= 0) {
+      v.fail(raw, field, `\`${field}\` must be a positive number of tokens`);
+      continue;
+    }
+    tokenBudget[key] = budget;
+  }
+
+  return {
+    rules,
+    ignore: v.stringArray(v.get(map, 'ignore'), 'lint.ignore'),
+    tokenBudget,
+  };
+}
+
 function fallbackManifest(file: string): RulegateManifest {
   return {
     schemaVersion: CANONICAL_SCHEMA_VERSION,
     tools: [],
     options: DEFAULT_MANIFEST_OPTIONS,
     canonicalSources: [],
+    lint: DEFAULT_LINT_CONFIG,
     source: { file },
   };
 }

@@ -24,3 +24,16 @@ CONVENTIONS.md
 # as stale.
 docs/tools/
 docs/adapters.md
+
+# Agent-tool state, written by the tools themselves. Same rule as everything above: a
+# formatter and a generator cannot both own a file. These are not merely generated once
+# — they are rewritten during a session, so formatting them buys a clean check that goes
+# red again on its own. `.headroom_wrap_marker.json` holds a live pid and port and is
+# rewritten every run; `settings.local.json` is machine-local by convention; `.serena/`
+# is serena's generated project state.
+#
+# Deliberately not the whole of `.claude/`: `settings.json`, `agents/`, `hooks/` and
+# `skills/` are hand-written project automation and stay formatted.
+.claude/.headroom_wrap_*
+.claude/settings.local.json
+.serena/

@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 
 /**
  * The rules below are not style preferences. They are the mechanical enforcement of
- * the permanent invariants in memory-bank/03-system-patterns.md: zero network calls,
+ * the permanent invariants in the `03-system-patterns` maintainer memory: zero network calls,
  * adapters are pure, core knows nothing tool-specific, and rendering is deterministic.
  * A lint rule catches these at author time; a code review does not.
  */

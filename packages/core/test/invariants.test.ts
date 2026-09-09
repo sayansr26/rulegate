@@ -226,20 +226,29 @@ describe('the shared rendering path', () => {
   });
 
   /**
-   * `check` is read-only by construction: it holds a filesystem with no write methods
-   * and never calls the one function that writes. The runtime test for that is inert on
-   * a clean repository — `applyPlan` writes nothing there either — so this pins the
-   * absence of the call site itself.
+   * `check` and `lint` are read-only by construction: each holds a filesystem with no
+   * write methods and never calls the one function that writes. The runtime test for
+   * that is inert on a clean repository — `applyPlan` writes nothing there either — so
+   * this pins the absence of the call site itself.
+   *
+   * A list rather than one path, because the next read-only command would otherwise
+   * ship unpinned and nothing would say so. `doctor` is deliberately absent: it
+   * constructs a `NodeFileSystem` (T027), which is a real gap rather than an oversight
+   * and is left stated here instead of silently widening the rule to fit it.
    */
-  it('keeps applyPlan and any writable filesystem out of check', async () => {
-    const check = path.join(repoRoot, 'packages/cli/src/commands/check.ts');
-    const text = await readFile(check, 'utf8');
-    expect(text).not.toMatch(/applyPlan/);
-    // `createReadOnlyFileSystem` returns an object with no writers on it; a
-    // `NodeFileSystem` typed as read-only is one cast away from a write.
-    expect(text).not.toMatch(/new NodeFileSystem\(/);
-    expect(text).toMatch(/createReadOnlyFileSystem\(/);
-  });
+  const READ_ONLY_COMMANDS = ['check.ts', 'lint.ts'];
+
+  it.each(READ_ONLY_COMMANDS)(
+    'keeps applyPlan and any writable filesystem out of %s',
+    async (file) => {
+      const text = await readFile(path.join(repoRoot, 'packages/cli/src/commands', file), 'utf8');
+      expect(text).not.toMatch(/applyPlan/);
+      // `createReadOnlyFileSystem` returns an object with no writers on it; a
+      // `NodeFileSystem` typed as read-only is one cast away from a write.
+      expect(text).not.toMatch(/new NodeFileSystem\(/);
+      expect(text).toMatch(/createReadOnlyFileSystem\(/);
+    },
+  );
 
   /**
    * `--staged` gave `check` a second filesystem, so the guarantee above needs a second

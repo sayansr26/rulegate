@@ -14,6 +14,10 @@ do that much. What Rulegate adds is the half that makes it trustworthy:
   generated file by hand, or forgets to re-run `sync`.
 - **`rulegate doctor`** — which tools this repository is configured for, which files each
   one will actually load, in what order, and roughly what they cost in tokens.
+- **`rulegate lint`** — the problems a passing `check` cannot see: an instruction file
+  over a cap its own tool documents, a rule citing a file that no longer exists, one tool
+  receiving the same rules through three mechanisms, a token budget overrun. Per-rule
+  severity and suppression, and exit 1 only on what you chose to call an error.
 - **`rulegate sync`** — the generation itself, sharing one rendering path with `check`,
   so `check` structurally cannot lie about what `sync` would write.
 
@@ -70,7 +74,7 @@ npx rulegate check    # verify they match — exit 1 on drift. Put this in CI.
 $ rulegate check
 hand-edited  GEMINI.md
 @@ -167,5 +167,3 @@
-   `memory-bank/05-progress-log.md` on every completion or phase gate. If they are not
+   the `05-progress-log` memory on every completion or phase gate. If they are not
    there, nothing is missing: everything a contributor needs is in `README.md`,
    `CONTRIBUTING.md`, and `docs/`.
 -
@@ -110,6 +114,46 @@ claim Rulegate makes carries a source URL and the tool version it was verified a
 
 `doctor` is read-only and **exits 0 even when it warns** — `check` owns exit 1, and a
 command that reports a correct permanent condition as a CI failure is one people mute.
+
+### What `lint` reports
+
+`check` answers one question — do the generated files match the canonical source? A
+repository can pass it and still be sending three copies of the same rules to one tool,
+or citing a document that was renamed a month ago. That is what `lint` is for.
+
+```text
+$ rulegate lint
+warn  conflicting-rules  .clinerules/10-project.md (+5)
+  Cline will load 7 files ~5446 tokens. 6 of them carry content that also arrives in
+  another file (…, AGENTS.md from codex) — about 1934 tokens are paid twice.
+warn  stale-path         .rulegate/rules/40-commands.md
+  references `docs/gone.md`, which does not exist
+
+0 errors, 2 warnings.
+```
+
+Four rules ship: `oversized-file`, `stale-path`, `conflicting-rules` and `token-budget`.
+Each has a severity you set per repository, in `.rulegate/rulegate.yaml`:
+
+```yaml
+lint:
+  rules:
+    conflicting-rules: off # we enable Copilot and Codex together on purpose
+    stale-path: error
+  ignore:
+    - 'fixtures/**'
+  tokenBudget:
+    claude-code: 20000
+```
+
+**Only `oversized-file` defaults to `error`**, because only it describes something no
+correct repository can be permanently in: content past a cap the tool itself publishes is
+silently dropped. Everything else defaults to `warn`, so `lint` exits 0 on a repository
+that is deliberately configured the way it is. A gate that fails on a correct permanent
+condition is a gate people mute.
+
+The `lint` block renders nothing — no adapter reads it — so tuning the linter never
+changes a generated file and never makes `check` fail.
 
 ## If you hand-edit a generated file
 

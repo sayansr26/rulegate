@@ -57,6 +57,18 @@ function serializeManifest(canonical: Canonical): string {
     doc['canonicalSources'] = [...manifest.canonicalSources];
   }
 
+  // Emitted only when it says something. A `lint: {}` in every generated manifest would
+  // be noise in the file a new user reads first, and the round trip has to hold either
+  // way: an absent block parses back to `DEFAULT_LINT_CONFIG`, which is what an empty
+  // one means.
+  const lint: Record<string, JsonValue> = {};
+  if (Object.keys(manifest.lint.rules).length > 0) lint['rules'] = { ...manifest.lint.rules };
+  if (manifest.lint.ignore.length > 0) lint['ignore'] = [...manifest.lint.ignore];
+  if (Object.keys(manifest.lint.tokenBudget).length > 0) {
+    lint['tokenBudget'] = { ...manifest.lint.tokenBudget };
+  }
+  if (Object.keys(lint).length > 0) doc['lint'] = lint;
+
   return ensureSingleTrailingNewline(stringifyYaml(doc, { lineWidth: 0 }));
 }
 

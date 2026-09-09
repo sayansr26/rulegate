@@ -5,6 +5,7 @@ import {
   type Canonical,
   type RulegateManifest,
 } from '../model/canonical.js';
+import { DEFAULT_LINT_CONFIG } from '../model/lint.js';
 import {
   AGENTS_MD,
   MANIFEST_PATH,
@@ -214,6 +215,7 @@ function syntheticManifest(
     tools: knownTools.map((id) => ({ id, enabled: true, options: {}, source: { file } })),
     options: DEFAULT_MANIFEST_OPTIONS,
     canonicalSources,
+    lint: DEFAULT_LINT_CONFIG,
     source: { file },
   };
 }
@@ -226,6 +228,7 @@ function emptyResultCanonical(): Canonical {
       tools: [],
       options: DEFAULT_MANIFEST_OPTIONS,
       canonicalSources: [],
+      lint: DEFAULT_LINT_CONFIG,
       source: { file: '.' },
     },
     rules: [],

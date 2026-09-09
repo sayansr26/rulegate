@@ -32,8 +32,11 @@ coverage/
 # own .rulegate/, rendered from public-safe rules and committed. An ignored file cannot
 # be gated by `rulegate check`, so ignoring one would silently opt it out of the very
 # guarantee this project sells. The hand-written working guide CLAUDE.md replaced now
-# lives at memory-bank/09-working-guide.md, covered by the rule below.
-memory-bank/
+# lives in the `09-working-guide` serena memory.
+#
+# `memory-bank/` was that store until 2026-09-09 and is now `.serena/memories/`, ignored
+# by .serena/.gitignore rather than here — the entry has to sit beside the directory it
+# protects, because a reader of this file would not think to look for one there.
 task-breakdown.md
 docs/PRD.md
 docs/reserch-report.md

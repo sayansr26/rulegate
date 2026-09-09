@@ -4,6 +4,7 @@ import { runInit } from './commands/init.js';
 import { runSync } from './commands/sync.js';
 import { runCheck } from './commands/check.js';
 import { runDoctor } from './commands/doctor.js';
+import { runLintCommand } from './commands/lint.js';
 import { runRestore } from './commands/restore.js';
 import { runAdapterNew } from './commands/adapter/index.js';
 import { resolveGlobalCwd } from './cwd.js';
@@ -141,6 +142,26 @@ export function buildProgram(): Command {
       const globals = cmd.optsWithGlobals<{ cwd?: string; quiet?: boolean; color?: boolean }>();
       const { root, searched } = resolveGlobalCwd(globals.cwd);
       const code = await runDoctor({
+        cwd: root,
+        ...(searched ? { announceRoot: true } : {}),
+        // commander stores --no-global as `global: false`.
+        ...(opts.global === false ? { noGlobal: true } : {}),
+        ...(opts.json === undefined ? {} : { json: opts.json }),
+        ...(globals.quiet === undefined ? {} : { quiet: globals.quiet }),
+        ...(globals.color === undefined ? {} : { color: globals.color }),
+      });
+      process.exitCode = code;
+    });
+
+  program
+    .command('lint')
+    .description('Check canonical rules and generated context for problems')
+    .option('--no-global', 'skip user-level files; read nothing outside the repository')
+    .option('--json', 'emit the full report as JSON')
+    .action(async (opts: { global?: boolean; json?: boolean }, cmd: Command) => {
+      const globals = cmd.optsWithGlobals<{ cwd?: string; quiet?: boolean; color?: boolean }>();
+      const { root, searched } = resolveGlobalCwd(globals.cwd);
+      const code = await runLintCommand({
         cwd: root,
         ...(searched ? { announceRoot: true } : {}),
         // commander stores --no-global as `global: false`.

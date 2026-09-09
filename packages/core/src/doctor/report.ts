@@ -17,6 +17,7 @@ import {
 import type { Adapter } from '../adapter/adapter.js';
 import type { FileResolution } from '../adapter/docs.js';
 import type { RulegateError } from '../model/errors.js';
+import type { Plan } from '../pipeline/plan.js';
 import type { ReadOnlyFileSystem } from '../fs/types.js';
 import type { DoctorReport, DoctorWarning, ToolDiagnosis } from './types.js';
 
@@ -34,6 +35,18 @@ export interface DoctorInput {
    * `escapesRoot` rather than reimplementing it.
    */
   readonly globalFs?: ReadOnlyFileSystem;
+  /**
+   * Diagnose this plan instead of computing one.
+   *
+   * For `lint` (T063), which needs the same plan this function would build and would
+   * otherwise walk `.rulegate/` twice for it. The same shape and the same reason as
+   * `PlanInput.canonical`: a parameter, not a second assembly path, because everything
+   * below derives from `plan` and a caller that built its own some other way could be
+   * shown a diagnosis of a repository that does not exist.
+   *
+   * Optional and unset by every other caller, so `doctor` keeps computing its own.
+   */
+  readonly plan?: Plan;
 }
 
 /**
@@ -51,7 +64,7 @@ export interface DoctorInput {
 export async function buildDoctorReport(input: DoctorInput): Promise<DoctorReport> {
   const { repoRoot, fs, adapters, globalFs } = input;
 
-  const plan = await computePlan({ repoRoot, fs, adapters });
+  const plan = input.plan ?? (await computePlan({ repoRoot, fs, adapters }));
   const adopted = !plan.errors.some((e) => e.code === 'E_NO_CANONICAL_SOURCE');
   const errors: readonly RulegateError[] = plan.errors.filter(
     (e) => e.code !== 'E_NO_CANONICAL_SOURCE',

@@ -1,3 +1,4 @@
+import { DEFAULT_LINT_CONFIG, type LintConfig } from './lint.js';
 import type { JsonValue, SourceRef, ToolId } from './ids.js';
 import type { McpServer } from './mcp.js';
 import type { RuleDocument } from './rule.js';
@@ -59,6 +60,12 @@ export interface RulegateManifest {
    * happens to trip over it first.
    */
   readonly canonicalSources: readonly string[];
+  /**
+   * Configuration for `rulegate lint` (T063).
+   *
+   * Nothing renders it, so it is not part of any artifact's input — see `LintConfig`.
+   */
+  readonly lint: LintConfig;
   readonly source: SourceRef;
 }
 
@@ -85,6 +92,7 @@ export function emptyManifest(source: SourceRef): RulegateManifest {
     tools: [],
     options: DEFAULT_MANIFEST_OPTIONS,
     canonicalSources: [],
+    lint: DEFAULT_LINT_CONFIG,
     source,
   };
 }

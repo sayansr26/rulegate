@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { MemoryFileSystem } from '../src/io/memory.js';
 import { NodeFileSystem } from '../src/io/node.js';
 import { parse } from '../src/parse/index.js';
+import { parseManifest } from '../src/parse/manifest.js';
 import { ALL_TOOLS } from '../src/model/selector.js';
 
 const fixtures = fileURLToPath(new URL('../../../fixtures/', import.meta.url));
@@ -243,5 +244,69 @@ describe('malformed input', () => {
     );
     const result = await parseFixture('unterminated-frontmatter');
     expect(`${result.errors.map((e) => e.format()).join('\n')}\n`).toBe(expected);
+  });
+});
+
+describe('the lint block', () => {
+  const read = (yaml: string): ReturnType<typeof parseManifest> =>
+    parseManifest(`schemaVersion: 1\n${yaml}`);
+
+  it('defaults to no rules, no ignores and no budgets when absent', () => {
+    const { manifest, errors } = read('tools: []\n');
+    expect(errors).toEqual([]);
+    expect(manifest.lint).toEqual({ rules: {}, ignore: [], tokenBudget: {} });
+  });
+
+  it('reads severities, ignores and per-tool budgets', () => {
+    const { manifest, errors } = read(
+      [
+        'lint:',
+        '  rules:',
+        '    oversized-file: error',
+        '    stale-path: off',
+        '  ignore:',
+        '    - fixtures/**',
+        '  tokenBudget:',
+        '    claude-code: 20000',
+      ].join('\n'),
+    );
+    expect(errors).toEqual([]);
+    expect(manifest.lint.rules).toEqual({ 'oversized-file': 'error', 'stale-path': 'off' });
+    expect(manifest.lint.ignore).toEqual(['fixtures/**']);
+    expect(manifest.lint.tokenBudget).toEqual({ 'claude-code': 20000 });
+  });
+
+  it('rejects a severity outside the three, rather than reading it as a default', () => {
+    const { manifest, errors } = read('lint:\n  rules:\n    oversized-file: loud\n');
+    expect(errors.map((e) => e.code)).toEqual(['E_MANIFEST_INVALID']);
+    expect(errors[0]?.message).toContain('lint.rules.oversized-file');
+    // The rule is dropped rather than silently kept at some coerced value.
+    expect(manifest.lint.rules).toEqual({});
+  });
+
+  it('does not validate rule ids, because the parser has no registry', () => {
+    // The engine reports an unknown id, where the rule set is actually known. A parser
+    // that knew it would have to change every time a rule is added.
+    const { manifest, errors } = read('lint:\n  rules:\n    no-such-rule: warn\n');
+    expect(errors).toEqual([]);
+    expect(manifest.lint.rules).toEqual({ 'no-such-rule': 'warn' });
+  });
+
+  it('rejects a non-positive budget with its own message', () => {
+    // `-1` specifically: it was the sentinel an earlier draft used for "already
+    // reported", which made a budget of -1 the one invalid value that parsed clean.
+    for (const value of ['0', '-1', '-5']) {
+      const { manifest, errors } = read(`lint:\n  tokenBudget:\n    claude-code: ${value}\n`);
+      expect(errors.map((e) => e.code)).toEqual(['E_MANIFEST_INVALID']);
+      expect(errors[0]?.message).toContain('positive number of tokens');
+      expect(manifest.lint.tokenBudget).toEqual({});
+    }
+  });
+
+  it('reports a non-integer budget once, not twice', () => {
+    const { manifest, errors } = read('lint:\n  tokenBudget:\n    claude-code: many\n');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toContain('must be an integer');
+    expect(manifest.lint.tokenBudget).toEqual({});
   });
 });

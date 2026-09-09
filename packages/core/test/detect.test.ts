@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_LINT_CONFIG } from '../src/model/lint.js';
 import { CANONICAL_SCHEMA_VERSION, DEFAULT_MANIFEST_OPTIONS } from '../src/model/canonical.js';
 import { ADAPTER_API_VERSION } from '../src/adapter/context.js';
 import { MANIFEST_PATH } from '../src/model/paths.js';
@@ -20,6 +21,7 @@ const canonical: Canonical = {
     tools: [],
     options: DEFAULT_MANIFEST_OPTIONS,
     canonicalSources: [],
+    lint: DEFAULT_LINT_CONFIG,
     source: { file: MANIFEST_PATH },
   },
   rules: [],

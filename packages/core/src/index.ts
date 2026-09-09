@@ -4,6 +4,7 @@ export * from './model/selector.js';
 export * from './model/rule.js';
 export * from './model/mcp.js';
 export * from './model/skill.js';
+export * from './model/lint.js';
 export * from './model/canonical.js';
 export * from './model/paths.js';
 export * from './model/fields.js';
@@ -48,6 +49,7 @@ export * from './detect/types.js';
 export * from './detect/global.js';
 export * from './detect/engine.js';
 
+export * from './lint/index.js';
 export * from './doctor/types.js';
 export * from './doctor/report.js';
 

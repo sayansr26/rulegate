@@ -1,2 +1,11 @@
 /cache
 /project.local.yml
+
+# Maintainer working notes, migrated from the git-ignored `memory-bank/` on 2026-09-09.
+# They keep that directory's confidentiality boundary: competitor analysis, decision
+# gates and kill-signals, launch timing and growth targets are internal, and this
+# repository is public. Moving them into a tracked directory would publish them.
+#
+# The public record is README.md, CONTRIBUTING.md and docs/ — that is what a contributor
+# needs in order to write an adapter.
+/memories

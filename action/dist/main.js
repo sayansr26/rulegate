@@ -10578,6 +10578,17 @@ function parseEnvRef(raw) {
   return m ? envRef(m[1]) : void 0;
 }
 
+// ../packages/core/dist/model/lint.js
+var LINT_SEVERITIES = ["error", "warn", "off"];
+function isLintSeverity(value) {
+  return LINT_SEVERITIES.includes(value);
+}
+var DEFAULT_LINT_CONFIG = {
+  rules: {},
+  ignore: [],
+  tokenBudget: {}
+};
+
 // ../packages/core/dist/model/canonical.js
 var CANONICAL_SCHEMA_VERSION = 1;
 var DEFAULT_MANIFEST_OPTIONS = {
@@ -10945,12 +10956,14 @@ function parseManifest(raw, file = MANIFEST_PATH) {
   const tools = parseTools(v, v.get(map, "tools"), file);
   const options2 = parseOptions(v, v.get(map, "options"));
   const canonicalSources = v.stringArray(v.get(map, "canonicalSources"), "canonicalSources");
+  const lint = parseLint(v, v.get(map, "lint"));
   return {
     manifest: {
       schemaVersion,
       tools,
       options: options2,
       canonicalSources,
+      lint,
       source: { file }
     },
     errors: v.errors
@@ -11011,12 +11024,53 @@ function parseOptions(v, node) {
     ignore: v.stringArray(v.get(map, "ignore"), "options.ignore")
   };
 }
+function parseLint(v, node) {
+  const map = v.asMap(node, "lint");
+  if (map === void 0)
+    return DEFAULT_LINT_CONFIG;
+  const rulesNode = v.asMap(v.get(map, "rules"), "lint.rules");
+  const rules = {};
+  for (const key of v.keys(rulesNode)) {
+    const field = `lint.rules.${key}`;
+    const raw = v.string(v.get(rulesNode, key), field);
+    if (raw === void 0)
+      continue;
+    if (!isLintSeverity(raw)) {
+      v.fail(v.get(rulesNode, key), field, `\`${field}\` must be one of ${LINT_SEVERITIES.join(", ")}, got "${raw}"`, `e.g. \`${field}: warn\``);
+      continue;
+    }
+    rules[key] = raw;
+  }
+  const budgetNode = v.asMap(v.get(map, "tokenBudget"), "lint.tokenBudget");
+  const tokenBudget = {};
+  for (const key of v.keys(budgetNode)) {
+    const field = `lint.tokenBudget.${key}`;
+    const raw = v.get(budgetNode, key);
+    if (raw === void 0)
+      continue;
+    const before = v.errors.length;
+    const budget = v.integer(raw, field, 0);
+    if (v.errors.length > before)
+      continue;
+    if (budget <= 0) {
+      v.fail(raw, field, `\`${field}\` must be a positive number of tokens`);
+      continue;
+    }
+    tokenBudget[key] = budget;
+  }
+  return {
+    rules,
+    ignore: v.stringArray(v.get(map, "ignore"), "lint.ignore"),
+    tokenBudget
+  };
+}
 function fallbackManifest(file) {
   return {
     schemaVersion: CANONICAL_SCHEMA_VERSION,
     tools: [],
     options: DEFAULT_MANIFEST_OPTIONS,
     canonicalSources: [],
+    lint: DEFAULT_LINT_CONFIG,
     source: { file }
   };
 }
@@ -11555,6 +11609,7 @@ function syntheticManifest(file, knownTools, canonicalSources) {
     tools: knownTools.map((id) => ({ id, enabled: true, options: {}, source: { file } })),
     options: DEFAULT_MANIFEST_OPTIONS,
     canonicalSources,
+    lint: DEFAULT_LINT_CONFIG,
     source: { file }
   };
 }
@@ -11566,6 +11621,7 @@ function emptyResultCanonical() {
       tools: [],
       options: DEFAULT_MANIFEST_OPTIONS,
       canonicalSources: [],
+      lint: DEFAULT_LINT_CONFIG,
       source: { file: "." }
     },
     rules: [],

@@ -13,7 +13,7 @@ export interface DetectResult {
    * `doctor` has to explain *why* it thinks a tool is in use — "detected Cursor"
    * with no evidence is exactly the unfalsifiable output the doctor exists to
    * replace. Returning the evidence rather than a bare boolean is a deliberate
-   * departure from the shape recorded in memory-bank/07-api-documentation.md, made
+   * departure from the shape recorded in the `07-api-documentation` memory, made
    * now because this contract freezes at T011 and widening a return type afterwards
    * breaks every external adapter.
    */

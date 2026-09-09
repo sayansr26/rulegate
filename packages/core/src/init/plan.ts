@@ -5,6 +5,7 @@ import {
   DEFAULT_MANIFEST_OPTIONS,
   emptyCanonical,
 } from '../model/canonical.js';
+import { DEFAULT_LINT_CONFIG } from '../model/lint.js';
 import { MANIFEST_PATH } from '../model/paths.js';
 import { serializeCanonical } from '../model/serialize.js';
 import { compareCodepoint } from '../render/order.js';
@@ -220,6 +221,7 @@ function canonicalFrom(
       schemaVersion: CANONICAL_SCHEMA_VERSION,
       tools,
       options: DEFAULT_MANIFEST_OPTIONS,
+      lint: DEFAULT_LINT_CONFIG,
       // Deliberately empty. The native files a user already has are what init just
       // imported *from*; from here they are generated output, and listing one as a
       // canonical source would freeze it as hand-maintained forever — the opposite of

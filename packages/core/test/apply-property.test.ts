@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_LINT_CONFIG } from '../src/model/lint.js';
 import { applyPlan, assertDeletable } from '../src/pipeline/apply.js';
 import { MemoryFileSystem } from '../src/io/memory.js';
 import { hashContents, serializeState, STATE_SCHEMA_VERSION } from '../src/state/state.js';
@@ -56,6 +57,7 @@ function canonicalFor(): Canonical {
       tools: [],
       options: DEFAULT_MANIFEST_OPTIONS,
       canonicalSources: [],
+      lint: DEFAULT_LINT_CONFIG,
       source: { file: '.rulegate/rulegate.yaml' },
     },
     rules: [],

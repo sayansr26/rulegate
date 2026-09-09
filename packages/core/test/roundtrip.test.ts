@@ -3,6 +3,7 @@ import { MemoryFileSystem } from '../src/io/memory.js';
 import { serializeCanonical } from '../src/model/serialize.js';
 import { parse } from '../src/parse/index.js';
 import { CANONICAL_SCHEMA_VERSION, DEFAULT_MANIFEST_OPTIONS } from '../src/model/canonical.js';
+import { DEFAULT_LINT_CONFIG } from '../src/model/lint.js';
 import { ALL_TOOLS } from '../src/model/selector.js';
 import { DEFAULT_RULE_ORDER } from '../src/model/rule.js';
 import { MANIFEST_PATH, ruleIdToPath } from '../src/model/paths.js';
@@ -28,6 +29,7 @@ const threeRuleModel: Canonical = {
     ],
     options: DEFAULT_MANIFEST_OPTIONS,
     canonicalSources: [],
+    lint: DEFAULT_LINT_CONFIG,
     source: { file: MANIFEST_PATH },
   },
   rules: [
@@ -92,6 +94,28 @@ describe('canonical round trip', () => {
     expect(result.errors).toEqual([]);
     expect(result.mode).toBe('rulegate-dir');
     expect(stripSources(result.canonical)).toEqual(stripSources(threeRuleModel));
+  });
+
+  it('survives a non-default lint block', async () => {
+    // The three-rule fixture uses DEFAULT_LINT_CONFIG, so the round trip above holds
+    // whether or not `serializeManifest` emits the block at all — the same shape as the
+    // `options.ignore` hole that still exists beside it. This is the case that fails
+    // when it is dropped.
+    const configured: Canonical = {
+      ...threeRuleModel,
+      manifest: {
+        ...threeRuleModel.manifest,
+        lint: {
+          rules: { 'oversized-file': 'error', 'stale-path': 'off' },
+          ignore: ['fixtures/**'],
+          tokenBudget: { 'claude-code': 20000 },
+        },
+      },
+    };
+
+    const result = await parseFrom(serializeCanonical(configured));
+    expect(result.errors).toEqual([]);
+    expect(result.canonical.manifest.lint).toEqual(configured.manifest.lint);
   });
 
   it('preserves frontmatter keys it does not understand', async () => {

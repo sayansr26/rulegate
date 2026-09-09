@@ -10,7 +10,7 @@
  * parameter, a field that became optional, or a new required member — none of which
  * changes a single export name. `DetectResult.evidence` is the concrete case the project
  * has already lived through (see the T006 change note in
- * `memory-bank/07-api-documentation.md`).
+ * the `07-api-documentation` maintainer memory).
  *
  * A pin is deliberately a hand-written copy, not a reference to the real type. Comparing
  * a type to itself proves nothing; the duplication is the assertion.

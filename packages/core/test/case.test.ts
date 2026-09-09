@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_LINT_CONFIG } from '../src/model/lint.js';
 import { foldPath, pathKeyFor, probeCaseInsensitive } from '../src/fs/case.js';
 import { compareToDisk } from '../src/state/compare.js';
 import { applyPlan, assertDeletable } from '../src/pipeline/apply.js';
@@ -43,6 +44,7 @@ function canonicalFor(): Canonical {
       tools: [],
       options: DEFAULT_MANIFEST_OPTIONS,
       canonicalSources: [],
+      lint: DEFAULT_LINT_CONFIG,
       source: { file: '.rulegate/rulegate.yaml' },
     },
     rules: [],
