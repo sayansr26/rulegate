@@ -14,10 +14,11 @@ import {
   type VerifyStatus,
 } from '@rulegate/core';
 import { ADAPTERS } from '../registry.js';
-import { createOutput, formatErrors, pluralize } from '../ui/report.js';
+import { createOutput, formatErrors, formatSkippedLevels, pluralize } from '../ui/report.js';
 import { renderDiff } from '../ui/diff.js';
 import {
   HINT_HAND_EDITED,
+  HINT_NO_RECURSIVE_ORPHANS,
   HINT_ORPHAN_HAND_EDITED,
   HINT_SYNC,
   HINT_UNMANAGED,
@@ -40,6 +41,14 @@ export interface CheckOptions {
    * but not staged, which is a correct answer to a question nobody asked.
    */
   readonly staged?: boolean;
+  /**
+   * Cover every nested `.rulegate/`, or the repository root alone (T062).
+   *
+   * Unset — the default — means "whatever the repository has": one level in an ordinary
+   * repository, every level in a monorepo. Passed straight to `computePlan`, which owns
+   * the reasoning; the CLI only preserves the three states.
+   */
+  readonly recursive?: boolean;
 }
 
 /**
@@ -98,7 +107,12 @@ export async function gatherCheck(options: CheckOptions): Promise<CheckResult> {
     fs = createReadOnlyFileSystem(repoRoot);
   }
 
-  const plan = await computePlan({ repoRoot, fs, adapters: ADAPTERS });
+  const plan = await computePlan({
+    repoRoot,
+    fs,
+    adapters: ADAPTERS,
+    ...(options.recursive === undefined ? {} : { recursive: options.recursive }),
+  });
 
   // A plan that would not render is not verified against anything, rather than carrying
   // an empty report that reads as clean.
@@ -147,6 +161,7 @@ export function reportCheck(result: CheckResult, options: CheckOptions): ExitCod
 
   const { plan } = result;
   for (const warning of plan.warnings) out.error(warning.format());
+  for (const line of formatSkippedLevels(plan)) out.error(line);
 
   if (result.kind === 'unrenderable') {
     // Exit 1 like `sync` does, and say what was not done.
@@ -176,7 +191,14 @@ export function reportCheck(result: CheckResult, options: CheckOptions): ExitCod
   // One hint per situation present, in the order `sync` would meet them. The first is
   // the common case and the only one `sync` fixes on its own; the others name the file
   // `sync` would refuse and say what to do about it.
-  if (statuses.has('stale') || statuses.has('missing') || statuses.has('orphaned')) {
+  // `--no-recursive` excluded the levels that produce these, so they are orphans of the
+  // flag rather than of the repository, and `sync` is the one thing not to suggest.
+  const excludedByFlag = options.recursive === false && statuses.has('orphaned');
+  if (excludedByFlag) out.error(HINT_NO_RECURSIVE_ORPHANS);
+  if (
+    !excludedByFlag &&
+    (statuses.has('stale') || statuses.has('missing') || statuses.has('orphaned'))
+  ) {
     out.error(HINT_SYNC);
   }
   if (statuses.has('hand-edited')) out.error(HINT_HAND_EDITED);

@@ -3,12 +3,21 @@
   "compilerOptions": {
     "noEmit": true,
     "allowJs": true,
-    // Workspace packages resolve to source, not to `dist/`. Without this, eslint's
-    // type-aware rules depend on whether someone has run `pnpm build` — and since
-    // `pnpm verify` runs `lint` *before* `build`, a clean clone produced hundreds of
-    // "could not be resolved" errors. This is the lint project only; the per-package
-    // build tsconfigs deliberately keep resolving through each package's `exports` map,
-    // which is what a published consumer sees.
+    // Two consumers, which is why this file is named for the workspace rather than for
+    // either of them: eslint's type-aware rules (`eslint.config.js`) and the second half
+    // of `pnpm typecheck`. It was `tsconfig.eslint.json` until 2026-09-09, when T087
+    // discovered that **no test file was typechecked anywhere** — the per-package
+    // tsconfigs are `"include": ["src/**/*"]` and the tests live in `test/`. This project
+    // already included them, so the fix was to run it, not to write a fourth copy of the
+    // map below. Keep it that way: a config named for one consumer is how the fourth copy
+    // gets written.
+    //
+    // Workspace packages resolve to source, not to `dist/`. Without this, type-aware
+    // rules depend on whether someone has run `pnpm build` — and since `pnpm verify` runs
+    // `lint` *before* `build`, a clean clone produced hundreds of "could not be resolved"
+    // errors. The per-package build tsconfigs deliberately keep resolving through each
+    // package's `exports` map, which is what a published consumer sees; `pnpm typecheck`
+    // runs those first, so both shapes are checked.
     "baseUrl": ".",
     "paths": {
       // The CLI is the one workspace package with an unscoped name, which is how it came

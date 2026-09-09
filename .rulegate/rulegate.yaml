@@ -16,9 +16,11 @@ tools:
   - gemini
 
 options:
-  # doctor only. `fixtures/` holds instruction files as *test data* — every golden
-  # CLAUDE.md, AGENTS.md and GEMINI.md under it is input to a byte-exact comparison, not a
-  # rule any tool loads — so the orphan scan would otherwise report ~30 of them. Nothing
-  # Rulegate generates is affected: `sync` and `check` do not read this key.
+  # `fixtures/` holds instruction files as *test data* — every golden CLAUDE.md, AGENTS.md
+  # and GEMINI.md under it is input to a byte-exact comparison, not a rule any tool loads —
+  # so the doctor orphan scan would otherwise report ~30 of them. Since T062 this also
+  # keeps nested discovery out: the fixtures contain whole `.rulegate/` trees, including
+  # deliberately malformed ones, and treating them as canonical levels would have `sync`
+  # generating artifacts into its own test data and `check` failing on a broken fixture.
   ignore:
     - fixtures/**

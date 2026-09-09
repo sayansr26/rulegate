@@ -59,6 +59,10 @@ function planFor(artifacts: readonly Artifact[]): Plan {
     artifacts,
     state: buildState(artifacts),
     enabledAdapters: ['claude-code'],
+    // The single root level a repository without nested `.rulegate/` has (T062).
+    levels: [
+      { dir: '', skippedTools: [], ownRuleIds: [], overriddenRuleIds: [], inheritedFrom: [] },
+    ],
     errors: [],
     warnings: [],
   };

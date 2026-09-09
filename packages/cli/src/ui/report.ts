@@ -1,5 +1,5 @@
 import pc from 'picocolors';
-import type { RulegateError } from '@rulegate/core';
+import type { Plan, RulegateError } from '@rulegate/core';
 
 /** The subset of picocolors this CLI uses, resolved once per run. */
 export type Colors = ReturnType<typeof pc.createColors>;
@@ -74,4 +74,20 @@ export function formatTokens(count: number): string {
     grouped += digits[i];
   }
   return `~${grouped}`;
+}
+
+/**
+ * The tools a nested level's rules never reached, one line per level.
+ *
+ * Reported, never silent. `sync` skips a tool at a nested level because that tool has no
+ * nested artifact to write — folding the package's rules into the root file instead would
+ * apply a package-scoped rule repository-wide, which is worse than not applying it — and
+ * the cost of skipping quietly is somebody believing their package's rules are live in a
+ * tool that never reads them. `check` prints the identical lines: the two commands say
+ * the same thing about the same repository.
+ */
+export function formatSkippedLevels(plan: Plan): readonly string[] {
+  return plan.levels
+    .filter((level) => level.skippedTools.length > 0)
+    .map((level) => `skipped  ${level.dir}  ${[...level.skippedTools].join(', ')}`);
 }

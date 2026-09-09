@@ -10,7 +10,7 @@ import {
   resolveRepoRoot,
 } from '@rulegate/core';
 import { ADAPTERS } from '../registry.js';
-import { createOutput, formatErrors, pluralize } from '../ui/report.js';
+import { createOutput, formatErrors, formatSkippedLevels, pluralize } from '../ui/report.js';
 import { renderDiff } from '../ui/diff.js';
 import {
   HINT_HAND_EDITED,
@@ -43,6 +43,14 @@ export interface SyncOptions {
    * is ambiguous without an anchor. Running at the root prints exactly what it always did.
    */
   readonly announceRoot?: boolean;
+  /**
+   * Cover every nested `.rulegate/`, or the repository root alone (T062).
+   *
+   * Unset — the default — means "whatever the repository has": one level in an ordinary
+   * repository, every level in a monorepo. Passed straight to `computePlan`, which owns
+   * the reasoning; the CLI only preserves the three states.
+   */
+  readonly recursive?: boolean;
   readonly quiet?: boolean;
   readonly color?: boolean;
 }
@@ -59,9 +67,15 @@ export async function runSync(options: SyncOptions): Promise<ExitCodeValue> {
   // errors") still means only errors.
   if (options.announceRoot === true) out.log(`repo  ${repoRoot}`);
 
-  const plan = await computePlan({ repoRoot, fs, adapters: ADAPTERS });
+  const plan = await computePlan({
+    repoRoot,
+    fs,
+    adapters: ADAPTERS,
+    ...(options.recursive === undefined ? {} : { recursive: options.recursive }),
+  });
 
   for (const warning of plan.warnings) out.error(warning.format());
+  for (const line of formatSkippedLevels(plan)) out.error(line);
 
   if (plan.errors.length > 0) {
     out.error(formatErrors(plan.errors));

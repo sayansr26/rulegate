@@ -96,15 +96,26 @@ describe('canonical round trip', () => {
     expect(stripSources(result.canonical)).toEqual(stripSources(threeRuleModel));
   });
 
-  it('survives a non-default lint block', async () => {
-    // The three-rule fixture uses DEFAULT_LINT_CONFIG, so the round trip above holds
-    // whether or not `serializeManifest` emits the block at all — the same shape as the
-    // `options.ignore` hole that still exists beside it. This is the case that fails
-    // when it is dropped.
+  it('survives every manifest key a repository can set away from its default', async () => {
+    // The three-rule fixture uses `DEFAULT_MANIFEST_OPTIONS` and `DEFAULT_LINT_CONFIG`
+    // throughout, so the round trip above holds whether or not `serializeManifest` emits
+    // these at all. That is not hypothetical: `options.ignore` was silently dropped for
+    // exactly that reason until T086, while `marker` and `backup` beside it were fine.
+    //
+    // So this asserts on the **whole manifest**, not on the key that happened to be
+    // broken. A test naming one key only guards that key, and the next field added to
+    // `ManifestOptions` would repeat the bug with the test still green.
     const configured: Canonical = {
       ...threeRuleModel,
       manifest: {
         ...threeRuleModel.manifest,
+        options: {
+          marker: false,
+          eol: 'lf',
+          backup: false,
+          ignore: ['fixtures/**', 'vendor/**'],
+        },
+        canonicalSources: ['AGENTS.md'],
         lint: {
           rules: { 'oversized-file': 'error', 'stale-path': 'off' },
           ignore: ['fixtures/**'],
@@ -115,7 +126,13 @@ describe('canonical round trip', () => {
 
     const result = await parseFrom(serializeCanonical(configured));
     expect(result.errors).toEqual([]);
-    expect(result.canonical.manifest.lint).toEqual(configured.manifest.lint);
+
+    // Compared through `stripSources`, which the whole-model assertion above already
+    // uses: source refs record where a value came from, so the hand-built model has none
+    // and the parsed one necessarily has real positions.
+    const manifestOf = (m: Canonical): unknown =>
+      (stripSources(m) as { manifest: unknown }).manifest;
+    expect(manifestOf(result.canonical)).toEqual(manifestOf(configured));
   });
 
   it('preserves frontmatter keys it does not understand', async () => {

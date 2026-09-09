@@ -60,3 +60,36 @@ export function globToRegExp(pattern: string): RegExp {
 export function matchesGlob(relPath: string, pattern: string): boolean {
   return globToRegExp(pattern).test(relPath);
 }
+
+/**
+ * The leading directory segments of `pattern` that contain no wildcard.
+ *
+ * `packages/a/.rulegate/rules/**` + a wildcard tail yields `packages/a/.rulegate/rules`;
+ * a pattern beginning with a wildcard yields `''`. A walker can use it to skip every
+ * subtree that cannot contain a match, which is the difference between one traversal per
+ * glob and one traversal of the whole repository per glob — quadratic once a monorepo has
+ * one canonical level per package (T062).
+ *
+ * Only whole segments count. A segment such as `p*` narrows nothing safely, because the
+ * directory that matches it is not known until it is read.
+ */
+export function literalPrefix(pattern: string): string {
+  const segments = pattern.split('/');
+  const literal: string[] = [];
+  // The last segment names files, not a directory to descend into, so it never counts.
+  for (const segment of segments.slice(0, -1)) {
+    if (/[*?[]/.test(segment)) break;
+    literal.push(segment);
+  }
+  return literal.join('/');
+}
+
+/**
+ * Could a directory at `dir` hold anything matching a glob whose literal prefix is
+ * `prefix`? True when the two are on the same branch — either could still become the
+ * other by descending.
+ */
+export function mayContain(dir: string, prefix: string): boolean {
+  if (prefix === '' || dir === '') return true;
+  return dir === prefix || dir.startsWith(`${prefix}/`) || prefix.startsWith(`${dir}/`);
+}

@@ -23,7 +23,10 @@ export interface ManifestOptions {
    * records — those are ours, and hiding them is how a tool comes to forget a file it
    * owns. It exists for the directories that hold instruction *files as data*, a golden
    * fixture tree above all, where `CLAUDE.md` is test input rather than a rule anything
-   * loads. `sync` and `check` ignore this key entirely.
+   * loads, and subtrees nested discovery must not treat as canonical levels (T062). A
+   * repository that holds `.rulegate/` trees as test data needs both: without the second,
+   * `sync` generates artifacts into its own fixtures and `check` fails on a deliberately
+   * malformed one.
    */
   readonly ignore: readonly string[];
 }

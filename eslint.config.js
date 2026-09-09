@@ -18,7 +18,7 @@ export default tseslint.config(
       parserOptions: {
         // A dedicated lint project: the per-package build tsconfigs deliberately
         // exclude tests and root config files, but those still need linting.
-        project: ['./tsconfig.eslint.json'],
+        project: ['./tsconfig.workspace.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },

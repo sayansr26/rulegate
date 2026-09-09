@@ -86,7 +86,7 @@ export async function resolveTool(docs: AdapterDocs, ctx: ResolveContext): Promi
     const found = measurements[i] ?? [];
     const hashes = found.map((m) => m.hash).filter((h): h is string => h !== undefined);
     const only = hashes.length === 1 ? hashes[0] : undefined;
-    const owner = ctx.managedBy.get(entry.pattern);
+    const owner = managedBy(ctx, entry);
     return {
       pattern: entry.pattern,
       rank: i,
@@ -246,11 +246,29 @@ function decideShadowed(
   });
 }
 
+/**
+ * The adapter that generates `entry`'s files, counting its nested spelling.
+ *
+ * `buildManagedByIndex` keys on the declared pattern, so Gemini's any-depth `GEMINI.md`
+ * row — the one covering the copies it reads from subdirectories — misses the plain
+ * `GEMINI.md` key its own adapter's managed entry sets, and every nested file Rulegate
+ * generates is reported as somebody else's. Stripping the any-depth prefix asks the same
+ * question one level up rather than adding a second ownership table that can drift from
+ * the first, and it is gated on the pattern *being* a nested spelling, so nothing else
+ * changes meaning.
+ */
+function managedBy(ctx: ResolveContext, entry: PrecedenceEntry): ToolId | undefined {
+  const exact = ctx.managedBy.get(entry.pattern);
+  if (exact !== undefined) return exact;
+  if (!entry.pattern.startsWith('**/')) return undefined;
+  return ctx.managedBy.get(entry.pattern.slice('**/'.length));
+}
+
 function statusOf(path: string, entry: PrecedenceEntry, ctx: ResolveContext): FileSyncStatus {
   // `managed` is only this adapter's own claim. `managedBy` catches the case that matters
   // most here — a file another adapter generates, which is exactly what a tool reading
   // AGENTS.md or CLAUDE.md is doing.
-  if (!entry.managed && !ctx.managedBy.has(entry.pattern)) return 'unmanaged';
+  if (!entry.managed && managedBy(ctx, entry) === undefined) return 'unmanaged';
 
   // `check`'s answer wins wherever it has one, so the two commands cannot describe one
   // file two ways. It has one for every planned path; a nested copy or a global file is

@@ -33,7 +33,6 @@ description: Working conventions
   comment density and idiom. Comments in this codebase explain _why_ a constraint
   exists, not what a line does.
 - **Maintainer working notes are not in this repository.** If your checkout has
-  `task-breakdown.md` or serena memories, they are git-ignored internal notes — read them
-  via `list_memories`/`read_memory`, keep task statuses current, and append to the
-  `05-progress-log` memory on every completion. If absent, nothing is missing:
-  `README.md`, `CONTRIBUTING.md` and `docs/` hold what a contributor needs.
+  `task-breakdown.md` or agent memories, they are git-ignored internal notes — read them
+  first, keep task statuses current, and log every completion there. If absent, nothing
+  is missing: `README.md`, `CONTRIBUTING.md` and `docs/` hold what a contributor needs.

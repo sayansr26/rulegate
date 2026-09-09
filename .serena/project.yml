@@ -148,7 +148,33 @@ added_modes:
 
 # initial prompt for the project. It will always be given to the LLM upon activating the project
 # (contrary to the memories, which are loaded on demand).
-initial_prompt: ""
+initial_prompt: |
+  Maintainer working notes for this repository live in serena memories, not in the
+  repository. They are git-ignored: this repo is public and the notes hold competitor
+  analysis, decision gates, kill-signals, launch timing and growth targets.
+
+  Before starting a coding task here:
+
+  1. `list_memories`, then `read_memory` the ones that bear on the task. Start with
+     `02-active-context` (current state and recent decisions) and `03-system-patterns`
+     (the invariants). `00-project-brief` and `04-tech-context` orient a first session.
+  2. `task-breakdown.md` is the task list, at the repository root. It is **git-ignored**
+     and this project sets `ignore_all_files_in_gitignore: true`, so serena's file-search
+     tools cannot see it — open it with a plain file read instead. Keep its statuses
+     current.
+  3. On every completion or phase gate, record it in the progress log. That log is
+     **split**: `05-progress-log` is an index listing every entry and the part holding
+     it, and `05-progress-log-part-1` .. `-6` hold the entries. Read the index, then
+     read only the part you need — the whole log is ~191 KB and `read_memory` refuses
+     it in one piece, which is why it was split (T089). Append to the
+     highest-numbered part, starting a new one past ~40 KB.
+
+     `02-active-context` is ~63 KB: readable, but read it when you need the current
+     state rather than by reflex.
+
+  These notes are the only record of *why* past decisions were taken. The repository
+  itself carries the what: README.md, CONTRIBUTING.md and docs/ are the public record and
+  are what a contributor needs in order to write an adapter.
 
 # time budget (seconds) per tool call for the retrieval of additional symbol information
 # such as docstrings or parameter information.

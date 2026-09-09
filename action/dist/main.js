@@ -10362,7 +10362,9 @@ var require_dist = __commonJS({
 var glob_exports = {};
 __export(glob_exports, {
   globToRegExp: () => globToRegExp,
-  matchesGlob: () => matchesGlob
+  literalPrefix: () => literalPrefix,
+  matchesGlob: () => matchesGlob,
+  mayContain: () => mayContain
 });
 function escapeLiteral(ch) {
   return ch.replace(/[.+^${}()|[\]\\]/g, "\\$&");
@@ -10415,6 +10417,21 @@ function globToRegExp(pattern) {
 }
 function matchesGlob(relPath, pattern) {
   return globToRegExp(pattern).test(relPath);
+}
+function literalPrefix(pattern) {
+  const segments = pattern.split("/");
+  const literal = [];
+  for (const segment of segments.slice(0, -1)) {
+    if (/[*?[]/.test(segment))
+      break;
+    literal.push(segment);
+  }
+  return literal.join("/");
+}
+function mayContain(dir, prefix) {
+  if (prefix === "" || dir === "")
+    return true;
+  return dir === prefix || dir.startsWith(`${prefix}/`) || prefix.startsWith(`${dir}/`);
 }
 var init_glob = __esm({
   "../packages/core/dist/fs/glob.js"() {
@@ -10612,7 +10629,9 @@ var STATE_PATH = `${RULEGATE_DIR}/state.json`;
 var BACKUP_DIR = `${RULEGATE_DIR}/backup`;
 var AGENTS_MD = "AGENTS.md";
 function deriveRuleId(relPath) {
-  const withoutPrefix = relPath.startsWith(`${RULES_DIR}/`) ? relPath.slice(RULES_DIR.length + 1) : relPath;
+  const marker = `${RULES_DIR}/`;
+  const idx = relPath.lastIndexOf(marker);
+  const withoutPrefix = idx === -1 ? relPath : relPath.slice(idx + marker.length);
   return withoutPrefix.replace(/\\/g, "/").replace(/\.md$/i, "").normalize("NFC");
 }
 
@@ -10650,6 +10669,30 @@ var ADAPTER_API_VERSION = 1;
 // ../packages/core/dist/adapter/adapter.js
 function detected(evidence) {
   return { detected: evidence.length > 0, evidence: [...evidence].sort() };
+}
+
+// ../packages/core/dist/adapter/nesting.js
+function nestedTargets(adapters) {
+  const out = [];
+  for (const adapter of adapters) {
+    for (const entry of adapter.docs.files) {
+      if (!entry.managed)
+        continue;
+      if (entry.nesting === void 0)
+        continue;
+      if (entry.scope === "global")
+        continue;
+      out.push({ tool: adapter.name, pattern: entry.pattern, nesting: entry.nesting });
+    }
+  }
+  return out;
+}
+function toolsWithoutNesting(adapters) {
+  const reachable = new Set(nestedTargets(adapters).map((t) => t.tool));
+  return adapters.map((a) => a.name).filter((name) => !reachable.has(name));
+}
+function nestedPath(dir, pattern) {
+  return dir === "" ? pattern : `${dir}/${pattern}`;
 }
 
 // ../packages/core/dist/fs/paths.js
@@ -11484,27 +11527,29 @@ async function parse(input) {
   const errors = [];
   const warnings = [];
   const sourceFiles = [];
-  const manifestRaw = await fs2.tryReadFile(MANIFEST_PATH);
-  const ruleFiles = (await fs2.glob(RULES_GLOB)).filter((p) => p.startsWith(`${RULES_DIR}/`));
+  const dir = input.dir === void 0 || input.dir === "" ? "" : normalizeRelative(input.dir);
+  const at = (p) => dir === "" ? p : `${dir}/${p}`;
+  const manifestRaw = await fs2.tryReadFile(at(MANIFEST_PATH));
+  const ruleFiles = (await fs2.glob(at(RULES_GLOB))).filter((p) => p.startsWith(`${at(RULES_DIR)}/`));
   let mode;
   let manifest;
   if (manifestRaw !== void 0) {
     mode = "rulegate-dir";
-    sourceFiles.push(MANIFEST_PATH);
+    sourceFiles.push(at(MANIFEST_PATH));
     const parsed = parseManifest(manifestRaw);
     manifest = parsed.manifest;
     errors.push(...parsed.errors);
     errors.push(...checkKnownTools(manifest, input.knownTools));
   } else if (ruleFiles.length > 0) {
     mode = "rules-only";
-    manifest = syntheticManifest(RULES_DIR, input.knownTools ?? [], []);
+    manifest = syntheticManifest(at(RULES_DIR), input.knownTools ?? [], []);
     warnings.push(new RulegateError({
       code: "E_MANIFEST_INVALID",
-      message: `no ${MANIFEST_PATH}; assuming every detected tool is enabled`,
-      source: { file: RULES_DIR },
-      hint: `run: rulegate init  (or create ${MANIFEST_PATH})`
+      message: dir === "" ? `no ${MANIFEST_PATH}; assuming every detected tool is enabled` : `no ${at(MANIFEST_PATH)}; this level inherits the nearest ancestor's tool list`,
+      source: { file: at(RULES_DIR) },
+      hint: dir === "" ? `run: rulegate init  (or create ${MANIFEST_PATH})` : `create ${at(MANIFEST_PATH)} to give this level its own tool list`
     }));
-  } else if (await fs2.exists(AGENTS_MD)) {
+  } else if (dir === "" && await fs2.exists(AGENTS_MD)) {
     mode = "bare-agents-md";
     manifest = syntheticManifest(AGENTS_MD, input.knownTools ?? [], [AGENTS_MD]);
   } else {
@@ -11513,8 +11558,8 @@ async function parse(input) {
       errors: [
         new RulegateError({
           code: "E_NO_CANONICAL_SOURCE",
-          message: "no canonical source found (.rulegate/ or AGENTS.md)",
-          source: { file: "." },
+          message: `no canonical source found (.rulegate/ or AGENTS.md)${dir === "" ? "" : ` in ${dir}`}`,
+          source: { file: dir === "" ? "." : dir },
           hint: "run: rulegate init"
         })
       ],
@@ -11544,9 +11589,9 @@ async function parse(input) {
   }
   const mcpServers = [];
   if (mode !== "bare-agents-md") {
-    const mcpRaw = await fs2.tryReadFile(MCP_SERVERS_PATH);
+    const mcpRaw = await fs2.tryReadFile(at(MCP_SERVERS_PATH));
     if (mcpRaw !== void 0) {
-      sourceFiles.push(MCP_SERVERS_PATH);
+      sourceFiles.push(at(MCP_SERVERS_PATH));
       const parsed = parseMcpServers(mcpRaw);
       mcpServers.push(...parsed.servers);
       errors.push(...parsed.errors);
@@ -11628,6 +11673,76 @@ function emptyResultCanonical() {
     mcpServers: [],
     skills: []
   };
+}
+
+// ../packages/core/dist/parse/nested.js
+init_glob();
+async function discoverSources(fs2, knownTools, ignore = []) {
+  const dirs = /* @__PURE__ */ new Set();
+  const add = (path4, marker) => {
+    const idx = path4.indexOf(marker);
+    if (idx === -1)
+      return;
+    const dir = idx === 0 ? "" : path4.slice(0, idx - 1);
+    if (ignore.some((pattern) => dir === pattern || matchesGlob(dir, pattern)))
+      return;
+    if (dir === BACKUP_DIR || dir.startsWith(`${BACKUP_DIR}/`) || dir.includes(`/${BACKUP_DIR}/`)) {
+      return;
+    }
+    dirs.add(dir);
+  };
+  for (const p of await fs2.glob(`**/${MANIFEST_PATH}`))
+    add(p, MANIFEST_PATH);
+  for (const p of await fs2.glob(`**/${RULES_GLOB}`))
+    add(p, `${RULEGATE_DIR}/rules/`);
+  const out = [];
+  for (const dir of [...dirs].sort(compareCodepoint)) {
+    out.push({
+      dir,
+      result: await parse({
+        fs: fs2,
+        ...knownTools === void 0 ? {} : { knownTools },
+        ...dir === "" ? {} : { dir }
+      })
+    });
+  }
+  return out;
+}
+function isUnder(dir, ancestor) {
+  if (ancestor === "")
+    return true;
+  return dir === ancestor || dir.startsWith(`${ancestor}/`);
+}
+function resolveNested(sources) {
+  const ordered = [...sources].sort((a, b) => compareCodepoint(a.dir, b.dir));
+  return ordered.map((level) => {
+    const ancestors = ordered.filter((s) => s.dir !== level.dir && isUnder(level.dir, s.dir));
+    const byId = /* @__PURE__ */ new Map();
+    for (const a of ancestors) {
+      for (const rule of a.result.canonical.rules)
+        byId.set(rule.id, rule);
+    }
+    const inherited = new Set(byId.keys());
+    const own = [];
+    const overridden = [];
+    for (const rule of level.result.canonical.rules) {
+      own.push(rule.id);
+      if (inherited.has(rule.id))
+        overridden.push(rule.id);
+      byId.set(rule.id, rule);
+    }
+    const config = level.result.mode === "rulegate-dir" ? level.result : [...ancestors].reverse().find((a) => a.result.mode === "rulegate-dir")?.result ?? level.result;
+    return {
+      dir: level.dir,
+      canonical: {
+        ...config.canonical,
+        rules: [...byId.values()]
+      },
+      ownRuleIds: [...own].sort(compareCodepoint),
+      overriddenRuleIds: [...overridden].sort(compareCodepoint),
+      inheritedFrom: ancestors.map((a) => a.dir)
+    };
+  });
 }
 
 // ../packages/core/dist/import/sections.js
@@ -12090,109 +12205,166 @@ async function computePlan(input) {
   const { fs: fs2, repoRoot, adapters } = input;
   const errors = [];
   const warnings = [];
-  let canonical;
-  if (input.canonical === void 0) {
-    const parsed = await parse({ fs: fs2, knownTools: adapters.map((a) => a.name) });
-    errors.push(...parsed.errors);
-    warnings.push(...parsed.warnings);
-    canonical = parsed.canonical;
-  } else {
-    canonical = input.canonical;
-  }
-  const enabled = canonical.manifest.tools.filter((t) => t.enabled).map((t) => t.id);
-  const selected = adapters.filter((a) => enabled.includes(a.name));
+  const levels = await resolveLevels(input, errors, warnings);
+  const rootLevel = levels.find((l) => l.dir === "") ?? levels[0];
   const artifacts = [];
   const claimedBy = /* @__PURE__ */ new Map();
-  for (const adapter of selected) {
-    if (adapter.apiVersion !== ADAPTER_API_VERSION) {
-      errors.push(new RulegateError({
-        code: "E_ADAPTER_API_VERSION",
-        message: `adapter \`${adapter.name}\` targets adapter API v${String(adapter.apiVersion)}, but this build speaks v${String(ADAPTER_API_VERSION)}`,
-        source: { file: canonical.manifest.source.file },
-        hint: `upgrade the adapter, or pin rulegate to a version that speaks v${String(adapter.apiVersion)}`
-      }));
-      continue;
-    }
-    const options2 = canonical.manifest.tools.find((t) => t.id === adapter.name)?.options ?? {};
-    const ctx = { repoRoot, canonical, fs: fs2, options: options2, apiVersion: ADAPTER_API_VERSION };
-    let produced;
-    try {
-      produced = await adapter.write(ctx);
-    } catch (cause) {
-      errors.push(cause instanceof RulegateError ? cause : new RulegateError({
-        code: "E_ADAPTER_FAILED",
-        message: `adapter \`${adapter.name}\` failed: ${describe2(cause)}`,
-        source: { file: canonical.manifest.source.file },
-        cause
-      }));
-      continue;
-    }
-    for (const raw of produced) {
-      const artifact = finalizeArtifact(raw);
-      const path4 = normalizeRelative(artifact.path);
-      if (escapesRoot(artifact.path)) {
+  const planLevels = [];
+  const enabledEverywhere = /* @__PURE__ */ new Set();
+  for (const level of levels) {
+    const canonical = level.canonical;
+    const nested = level.dir !== "";
+    const enabled = canonical.manifest.tools.filter((t) => t.enabled).map((t) => t.id);
+    const selected = adapters.filter((a) => enabled.includes(a.name));
+    const skippedTools = nested ? toolsWithoutNesting(selected) : [];
+    const skipped = new Set(skippedTools);
+    const eligible = selected.filter((a) => !skipped.has(a.name));
+    if (nested)
+      warnings.push(...allMergedWarnings(level, eligible));
+    planLevels.push({
+      dir: level.dir,
+      skippedTools,
+      ownRuleIds: level.ownRuleIds,
+      overriddenRuleIds: level.overriddenRuleIds,
+      inheritedFrom: level.inheritedFrom
+    });
+    for (const adapter of eligible) {
+      enabledEverywhere.add(adapter.name);
+      if (adapter.apiVersion !== ADAPTER_API_VERSION) {
         errors.push(new RulegateError({
-          code: "E_PATH_ESCAPE",
-          message: `adapter \`${adapter.name}\` tried to write outside the repository: ${artifact.path}`,
-          source: { file: artifact.path }
+          code: "E_ADAPTER_API_VERSION",
+          message: `adapter \`${adapter.name}\` targets adapter API v${String(adapter.apiVersion)}, but this build speaks v${String(ADAPTER_API_VERSION)}`,
+          source: { file: canonical.manifest.source.file },
+          hint: `upgrade the adapter, or pin rulegate to a version that speaks v${String(adapter.apiVersion)}`
         }));
         continue;
       }
-      if (artifact.kind === "mcp") {
-        const found = scanTextForSecrets(artifact.contents);
-        if (found.length > 0) {
+      const options2 = canonical.manifest.tools.find((t) => t.id === adapter.name)?.options ?? {};
+      const ctx = { repoRoot, canonical, fs: fs2, options: options2, apiVersion: ADAPTER_API_VERSION };
+      let produced;
+      try {
+        produced = await adapter.write(ctx);
+      } catch (cause) {
+        errors.push(cause instanceof RulegateError ? cause : new RulegateError({
+          code: "E_ADAPTER_FAILED",
+          message: `adapter \`${adapter.name}\` failed: ${describe2(cause)}`,
+          source: { file: canonical.manifest.source.file },
+          cause
+        }));
+        continue;
+      }
+      for (const raw of produced) {
+        const artifact = finalizeArtifact(raw);
+        const local = normalizeRelative(artifact.path);
+        const path4 = normalizeRelative(nestedPath(level.dir, local));
+        if (escapesRoot(path4)) {
           errors.push(new RulegateError({
-            code: "E_LITERAL_SECRET",
-            // Locations, never the values. A message that quoted what it found would
-            // print the secret into CI logs.
-            message: `adapter \`${adapter.name}\` would write a literal credential to ${path4} (${found.join(", ")})`,
-            source: { file: path4 },
-            hint: "use an `env:NAME` reference in .rulegate/mcp/servers.yaml; rulegate never writes a literal secret"
+            code: "E_PATH_ESCAPE",
+            message: `adapter \`${adapter.name}\` tried to write outside the repository: ${artifact.path}`,
+            source: { file: artifact.path }
           }));
           continue;
         }
+        if (artifact.kind === "mcp") {
+          const found = scanTextForSecrets(artifact.contents);
+          if (found.length > 0) {
+            errors.push(new RulegateError({
+              code: "E_LITERAL_SECRET",
+              // Locations, never the values. A message that quoted what it found would
+              // print the secret into CI logs.
+              message: `adapter \`${adapter.name}\` would write a literal credential to ${path4} (${found.join(", ")})`,
+              source: { file: path4 },
+              hint: "use an `env:NAME` reference in .rulegate/mcp/servers.yaml; rulegate never writes a literal secret"
+            }));
+            continue;
+          }
+        }
+        if (isCanonicalSource(canonical.manifest, path4) || isCanonicalSource(canonical.manifest, local)) {
+          errors.push(new RulegateError({
+            code: "E_ARTIFACT_OVERWRITES_SOURCE",
+            message: `adapter \`${adapter.name}\` tried to overwrite the canonical source ${path4}`,
+            source: { file: path4 },
+            hint: "the file it generates is also the file it reads from; disable that tool or move your canonical source"
+          }));
+          continue;
+        }
+        if (local === STATE_PATH) {
+          errors.push(new RulegateError({
+            code: "E_ARTIFACT_PATH_CONFLICT",
+            message: `adapter \`${adapter.name}\` tried to write ${STATE_PATH}, which Rulegate owns`,
+            source: { file: path4 }
+          }));
+          continue;
+        }
+        const key = path4.toLowerCase();
+        const other = claimedBy.get(key);
+        if (other !== void 0) {
+          errors.push(new RulegateError({
+            code: "E_ARTIFACT_PATH_CONFLICT",
+            message: `adapters \`${other}\` and \`${adapter.name}\` both generate ${path4}`,
+            source: { file: path4 },
+            hint: "disable one of the two tools, or report this as an adapter bug. Paths that differ only in case are the same file on Windows and macOS."
+          }));
+          continue;
+        }
+        claimedBy.set(key, adapter.name);
+        artifacts.push({ ...artifact, path: path4 });
       }
-      if (isCanonicalSource(canonical.manifest, path4)) {
-        errors.push(new RulegateError({
-          code: "E_ARTIFACT_OVERWRITES_SOURCE",
-          message: `adapter \`${adapter.name}\` tried to overwrite the canonical source ${path4}`,
-          source: { file: path4 },
-          hint: "the file it generates is also the file it reads from; disable that tool or move your canonical source"
-        }));
-        continue;
-      }
-      if (path4 === STATE_PATH) {
-        errors.push(new RulegateError({
-          code: "E_ARTIFACT_PATH_CONFLICT",
-          message: `adapter \`${adapter.name}\` tried to write ${STATE_PATH}, which Rulegate owns`,
-          source: { file: path4 }
-        }));
-        continue;
-      }
-      const key = path4.toLowerCase();
-      const other = claimedBy.get(key);
-      if (other !== void 0) {
-        errors.push(new RulegateError({
-          code: "E_ARTIFACT_PATH_CONFLICT",
-          message: `adapters \`${other}\` and \`${adapter.name}\` both generate ${path4}`,
-          source: { file: path4 },
-          hint: "disable one of the two tools, or report this as an adapter bug. Paths that differ only in case are the same file on Windows and macOS."
-        }));
-        continue;
-      }
-      claimedBy.set(key, adapter.name);
-      artifacts.push({ ...artifact, path: path4 });
     }
   }
   const sorted = sortArtifacts(artifacts);
   return {
-    canonical,
+    canonical: rootLevel.canonical,
     artifacts: sorted,
     state: buildState(sorted),
-    enabledAdapters: selected.map((a) => a.name),
+    enabledAdapters: [...enabledEverywhere].sort(compareCodepoint),
+    levels: planLevels,
     errors,
     warnings
   };
+}
+async function resolveLevels(input, errors, warnings) {
+  const { fs: fs2, adapters } = input;
+  if (input.canonical !== void 0) {
+    return [
+      {
+        dir: "",
+        canonical: input.canonical,
+        ownRuleIds: input.canonical.rules.map((r) => r.id),
+        overriddenRuleIds: [],
+        inheritedFrom: []
+      }
+    ];
+  }
+  const knownTools = adapters.map((a) => a.name);
+  const rootResult = await parse({ fs: fs2, knownTools });
+  const nested = input.recursive === false ? [] : (await discoverSources(fs2, knownTools, rootResult.canonical.manifest.options.ignore)).filter((source) => source.dir !== "");
+  const sources = [{ dir: "", result: rootResult }, ...nested];
+  for (const source of sources) {
+    if (source.dir === "" && rootResult.mode === "none" && nested.length > 0)
+      continue;
+    errors.push(...source.result.errors);
+    warnings.push(...source.result.warnings);
+  }
+  return resolveNested(sources);
+}
+function allMergedWarnings(level, eligible) {
+  if (level.overriddenRuleIds.length === 0)
+    return [];
+  const out = [];
+  for (const target of nestedTargets(eligible)) {
+    if (target.nesting !== "all-merged")
+      continue;
+    for (const id of level.overriddenRuleIds) {
+      out.push(new RulegateError({
+        code: "W_NESTED_MERGE_CONFLICT",
+        message: `${level.dir} redefines rule \`${id}\`, but ${target.tool} merges nested files instead of overriding: it will load both texts`,
+        source: { file: nestedPath(level.dir, target.pattern) },
+        hint: `give the rule a different id in ${level.dir}, or disable ${target.tool} there`
+      }));
+    }
+  }
+  return out;
 }
 function describe2(cause) {
   return cause instanceof Error ? cause.message : String(cause);
@@ -12622,6 +12794,7 @@ var NodeFileSystem = class {
     const out = [];
     const root = await realpathOr(this.repoRoot);
     const seen = /* @__PURE__ */ new Set();
+    const prefix = literalPrefix(pattern);
     const contained = async (abs) => {
       const real = await realpathOr(abs);
       const rel = path2.relative(root, real);
@@ -12643,6 +12816,8 @@ var NodeFileSystem = class {
           kind = stat.isDirectory() ? "dir" : "file";
         }
         if (kind === "dir") {
+          if (!mayContain(child, prefix))
+            continue;
           const real = await realpathOr(path2.join(this.repoRoot, fromPosix(child)));
           if (seen.has(real))
             continue;
@@ -15472,6 +15647,9 @@ function formatErrors(errors) {
 function pluralize(count, singular, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
+function formatSkippedLevels(plan) {
+  return plan.levels.filter((level) => level.skippedTools.length > 0).map((level) => `skipped  ${level.dir}  ${[...level.skippedTools].join(", ")}`);
+}
 
 // ../packages/cli/dist/ui/exit.js
 var ExitCode = { Ok: 0, Failure: 1, Usage: 2 };
@@ -15499,6 +15677,7 @@ var HINT_SYNC = "hint: run: rulegate sync";
 var HINT_HAND_EDITED = "hint: re-apply your edit in .rulegate/, then delete the generated file so sync can rewrite it.";
 var HINT_ORPHAN_HAND_EDITED = "hint: delete the file yourself to accept the removal, or restore the rule that generated it in .rulegate/rules/";
 var HINT_UNMANAGED = "hint: move the file aside to keep it, or run: rulegate sync --force (originals are copied to .rulegate/backup/ first)";
+var HINT_NO_RECURSIVE_ORPHANS = "hint: these sit under a nested .rulegate/ that --no-recursive excluded; re-run without it";
 
 // ../packages/cli/dist/commands/check.js
 async function gatherCheck(options2) {
@@ -15519,7 +15698,12 @@ async function gatherCheck(options2) {
   } else {
     fs2 = createReadOnlyFileSystem(repoRoot);
   }
-  const plan = await computePlan({ repoRoot, fs: fs2, adapters: ADAPTERS });
+  const plan = await computePlan({
+    repoRoot,
+    fs: fs2,
+    adapters: ADAPTERS,
+    ...options2.recursive === void 0 ? {} : { recursive: options2.recursive }
+  });
   if (plan.errors.length > 0)
     return { kind: "unrenderable", repoRoot, plan };
   return { kind: "verified", repoRoot, plan, report: await verifyPlan(plan, fs2) };
@@ -15539,6 +15723,8 @@ function reportCheck(result2, options2) {
   const { plan } = result2;
   for (const warning of plan.warnings)
     out.error(warning.format());
+  for (const line of formatSkippedLevels(plan))
+    out.error(line);
   if (result2.kind === "unrenderable") {
     out.error(formatErrors(plan.errors));
     out.error(`
@@ -15562,7 +15748,10 @@ ${pluralize(plan.errors.length, "error")}; nothing was checked.`);
   const statuses = new Set(report.entries.map((e) => e.status));
   out.error("");
   out.error(`${pluralize(report.entries.length, "file")} out of sync.`);
-  if (statuses.has("stale") || statuses.has("missing") || statuses.has("orphaned")) {
+  const excludedByFlag = options2.recursive === false && statuses.has("orphaned");
+  if (excludedByFlag)
+    out.error(HINT_NO_RECURSIVE_ORPHANS);
+  if (!excludedByFlag && (statuses.has("stale") || statuses.has("missing") || statuses.has("orphaned"))) {
     out.error(HINT_SYNC);
   }
   if (statuses.has("hand-edited"))

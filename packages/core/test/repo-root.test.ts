@@ -78,13 +78,25 @@ describe('findRepoRoot', () => {
     expect(findRepoRoot(dir('outer/repo/pkg'))).toBe(dir('outer/repo'));
   });
 
-  it('prefers the nearest .rulegate', async () => {
-    // Nothing is merged across levels — nested canonical sources are T061. This is
-    // exactly what `--cwd packages/core` already means today.
+  it('prefers the outermost .rulegate, so a subpackage resolves its ancestors', async () => {
+    // A nested level inherits (T061), so the root is what a run from `packages/core` has
+    // to see: stopping at the nearer one renders the package without the repository's
+    // conventions, and the same file then depends on which directory you typed the
+    // command in. `--cwd packages/core` is still the way to ask for that level alone.
     await makeDir('repo/.rulegate');
     await makeDir('repo/packages/core/.rulegate');
 
-    expect(findRepoRoot(dir('repo/packages/core'))).toBe(dir('repo/packages/core'));
+    expect(findRepoRoot(dir('repo/packages/core'))).toBe(dir('repo'));
+  });
+
+  it('stops at .git even when only a package below it has a .rulegate', async () => {
+    // The levels live in the packages and the repository root has none of its own. The
+    // root is still the answer: it is every level's ancestor, and it is the boundary
+    // `sync` must not write outside of.
+    await makeDir('repo/.git');
+    await makeDir('repo/packages/core/.rulegate');
+
+    expect(findRepoRoot(dir('repo/packages/core'))).toBe(dir('repo'));
   });
 
   it.skipIf(tmpdirHasMarkerAbove())(

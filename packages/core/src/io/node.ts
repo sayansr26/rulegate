@@ -5,7 +5,7 @@ import path from 'node:path';
 import { RulegateError } from '../model/errors.js';
 import { RULEGATE_DIR } from '../model/paths.js';
 import { escapesRoot, fromPosix, normalizeRelative, toPosix } from '../fs/paths.js';
-import { matchesGlob } from '../fs/glob.js';
+import { literalPrefix, matchesGlob, mayContain } from '../fs/glob.js';
 import { compareCodepoint } from '../render/order.js';
 import { normalizeText } from '../render/eol.js';
 import type { DirEntry, ReadOnlyFileSystem, WritableFileSystem } from '../fs/types.js';
@@ -93,6 +93,10 @@ export class NodeFileSystem implements WritableFileSystem {
     const out: string[] = [];
     const root = await realpathOr(this.repoRoot);
     const seen = new Set<string>();
+    // Descend only where a match could be. Without this every glob walks the entire
+    // repository, so a monorepo with one canonical level per package pays one full
+    // traversal per level — quadratic, and measurably so at fifty packages (T062).
+    const prefix = literalPrefix(pattern);
 
     const contained = async (abs: string): Promise<boolean> => {
       const real = await realpathOr(abs);
@@ -115,6 +119,7 @@ export class NodeFileSystem implements WritableFileSystem {
         }
 
         if (kind === 'dir') {
+          if (!mayContain(child, prefix)) continue;
           const real = await realpathOr(path.join(this.repoRoot, fromPosix(child)));
           if (seen.has(real)) continue;
           seen.add(real);
@@ -191,6 +196,12 @@ export function resolveRepoRoot(cwd: string): string {
  * `packages/core` fails with `E_NO_CANONICAL_SOURCE` and hints `rulegate init` — advice
  * that would create a second, nested `.rulegate/`.
  *
+ * The answer is the **outermost** canonical root, not the nearest one (T062): a nested
+ * level inherits its ancestors' rules, so stopping at `packages/a/.rulegate` would render
+ * that package without the repository's conventions and make the same artifact depend on
+ * which directory the command was typed in. `--cwd packages/a` is still taken literally
+ * and is the way to ask for one level alone.
+ *
  * `.git` is a *terminator*, not merely a candidate: the walk never looks above it. That is
  * what keeps "sync never writes outside the repo" true. It is matched as a file as well as
  * a directory, because worktrees and submodules write `.git` as a file containing
@@ -214,16 +225,24 @@ export function findRepoRoot(startDir: string): string {
   const home = path.resolve(os.homedir());
   let dir = start;
 
+  // The **outermost** `.rulegate/` inside the repository, not the nearest (T062). A nested
+  // level inherits its ancestors' rules, so a run from `packages/a` that stopped at
+  // `packages/a/.rulegate` would render that package without the repository's conventions
+  // — the same file, different bytes depending on which directory you were standing in.
+  // Stopping at the nearest one was correct only while nothing was merged across levels.
+  let outermost: string | undefined;
+
   for (;;) {
-    // A nearer `.rulegate/` wins. Nothing is merged across levels: nested canonical
-    // sources are T061, and this is exactly what `--cwd <subpackage>` already means.
-    if (probe(path.join(dir, RULEGATE_DIR))) return dir;
+    // `.git` still terminates immediately and wins over anything above it: that is what
+    // keeps "sync never writes outside the repo" true when an unrelated ancestor happens
+    // to hold a `.rulegate/`.
     if (probe(path.join(dir, '.git'))) return dir;
+    if (probe(path.join(dir, RULEGATE_DIR))) outermost = dir;
 
     const parent = path.dirname(dir);
     // The home directory is examined like any other, but never ascended past: a stray
     // `~/.rulegate` must not silently become the root of an unrelated project.
-    if (parent === dir || dir === home) return start;
+    if (parent === dir || dir === home) return outermost ?? start;
     dir = parent;
   }
 }

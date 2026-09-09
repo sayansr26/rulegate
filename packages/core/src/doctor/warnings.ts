@@ -267,8 +267,19 @@ export async function orphanWarnings(
   return out;
 }
 
+/**
+ * Where a tool will read `pattern`, given that it declares nesting.
+ *
+ * Unconditional, including for a pattern carrying a directory. `shapeGlob` below has the
+ * opposite rule for a good reason — a *shape* named by directory stays named by directory
+ * — but this list answers a different question: not "what could be a misplaced copy" but
+ * "where does the tool actually look". An entry declaring `nesting` is the tool saying it
+ * walks up from the file it is working on, so `packages/a/.cursor/rules/10-style.mdc` is
+ * read, not stranded. Rulegate now writes exactly those paths (T062), and before this the
+ * files it had just generated were reported as sitting where nothing reads them.
+ */
 function expand(pattern: string): string {
-  return pattern.includes('/') ? pattern : `**/${pattern}`;
+  return pattern.startsWith('**/') ? pattern : `**/${pattern}`;
 }
 
 /**

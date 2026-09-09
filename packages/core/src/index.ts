@@ -14,6 +14,7 @@ export * from './adapter/adapter.js';
 export * from './adapter/artifact.js';
 export * from './adapter/context.js';
 export * from './adapter/docs.js';
+export * from './adapter/nesting.js';
 
 export * from './fs/types.js';
 export * from './fs/paths.js';
@@ -29,6 +30,7 @@ export * from './render/markdown.js';
 export * from './render/finalize.js';
 
 export * from './parse/index.js';
+export * from './parse/nested.js';
 
 export * from './import/index.js';
 

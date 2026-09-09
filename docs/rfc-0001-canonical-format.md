@@ -174,6 +174,68 @@ positive integers. Only files with `role: 'instructions'` count toward the total
 same set `doctor` charges for — settings and permissions files are configuration, not
 context.
 
+### 4.3 Nested `.rulegate/` — normative (T061)
+
+A repository may hold more than one `.rulegate/`. Each directory containing one is a
+**level**; the repository root is the level `''`. A `.rulegate/` beneath
+`.rulegate/backup/` is a saved copy of replaced config and is **never** a level.
+
+**A nested level inherits.** Its rules are its ancestors' rules plus its own, with
+conflicts resolved by **rule id**, nearest level winning. A rule id is relative to its own
+level, so `packages/a/.rulegate/rules/10-style.md` and `.rulegate/rules/10-style.md` both
+carry the id `10-style` and the nearer one replaces the further one.
+
+Inheritance rather than replacement is not a preference. Every tool Rulegate targets walks
+up from the file it is working on and collects what it finds — `nesting` in `AdapterDocs`
+records this per tool as `nearest-wins` or `all-merged`. A self-contained nested source
+would force every package to restate the repository's conventions and would still not
+describe what the tool does at runtime.
+
+**Rules merge; the manifest does not.** `tools`, `options`, `canonicalSources` and `lint`
+come from the level's own manifest when it has one, and otherwise from the nearest
+ancestor that does. A package declaring `tools: [cursor]` means cursor — merging tool
+lists would silently re-enable an adapter the package had deliberately left out, and a
+rules-only package must not fall back to "every known tool", which is what a synthetic
+manifest would give it.
+
+**Three adapters declare no nesting at all** — aider, cline and zed, the last because its
+resolution is `first-match` and it stops at the first file it finds. Rules from a nested
+level cannot reach those tools, and a level's rules are therefore skipped for them and
+reported rather than written somewhere they would be read repository-wide.
+
+**`sync` and `check` cover the whole tree, and a level's artifacts are written under it**
+(T062). For a level at `packages/a`, each enabled tool's artifact is its ordinary path
+prefixed with the level's directory: `packages/a/CLAUDE.md`, `packages/a/.cursor/rules/*.mdc`.
+A tool is written at a nested level exactly when its managed entry carries a `nesting`
+value — that is the tool stating, with a source link and a verified version, that it reads
+that file from a subdirectory — and skipped-and-reported otherwise, per the paragraph above.
+
+Covering the tree is the **default**, not an opt-in. `state.json` is the single ownership
+record for every level, so a run that planned only the root would find every nested
+artifact recorded and unplanned, report it as an orphan, and — for `check` — exit 1 on a
+repository that is correct, or — for `sync` — delete it. `--no-recursive` restricts a run
+to the root level and accepts exactly that consequence; it exists for the case where one
+level is genuinely all you want to touch.
+
+**There is one `state.json`, at the repository root**, listing every level's artifacts by
+their prefixed paths. A per-level state would mean that deleting `packages/a/.rulegate/`
+leaves the files Rulegate wrote there with no record of who owns them, which is the one
+thing `state.json` exists to prevent.
+
+**A nested override reaching an `all-merged` tool is reported.** Gemini, Roo Code and
+Windsurf load the ancestor's file _and_ the nested one rather than resolving between them,
+so a level redefining an inherited rule id hands those tools both texts. That is a correct
+permanent property of the tool rather than a repository defect, so it is a warning
+(`W_NESTED_MERGE_CONFLICT`) and the artifacts are still written: refusing would leave the
+package with no rules at all instead of reported ones. `check` continues to own exit 1 for
+drift alone.
+
+**The repository root is the outermost canonical root**, not the nearest one. A run from
+inside `packages/a` resolves the same root as a run from the top, so the package inherits
+the repository's conventions either way and one artifact cannot have two spellings
+depending on where the command was typed. A `.git` boundary still stops the search, and
+`--cwd` is still taken literally.
+
 ## 5. `rules/*.md`
 
 Each file is Markdown with optional YAML frontmatter.
@@ -612,7 +674,7 @@ costs nothing and loses nothing.
 | **Templating / variable interpolation**                          | Turns a config format into a language, with the escaping and debugging burden that follows.                                                                                | Demonstrated need that partials cannot meet.                    |
 | **Per-tool body overrides**                                      | The 90% case is per-tool _inclusion_, already covered by `tools`. Divergent bodies per tool undercut the premise that there is one source of truth.                        | Users are demonstrably forking rules by hand to work around it. |
 | **Priority weights beyond one integer**                          | `order` plus an id tiebreak is total and predictable. Multi-key precedence is harder to reason about and no more expressive.                                               | A concrete case `order` cannot express.                         |
-| **Nested `.rulegate/`** (monorepos)                              | Needs nearest-file-wins semantics matching how each _target_ tool resolves nesting — which must be researched per tool first.                                              | T061, after the precedence rules of T025 exist.                 |
+| **Nested `.rulegate/`** (monorepos)                              | Specified in §4.3: resolution as of T061, emission and command semantics as of T062. No longer deferred.                                                                   | Shipped.                                                        |
 
 ## 14. Worked example
 

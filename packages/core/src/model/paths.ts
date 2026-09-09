@@ -18,9 +18,14 @@ export const AGENTS_MD = 'AGENTS.md';
  * that stays invisible until the cross-platform matrix goes red.
  */
 export function deriveRuleId(relPath: string): string {
-  const withoutPrefix = relPath.startsWith(`${RULES_DIR}/`)
-    ? relPath.slice(RULES_DIR.length + 1)
-    : relPath;
+  // The prefix is stripped wherever it appears, not only at the start, so a rule id is
+  // relative to **its own level**: `packages/a/.rulegate/rules/10-style.md` is `10-style`,
+  // the same id the root's `10-style` carries. That is what lets a nested source override
+  // an inherited rule (T061) — an id that embedded the package path could never collide
+  // with the rule it is meant to replace, and inheritance would silently accumulate two.
+  const marker = `${RULES_DIR}/`;
+  const idx = relPath.lastIndexOf(marker);
+  const withoutPrefix = idx === -1 ? relPath : relPath.slice(idx + marker.length);
   return withoutPrefix.replace(/\\/g, '/').replace(/\.md$/i, '').normalize('NFC');
 }
 

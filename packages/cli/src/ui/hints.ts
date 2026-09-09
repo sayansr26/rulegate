@@ -48,3 +48,14 @@ export const HINT_ORPHAN_HAND_EDITED =
 export const HINT_UNMANAGED =
   'hint: move the file aside to keep it, or run: rulegate sync --force' +
   ' (originals are copied to .rulegate/backup/ first)';
+
+/**
+ * The orphans `--no-recursive` created by excluding the levels that produce them.
+ *
+ * `HINT_SYNC` is the wrong advice here and actively dangerous: `sync --no-recursive`
+ * would take these files as orphans and delete them, because they are recorded in
+ * `state.json` and absent from a plan that deliberately did not cover their level. The
+ * files are not stale; the run simply did not look at them.
+ */
+export const HINT_NO_RECURSIVE_ORPHANS =
+  'hint: these sit under a nested .rulegate/ that --no-recursive excluded; re-run without it';

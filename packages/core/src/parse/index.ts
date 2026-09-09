@@ -1,4 +1,5 @@
 import { RulegateError } from '../model/errors.js';
+import { normalizeRelative } from '../fs/paths.js';
 import {
   CANONICAL_SCHEMA_VERSION,
   DEFAULT_MANIFEST_OPTIONS,
@@ -29,6 +30,17 @@ export interface ParseInput {
   readonly fs: ReadOnlyFileSystem;
   /** Adapter ids registered in this process, used to seed a synthetic manifest. */
   readonly knownTools?: readonly string[];
+  /**
+   * Repo-relative POSIX directory holding the `.rulegate/` to read. Root when absent.
+   *
+   * For nested canonical sources in a monorepo (T061). A prefix rather than a re-rooted
+   * filesystem because every path this function reports — `sourceFiles`, error `source`
+   * refs, the rule `path` that becomes an artifact's provenance — has to stay
+   * repo-relative. Re-rooting would make them relative to the package instead, and
+   * `state.json`, the diff and every hint would then name a path that does not exist
+   * from where the user is standing.
+   */
+  readonly dir?: string;
 }
 
 export interface ParseResult {
@@ -53,31 +65,47 @@ export async function parse(input: ParseInput): Promise<ParseResult> {
   const warnings: RulegateError[] = [];
   const sourceFiles: string[] = [];
 
-  const manifestRaw = await fs.tryReadFile(MANIFEST_PATH);
-  const ruleFiles = (await fs.glob(RULES_GLOB)).filter((p) => p.startsWith(`${RULES_DIR}/`));
+  const dir = input.dir === undefined || input.dir === '' ? '' : normalizeRelative(input.dir);
+  const at = (p: string): string => (dir === '' ? p : `${dir}/${p}`);
+
+  const manifestRaw = await fs.tryReadFile(at(MANIFEST_PATH));
+  const ruleFiles = (await fs.glob(at(RULES_GLOB))).filter((p) =>
+    p.startsWith(`${at(RULES_DIR)}/`),
+  );
 
   let mode: CanonicalMode | 'none';
   let manifest: RulegateManifest;
 
   if (manifestRaw !== undefined) {
     mode = 'rulegate-dir';
-    sourceFiles.push(MANIFEST_PATH);
+    sourceFiles.push(at(MANIFEST_PATH));
     const parsed = parseManifest(manifestRaw);
     manifest = parsed.manifest;
     errors.push(...parsed.errors);
     errors.push(...checkKnownTools(manifest, input.knownTools));
   } else if (ruleFiles.length > 0) {
     mode = 'rules-only';
-    manifest = syntheticManifest(RULES_DIR, input.knownTools ?? [], []);
+    manifest = syntheticManifest(at(RULES_DIR), input.knownTools ?? [], []);
+    // A nested level says something different from the root. The synthetic manifest is
+    // only what this function can see on its own; `resolveNested` then replaces it with
+    // the nearest ancestor's, which is the whole point of a rules-only package (T061). A
+    // message promising "every detected tool" there would describe a tool list the run
+    // does not use, and would send the reader off to write a manifest they do not need.
     warnings.push(
       new RulegateError({
         code: 'E_MANIFEST_INVALID',
-        message: `no ${MANIFEST_PATH}; assuming every detected tool is enabled`,
-        source: { file: RULES_DIR },
-        hint: `run: rulegate init  (or create ${MANIFEST_PATH})`,
+        message:
+          dir === ''
+            ? `no ${MANIFEST_PATH}; assuming every detected tool is enabled`
+            : `no ${at(MANIFEST_PATH)}; this level inherits the nearest ancestor's tool list`,
+        source: { file: at(RULES_DIR) },
+        hint:
+          dir === ''
+            ? `run: rulegate init  (or create ${MANIFEST_PATH})`
+            : `create ${at(MANIFEST_PATH)} to give this level its own tool list`,
       }),
     );
-  } else if (await fs.exists(AGENTS_MD)) {
+  } else if (dir === '' && (await fs.exists(AGENTS_MD))) {
     mode = 'bare-agents-md';
     // AGENTS.md is canonical input here, so it is registered as a protected source.
     // Without this the Codex adapter (T014) would happily overwrite the very file it
@@ -89,8 +117,8 @@ export async function parse(input: ParseInput): Promise<ParseResult> {
       errors: [
         new RulegateError({
           code: 'E_NO_CANONICAL_SOURCE',
-          message: 'no canonical source found (.rulegate/ or AGENTS.md)',
-          source: { file: '.' },
+          message: `no canonical source found (.rulegate/ or AGENTS.md)${dir === '' ? '' : ` in ${dir}`}`,
+          source: { file: dir === '' ? '.' : dir },
           hint: 'run: rulegate init',
         }),
       ],
@@ -123,9 +151,9 @@ export async function parse(input: ParseInput): Promise<ParseResult> {
   // A bare `AGENTS.md` repository has nowhere to put it and is not searched.
   const mcpServers: McpServer[] = [];
   if (mode !== 'bare-agents-md') {
-    const mcpRaw = await fs.tryReadFile(MCP_SERVERS_PATH);
+    const mcpRaw = await fs.tryReadFile(at(MCP_SERVERS_PATH));
     if (mcpRaw !== undefined) {
-      sourceFiles.push(MCP_SERVERS_PATH);
+      sourceFiles.push(at(MCP_SERVERS_PATH));
       const parsed = parseMcpServers(mcpRaw);
       mcpServers.push(...parsed.servers);
       errors.push(...parsed.errors);

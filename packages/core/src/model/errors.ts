@@ -64,7 +64,13 @@ export type RulegateErrorCode =
   // A competing rule-sync tool held something Rulegate imports rules but not everything
   // from — MCP, skills, subagents (T054). A warning: `init` completes, and the user is told
   // what did not come across rather than discovering it when a server stops working.
-  | 'W_INTEROP_NOT_IMPORTED';
+  | 'W_INTEROP_NOT_IMPORTED'
+  // A nested level redefines a rule id, for a tool that merges nested files rather than
+  // overriding them (T062). A warning: it is a correct permanent property of Gemini, Roo
+  // Code and Windsurf, not a repository defect, and `check` owns exit 1 for drift alone.
+  // Silence is the only wrong answer — the tool loads both texts and no byte comparison
+  // anywhere can see the contradiction.
+  | 'W_NESTED_MERGE_CONFLICT';
 
 export interface RulegateErrorInit {
   readonly code: RulegateErrorCode;

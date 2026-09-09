@@ -401,7 +401,7 @@ async function adapterFiles(): Promise<string[]> {
 }
 
 /**
- * Two hand-maintained copies of one package -> source map: `tsconfig.eslint.json` for the
+ * Two hand-maintained copies of one package -> source map: `tsconfig.workspace.json` for the
  * linter and `vitest.config.ts` for the runner. Both exist because `pnpm verify` runs
  * `lint` and `test` *before* `build`, so neither may resolve a workspace package through
  * its `exports` map into a `dist/` that a clean clone does not have.
@@ -423,15 +423,16 @@ describe('workspace source maps', () => {
     return key.startsWith('@') ? segments.slice(0, 2).join('/') : (segments[0] ?? key);
   }
 
-  async function eslintPaths(): Promise<Record<string, string[]>> {
-    const text = await readFile(path.join(repoRoot, 'tsconfig.eslint.json'), 'utf8');
+  async function workspacePaths(): Promise<Record<string, string[]>> {
+    const text = await readFile(path.join(repoRoot, 'tsconfig.workspace.json'), 'utf8');
     // The file is JSONC. Its comments are all whole-line, which is the only form this
     // strips; a trailing one would make `JSON.parse` throw here rather than pass quietly.
     const parsed = JSON.parse(text.replace(/^\s*\/\/.*$/gm, '')) as {
       compilerOptions?: { paths?: Record<string, string[]> };
     };
     const paths = parsed.compilerOptions?.paths;
-    if (paths === undefined) throw new Error('tsconfig.eslint.json has no compilerOptions.paths');
+    if (paths === undefined)
+      throw new Error('tsconfig.workspace.json has no compilerOptions.paths');
     return paths;
   }
 
@@ -442,8 +443,8 @@ describe('workspace source maps', () => {
       .sort();
   }
 
-  it("covers every workspace package in eslint's path map", async () => {
-    const mapped = [...new Set(Object.keys(await eslintPaths()).map(basePackage))].sort();
+  it('covers every workspace package in the workspace path map', async () => {
+    const mapped = [...new Set(Object.keys(await workspacePaths()).map(basePackage))].sort();
     expect(mapped).toEqual(await expectedNames());
   });
 
@@ -456,9 +457,9 @@ describe('workspace source maps', () => {
     expect(mapped).toEqual(await expectedNames());
   });
 
-  it('points every eslint path entry at a file that exists', async () => {
+  it('points every workspace path entry at a file that exists', async () => {
     const missing: string[] = [];
-    for (const [key, targets] of Object.entries(await eslintPaths())) {
+    for (const [key, targets] of Object.entries(await workspacePaths())) {
       for (const target of targets) {
         // A map entry left behind by a rename resolves to nothing, which reads exactly
         // like the bug above: the linter silently falls back to the `exports` map.

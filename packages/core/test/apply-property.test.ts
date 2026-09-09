@@ -75,7 +75,10 @@ function makeRepo(seed: number): Repo {
   const next = rng(seed);
   const pick = <T>(items: readonly T[]): T => items[Math.floor(next() * items.length)]!;
 
-  const fs = new MemoryFileSystem();
+  // Seeded through the constructor rather than by writing to `fs.files`, which is
+  // private. The loop below collects entries and the filesystem is built once it has
+  // finished — `makeRepo` is synchronous, so the async `writeFile` is not an option here.
+  const seeded: [string, string][] = [];
   const before = new Map<string, string>();
   const recorded = new Map<string, string>();
   const stateEntries: StateArtifact[] = [];
@@ -107,7 +110,7 @@ function makeRepo(seed: number): Repo {
     const generated = `# ${path}\n\ngenerated ${String(Math.floor(next() * 1000))}\n`;
 
     if (role === 'ours-current' || role === 'ours-edited' || role === 'absent') {
-      artifacts.push({ path, contents: generated, adapter: 'claude-code', kind: 'instructions' });
+      artifacts.push({ path, contents: generated, adapter: 'claude-code', kind: 'rules' });
     }
 
     if (
@@ -120,7 +123,7 @@ function makeRepo(seed: number): Repo {
         path,
         hash: hashContents(generated),
         adapter: 'claude-code',
-        kind: 'instructions',
+        kind: 'rules',
       });
       recorded.set(path, hashContents(generated));
     }
@@ -129,7 +132,7 @@ function makeRepo(seed: number): Repo {
         path,
         hash: hashContents(generated),
         adapter: 'claude-code',
-        kind: 'instructions',
+        kind: 'rules',
       });
       recorded.set(path, hashContents(generated));
     }
@@ -144,14 +147,15 @@ function makeRepo(seed: number): Repo {
             : undefined;
 
     if (onDisk !== undefined) {
-      fs.files.set(path, onDisk);
+      seeded.push([path, onDisk]);
       before.set(path, onDisk);
     }
   }
 
   stateEntries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   const previous: StateFile = { schemaVersion: STATE_SCHEMA_VERSION, artifacts: stateEntries };
-  fs.files.set(STATE_PATH, serializeState(previous));
+  seeded.push([STATE_PATH, serializeState(previous)]);
+  const fs = new MemoryFileSystem(seeded);
 
   const sorted = [...artifacts].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   const plan: Plan = {
@@ -159,6 +163,10 @@ function makeRepo(seed: number): Repo {
     artifacts: sorted,
     state: buildState(sorted),
     enabledAdapters: ['claude-code'],
+    // The single root level a repository without nested `.rulegate/` has (T062).
+    levels: [
+      { dir: '', skippedTools: [], ownRuleIds: [], overriddenRuleIds: [], inheritedFrom: [] },
+    ],
     errors: [],
     warnings: [],
   };
@@ -216,7 +224,7 @@ describe('non-destruction over random repository states (T020)', () => {
 
       for (const path of report.deleted) {
         expect(
-          repo.fs.files.get(`.rulegate/backup/${path}`),
+          await repo.fs.tryReadFile(`.rulegate/backup/${path}`),
           `seed ${String(seed)}: no backup for ${path}`,
         ).toBe(repo.before.get(path));
       }
@@ -232,7 +240,9 @@ describe('non-destruction over random repository states (T020)', () => {
         const wasOurs = repo.recorded.has(path);
         const wasPlanned = repo.plan.artifacts.some((a) => a.path === path);
         if (wasOurs || wasPlanned) continue;
-        expect(repo.fs.files.get(path), `seed ${String(seed)}: touched ${path}`).toBe(contents);
+        expect(await repo.fs.tryReadFile(path), `seed ${String(seed)}: touched ${path}`).toBe(
+          contents,
+        );
       }
     }
   });
@@ -243,7 +253,7 @@ describe('E_DELETE_UNRECORDED (T020)', () => {
     path: 'CLAUDE.md',
     hash: hashContents('# generated\n'),
     adapter: 'claude-code',
-    kind: 'instructions',
+    kind: 'rules',
   } as const;
 
   it('refuses a path state.json does not record, and returns the record for one it does', () => {

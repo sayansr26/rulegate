@@ -26,7 +26,7 @@
     },
     {
       "adapter": "cline",
-      "hash": "sha256:cd0b808e4e4445de775950ecd47727ef89c997695aa96040d3d78bfcc95b7505",
+      "hash": "sha256:3c7ffca395b12e27ffb87419585783760fb942dc556803c99e8cfbb1974b1a33",
       "kind": "rules",
       "path": ".clinerules/50-conventions.md"
     },
@@ -56,13 +56,13 @@
     },
     {
       "adapter": "cursor",
-      "hash": "sha256:415bbef430742efa4f5a1d11b387c2e1da847ebd7244353beadec66ca2a7bdde",
+      "hash": "sha256:1c422c6d021f3322567ab767dffea503051cc7249cc6a440f049d2e0c8fb52f8",
       "kind": "rules",
       "path": ".cursor/rules/50-conventions.mdc"
     },
     {
       "adapter": "copilot",
-      "hash": "sha256:e02cb338adf3d8b9df23541bd4999f2a54c60991ecd8ec933a9f657555e9530b",
+      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
       "kind": "rules",
       "path": ".github/copilot-instructions.md"
     },
@@ -92,13 +92,13 @@
     },
     {
       "adapter": "roo-code",
-      "hash": "sha256:cd0b808e4e4445de775950ecd47727ef89c997695aa96040d3d78bfcc95b7505",
+      "hash": "sha256:3c7ffca395b12e27ffb87419585783760fb942dc556803c99e8cfbb1974b1a33",
       "kind": "rules",
       "path": ".roo/rules/005-50-conventions.md"
     },
     {
       "adapter": "zed",
-      "hash": "sha256:e02cb338adf3d8b9df23541bd4999f2a54c60991ecd8ec933a9f657555e9530b",
+      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
       "kind": "rules",
       "path": ".rules"
     },
@@ -128,31 +128,31 @@
     },
     {
       "adapter": "windsurf",
-      "hash": "sha256:af9ec09caa38835981c05dd1e9ac79ba9b33baa4d46a2105a6bac8d02862c19f",
+      "hash": "sha256:8b287c33103c5c43774077b974cd6fa581b6128f5589565f4917e00304f66382",
       "kind": "rules",
       "path": ".windsurf/rules/50-conventions.md"
     },
     {
       "adapter": "codex",
-      "hash": "sha256:e02cb338adf3d8b9df23541bd4999f2a54c60991ecd8ec933a9f657555e9530b",
+      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
       "kind": "rules",
       "path": "AGENTS.md"
     },
     {
       "adapter": "claude-code",
-      "hash": "sha256:e02cb338adf3d8b9df23541bd4999f2a54c60991ecd8ec933a9f657555e9530b",
+      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
       "kind": "rules",
       "path": "CLAUDE.md"
     },
     {
       "adapter": "aider",
-      "hash": "sha256:e02cb338adf3d8b9df23541bd4999f2a54c60991ecd8ec933a9f657555e9530b",
+      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
       "kind": "rules",
       "path": "CONVENTIONS.md"
     },
     {
       "adapter": "gemini",
-      "hash": "sha256:e02cb338adf3d8b9df23541bd4999f2a54c60991ecd8ec933a9f657555e9530b",
+      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
       "kind": "rules",
       "path": "GEMINI.md"
     }

@@ -68,6 +68,8 @@ export function buildProgram(): Command {
     // file is a choice rather than a dead end (T051, T075).
     .option('--import', 'merge hand-edits on generated files back into .rulegate/')
     .option('--yes', 'apply the merge --import printed')
+    .option('--recursive', 'plan every nested .rulegate/ (the default when more than one exists)')
+    .option('--no-recursive', 'plan the repository root only')
     .action(
       async (
         opts: { dryRun?: boolean; force?: boolean; import?: boolean; yes?: boolean },
@@ -78,6 +80,7 @@ export function buildProgram(): Command {
         const code = await runSync({
           cwd: root,
           ...(searched ? { announceRoot: true } : {}),
+          ...recursiveOption(cmd),
           ...(opts.dryRun === undefined ? {} : { dryRun: opts.dryRun }),
           ...(opts.force === undefined ? {} : { force: opts.force }),
           ...(opts.import === undefined ? {} : { import: opts.import }),
@@ -97,12 +100,15 @@ export function buildProgram(): Command {
     .command('check')
     .description('Verify generated tool configs match .rulegate/ (read-only; exits 1 on drift)')
     .option('--staged', 'check the git index instead of the working tree (for pre-commit hooks)')
+    .option('--recursive', 'check every nested .rulegate/ (the default when more than one exists)')
+    .option('--no-recursive', 'check the repository root only')
     .action(async (opts: { staged?: boolean }, cmd: Command) => {
       const globals = cmd.optsWithGlobals<{ cwd?: string; quiet?: boolean; color?: boolean }>();
       const { root, searched } = resolveGlobalCwd(globals.cwd);
       const code = await runCheck({
         cwd: root,
         ...(searched ? { announceRoot: true } : {}),
+        ...recursiveOption(cmd),
         ...(opts.staged === undefined ? {} : { staged: opts.staged }),
         ...(globals.quiet === undefined ? {} : { quiet: globals.quiet }),
         ...(globals.color === undefined ? {} : { color: globals.color }),
@@ -200,4 +206,25 @@ export function buildProgram(): Command {
     });
 
   return program;
+}
+
+/**
+ * `--recursive` / `--no-recursive` as the three states the planner actually has.
+ *
+ * Commander folds a `--no-x` pair into one boolean and defaults it to `true`, which would
+ * make "not passed" indistinguishable from "--recursive" — and the default is not
+ * `true`, it is *unset*: cover whatever the repository has. `getOptionValueSource` is the
+ * only thing that separates the two, so the flag is read here rather than off `opts`,
+ * where the distinction has already been lost.
+ */
+function recursiveOption(cmd: Command): { recursive?: boolean } {
+  // Two ways to be unset, and both must map to `{}`. Defining `--recursive` before
+  // `--no-recursive` leaves the value `undefined` rather than commander's usual implied
+  // `true`, so a bare `=== true` coercion turns "not passed" into `recursive: false` —
+  // which is the escape hatch, not the default, and silently reintroduces every trap the
+  // default exists to avoid. Caught by running the built binary, not by the types.
+  if (cmd.getOptionValueSource('recursive') === 'default') return {};
+  const value: unknown = cmd.getOptionValue('recursive');
+  if (typeof value !== 'boolean') return {};
+  return { recursive: value };
 }

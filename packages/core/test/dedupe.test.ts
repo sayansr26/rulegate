@@ -10,9 +10,21 @@ function rule(id: string, body: string, description?: string) {
   });
 }
 
+/**
+ * An `ImportSource` carrying rules and nothing else.
+ *
+ * The MCP fields are explicit rather than optional on the interface, so a source that
+ * predates them cannot silently mean "no MCP" — `carriesMcp: false` says the tool was
+ * never asked, which is the distinction `dedupeMcpServers` is built around. Every
+ * fixture in this file goes through here: three inline literals had drifted from
+ * `ImportSource` and still compiled, because no test file was typechecked (T087).
+ */
 const source = (tool: string, ...rules: ReturnType<typeof rule>[]): ImportSource => ({
   tool,
   rules,
+  mcpServers: [],
+  carriesMcp: false,
+  mcpWarnings: [],
 });
 
 describe('dedupeImported', () => {
@@ -96,8 +108,8 @@ describe('dedupeImported', () => {
         source: { file: `${id}.md` },
       });
     const { rules } = dedupeImported([
-      { tool: 'claude-code', rules: [scoped('a', 'src/components/**')] },
-      { tool: 'cursor', rules: [scoped('b', 'src/app/**')] },
+      source('claude-code', scoped('a', 'src/components/**')),
+      source('cursor', scoped('b', 'src/app/**')),
     ]);
     expect(rules).toHaveLength(2);
   });

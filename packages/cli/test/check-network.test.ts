@@ -6,7 +6,7 @@ import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { runCheck } from '../src/commands/check.js';
 import { runSync } from '../src/commands/sync.js';
 import { ExitCode } from '../src/ui/exit.js';
@@ -20,7 +20,12 @@ const fixtures = fileURLToPath(new URL('../../../fixtures/', import.meta.url));
  */
 describe('rulegate check makes no network call', () => {
   let repo: string;
-  const spies: ReturnType<typeof vi.spyOn>[] = [];
+  // `MockInstance` is invariant in its function type, so `ReturnType<typeof vi.spyOn>`
+  // — which infers the unparameterized `(...args: unknown[]) => unknown` — rejects a spy
+  // on a real overloaded signature like `http.request`. Only two things are ever asked of
+  // these: that they were not called, and that the array can be cleared. Typing what is
+  // actually used keeps the heterogeneous list honest without an `any`.
+  const spies: MockInstance[] = [];
 
   beforeEach(async () => {
     repo = await mkdtemp(path.join(tmpdir(), 'rulegate-check-net-'));

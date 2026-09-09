@@ -11,6 +11,38 @@ const binPath = fileURLToPath(new URL('../dist/bin.js', import.meta.url));
 const fixtures = fileURLToPath(new URL('../../../fixtures/', import.meta.url));
 
 /**
+ * Run a command that is expected to fail, and normalize both outcomes to one shape.
+ *
+ * `execFile` resolves with `{ stdout, stderr }` and rejects with an error carrying
+ * `code`, so `.catch(e => e)` produces a union whose success arm has no `code` at all.
+ * Every call site here then read `.code` off that union — which typechecked nowhere,
+ * because no test file was typechecked until T087.
+ *
+ * Returning `code: 0` on success rather than casting keeps the failure honest: a command
+ * that unexpectedly succeeds now fails the `toBe(1)` assertion, instead of reading
+ * `undefined` off a value the types promised could not exist.
+ */
+interface RunResult {
+  readonly code: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+async function runFailing(...args: Parameters<typeof run>): Promise<RunResult> {
+  try {
+    const { stdout, stderr } = await run(...args);
+    // `promisify(execFile)` types these as `string | Buffer` because the encoding is an
+    // option; every call here leaves it at the utf8 default, so they are strings at
+    // runtime. Converted rather than asserted, so a future call that does pass an
+    // encoding cannot silently produce "[object Object]" in an assertion message.
+    return { code: 0, stdout: String(stdout), stderr: String(stderr) };
+  } catch (e) {
+    const err = e as { code?: number; stdout?: string; stderr?: string };
+    return { code: err.code ?? -1, stdout: err.stdout ?? '', stderr: err.stderr ?? '' };
+  }
+}
+
+/**
  * Vitest aliases @rulegate/* to source so tests run on a clean clone before a build.
  * The cost is that nothing else exercises the built output, so a broken `exports` map
  * or a bad bin shebang would stay invisible until publish day. This suite closes that
@@ -124,9 +156,7 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
       expect(stdout).toContain('in sync (5 artifacts)');
 
       await writeFile(path.join(repo, 'CLAUDE.md'), 'edited by hand\n');
-      const drifted = await run(process.execPath, [binPath, 'check'], { cwd: repo }).catch(
-        (e: { code: number; stdout: string; stderr: string }) => e,
-      );
+      const drifted = await runFailing(process.execPath, [binPath, 'check'], { cwd: repo });
       expect(drifted.code).toBe(1);
       expect(drifted.stdout).toContain('hand-edited  CLAUDE.md');
       expect(drifted.stdout).toContain('-edited by hand');
@@ -164,9 +194,9 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
       // And it exits 1, not 2, on real drift in the index — the distinction CI reads.
       await writeFile(path.join(repo, 'CLAUDE.md'), 'edited by hand, and staged\n');
       await git('add', '-A');
-      const drifted = await run(process.execPath, [binPath, 'check', '--staged'], {
+      const drifted = await runFailing(process.execPath, [binPath, 'check', '--staged'], {
         cwd: repo,
-      }).catch((e: { code: number }) => e);
+      });
       expect(drifted.code).toBe(1);
     } finally {
       await rm(repo, { recursive: true, force: true });
@@ -186,9 +216,7 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
     delete env['INPUT_ANNOTATIONS'];
     try {
       await cp(path.join(fixtures, 'cursor/input'), repo, { recursive: true });
-      const drifted = await run(process.execPath, [actionMain], { cwd: repo, env }).catch(
-        (e: { code: number; stdout: string }) => e,
-      );
+      const drifted = await runFailing(process.execPath, [actionMain], { cwd: repo, env });
       expect(drifted.code).toBe(1);
       // Annotations are on by default, and they name a real file. `check`'s own output
       // says nothing GitHub can place on a diff, so this is the only assertion that the

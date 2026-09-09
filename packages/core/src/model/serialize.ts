@@ -51,6 +51,14 @@ function serializeManifest(canonical: Canonical): string {
   if (manifest.options.backup !== DEFAULT_MANIFEST_OPTIONS.backup) {
     options['backup'] = manifest.options.backup;
   }
+  // T086. This was missing while `marker` and `backup` were emitted, so a manifest
+  // carrying an `ignore` lost it through any model -> serialize -> parse trip — including
+  // the one `init` writes through. The round-trip test could not see it: its fixture uses
+  // `DEFAULT_MANIFEST_OPTIONS`, so the trip held whether or not the key was written. The
+  // guard against a third instance is a test with a **non-default** value, not vigilance.
+  if (manifest.options.ignore.length > 0) {
+    options['ignore'] = [...manifest.options.ignore];
+  }
   if (Object.keys(options).length > 0) doc['options'] = options;
 
   if (manifest.canonicalSources.length > 0) {

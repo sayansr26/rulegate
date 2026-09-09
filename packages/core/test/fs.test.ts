@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryFileSystem } from '../src/io/memory.js';
 import { escapesRoot, normalizeRelative } from '../src/fs/paths.js';
-import { matchesGlob } from '../src/fs/glob.js';
+import { literalPrefix, matchesGlob, mayContain } from '../src/fs/glob.js';
 import { ensureSingleTrailingNewline, normalizeText } from '../src/render/eol.js';
 
 describe('path safety', () => {
@@ -31,6 +31,61 @@ describe('glob', () => {
     ['src/nested/a.ts', 'src/*.ts', false],
   ])('matchesGlob(%s, %s) === %s', (p, pattern, expected) => {
     expect(matchesGlob(p, pattern)).toBe(expected);
+  });
+
+  /**
+   * `literalPrefix` and `mayContain` let the walker skip subtrees. Being wrong costs a
+   * *missing* file rather than a slow one — a rule that silently never renders — so the
+   * pruning is pinned separately from the matcher it optimises.
+   */
+  it.each([
+    ['packages/a/.rulegate/rules/**/*.md', 'packages/a/.rulegate/rules'],
+    ['.rulegate/rules/**/*.md', '.rulegate/rules'],
+    ['**/.rulegate/rulegate.yaml', ''],
+    ['CLAUDE.md', ''],
+    // A wildcard segment narrows nothing safely: which directory it names is not known
+    // until the directory is read.
+    ['packages/*/rules/*.md', 'packages'],
+    ['.cursor/rules/*.mdc', '.cursor/rules'],
+  ])('literalPrefix(%s) === %s', (pattern, expected) => {
+    expect(literalPrefix(pattern)).toBe(expected);
+  });
+
+  it.each([
+    // On the way down to the prefix.
+    ['packages', 'packages/a/.rulegate/rules', true],
+    ['packages/a', 'packages/a/.rulegate/rules', true],
+    // At or below it.
+    ['packages/a/.rulegate/rules', 'packages/a/.rulegate/rules', true],
+    ['packages/a/.rulegate/rules/nested', 'packages/a/.rulegate/rules', true],
+    // A different branch entirely.
+    ['packages/b', 'packages/a/.rulegate/rules', false],
+    ['docs', 'packages/a/.rulegate/rules', false],
+    // The near-miss that a `startsWith` without the separator would get wrong.
+    ['packages/ab', 'packages/a/.rulegate/rules', false],
+    // No prefix means no pruning at all.
+    ['anything/at/all', '', true],
+  ])('mayContain(%s, %s) === %s', (dir, prefix, expected) => {
+    expect(mayContain(dir, prefix)).toBe(expected);
+  });
+
+  it('finds the same files with pruning as an unpruned walk would', async () => {
+    const fs = new MemoryFileSystem([
+      ['.rulegate/rules/10-style.md', 'a'],
+      ['.rulegate/rules/nested/20-deep.md', 'b'],
+      ['packages/a/.rulegate/rules/30-a.md', 'c'],
+      ['packages/ab/.rulegate/rules/40-ab.md', 'd'],
+      ['docs/readme.md', 'e'],
+    ]);
+
+    expect(await fs.glob('packages/a/.rulegate/rules/**/*.md')).toEqual([
+      'packages/a/.rulegate/rules/30-a.md',
+    ]);
+    expect(await fs.glob('.rulegate/rules/**/*.md')).toEqual([
+      '.rulegate/rules/10-style.md',
+      '.rulegate/rules/nested/20-deep.md',
+    ]);
+    expect((await fs.glob('**/.rulegate/rules/**/*.md')).length).toBe(4);
   });
 });
 
