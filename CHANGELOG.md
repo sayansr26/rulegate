@@ -5,7 +5,58 @@ All notable changes to this project are recorded here. This project follows
 
 ## [Unreleased]
 
-## [0.2.0] — unreleased
+## [0.3.0] — unreleased
+
+### Breaking
+
+- **`.codex/config.toml` now writes `env_http_headers` instead of `bearer_token_env_var`, and
+  the environment variable's contents must change with it.** Codex supplies the `Bearer `
+  scheme for `bearer_token_env_var` itself, so that variable held a _bare token_ — while every
+  other tool substitutes the same canonical header reference as the header's whole value, so
+  its variable held `Bearer <token>`. One entry in `.rulegate/mcp/servers.yaml` could not be
+  right for both, and whichever way you had set the variable, one of your tools was sending
+  `Bearer Bearer …` or a token with no scheme.
+
+  **To migrate**: run `rulegate sync`, which rewrites the file — `check` reports it as _stale_,
+  not hand-edited, and prints the diff first. Then **change the variable itself** to hold the
+  full `Bearer <token>`. `check` can show you the key moving; it cannot see that a value's
+  meaning moved with it, so this is the one step nothing will remind you about.
+
+  Only repositories whose MCP servers carry an `Authorization` header _and_ enable the `codex`
+  adapter are affected. A side benefit: references now work in **any** header, not just
+  `Authorization`, so a server Rulegate used to omit from Codex's config is now written.
+
+### Fixed
+
+- **`init` warns before a credential can be committed.** Taking ownership of a file copies it
+  verbatim to `.rulegate/backup/` — which is what lets `restore` return a CRLF or BOM original
+  byte for byte — and for an `.mcp.json` holding a token, that copy is a plaintext credential
+  inside the directory you are told to commit. `W_BACKUP_SECRET` fires when the file holds a
+  literal credential and `.gitignore` does not already cover the backup path. It stays silent
+  when your ignore rules already cover it, and it never quotes the credential.
+- **A Cursor `globs: ["**/*.py"]` flow sequence imported as one literal glob** whose text was
+  the sequence syntax itself, brackets and quotes included — so a rule scoped to Python files
+  matched nothing, while `init` reported success and `check` reported in sync. All four
+  spellings Cursor accepts now import identically. A glob containing a character class
+  (`src/[abc]*.ts`) is untouched.
+- **`doctor` counted Rulegate's own backup as one of a tool's configuration files.** A nested
+  pattern such as `**/GEMINI.md` matched `.rulegate/backup/GEMINI.md`, which put a backup and a
+  real artifact in one row, reported that row as `unmanaged`, and billed the tokens twice. Both
+  Claude Code's and Gemini's file counts were wrong on a monorepo.
+- **`rulegate adapter new` scaffolded every adapter at a hardcoded `0.0.0`**, which made a
+  newly scaffolded adapter a version island the moment the workspace released.
+
+### Known limitations
+
+- **A tool that scans subdirectories will read `.rulegate/backup/`.** Gemini walks below the
+  working directory honouring only `.gitignore` and `.geminiignore`, so unless you have ignored
+  `.rulegate/`, the pre-Rulegate copy of your rules is delivered to the model alongside the
+  generated one. Adding `.rulegate/backup/` to `.gitignore` fixes both this and the credential
+  exposure above. A built-in answer is still being decided.
+- **No unaided external first run yet**, and cold install is proven on macOS and Linux only —
+  Windows is unverified and the Windows CI matrix has never run.
+
+## [0.2.0] — 2026-09-20
 
 Upgrading from `0.0.0` is the only upgrade path there is: `0.1.0` was never published and
 never will be.
@@ -65,5 +116,6 @@ never will be.
 - `AGENTS.md` sits at Windsurf's per-file cap with no headroom; the lint rule reports it, the
   adapter does not yet do anything about it.
 
-[unreleased]: https://github.com/sayansr26/rulegate/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/sayansr26/rulegate/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sayansr26/rulegate/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sayansr26/rulegate/compare/v0.0.0...v0.2.0

@@ -49,12 +49,14 @@ describe('parseToml — T048', () => {
 });
 
 describe('importConfigToml — T048', () => {
-  it('inverts env_vars and bearer_token_env_var back into references', () => {
+  it('inverts env_vars and env_http_headers back into references', () => {
     const { servers } = importConfigToml(
       [
         '[mcp_servers.gh]',
         'url = "https://api.githubcopilot.com/mcp"',
-        'bearer_token_env_var = "GITHUB_TOKEN"',
+        '',
+        '[mcp_servers.gh.env_http_headers]',
+        'Authorization = "GITHUB_TOKEN"',
         '',
         '[mcp_servers.pg]',
         'command = "uvx"',
@@ -67,13 +69,40 @@ describe('importConfigToml — T048', () => {
     expect(servers[1]!.env['PGPASSWORD']).toEqual({ kind: 'env', name: 'PGPASSWORD' });
   });
 
+  /**
+   * T096. `bearer_token_env_var` names a variable holding a *bare* token, because Codex
+   * supplies the `Bearer ` scheme itself. Canonical headers hold a whole value, so importing
+   * it as `Authorization: env:X` would hand every other tool a token with no scheme — a
+   * server that starts and fails to authenticate. That is the silent-wrong-answer case this
+   * codebase refuses rather than warns about, so the header is not imported and the key is
+   * preserved verbatim instead.
+   */
+  it('does not invent an Authorization header out of `bearer_token_env_var`', () => {
+    const { servers, warnings } = importConfigToml(
+      [
+        '[mcp_servers.gh]',
+        'url = "https://api.githubcopilot.com/mcp"',
+        'bearer_token_env_var = "GITHUB_TOKEN"',
+      ].join('\n'),
+      FILE,
+    );
+    expect(servers[0]!.headers).toEqual({});
+    // Preserved, not dropped: the value still round-trips through `unknown`.
+    expect(servers[0]!.unknown['bearer_token_env_var']).toBe('GITHUB_TOKEN');
+    expect(warnings.join('\n')).toContain('bearer_token_env_var');
+  });
+
   it('round-trips what the writer produces', () => {
     // The strongest available check that reader and writer agree, and the one that would
     // catch either drifting from the other.
     const { servers } = importConfigToml(
-      ['[mcp_servers.gh]', 'url = "https://x.test/mcp"', 'bearer_token_env_var = "TOKEN"'].join(
-        '\n',
-      ),
+      [
+        '[mcp_servers.gh]',
+        'url = "https://x.test/mcp"',
+        '',
+        '[mcp_servers.gh.env_http_headers]',
+        'Authorization = "TOKEN"',
+      ].join('\n'),
       FILE,
     );
     const rendered = renderConfigToml(servers, false);

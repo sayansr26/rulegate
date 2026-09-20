@@ -11135,6 +11135,11 @@ var SECRET_WORDS = [
   "bearer"
 ];
 var ENV_VAR_NAME_SUFFIXES = ["envvar", "envvariable", "envvarname"];
+var ENV_VAR_NAME_SECTIONS = ["envhttpheaders"];
+function sectionNamesEnvVars(header) {
+  const last = header.split(".").pop() ?? "";
+  return ENV_VAR_NAME_SECTIONS.includes(last.toLowerCase().replace(/[^a-z0-9]/g, ""));
+}
 function namesEnvVar(flatKey) {
   return ENV_VAR_NAME_SUFFIXES.some((suffix) => flatKey.endsWith(suffix));
 }
@@ -11213,7 +11218,13 @@ function findLiteralSecrets(value, prefix) {
 }
 function scanTextForSecrets(text) {
   const found = [];
+  let inEnvVarSection = false;
   text.split("\n").forEach((line, i) => {
+    const header = /^\s*\[([^\]]+)\]\s*$/.exec(line);
+    if (header) {
+      inEnvVarSection = sectionNamesEnvVars(header[1]);
+      return;
+    }
     const label = `line ${String(i + 1)}`;
     if (TOKEN_PATTERNS.some((re) => re.test(line))) {
       found.push(label);
@@ -11221,6 +11232,8 @@ function scanTextForSecrets(text) {
     }
     const pair = /["']?([A-Za-z0-9_\-.]+)["']?\s*[:=]\s*(?:"([^"]*)"|'([^']*)'|([^\s,}\]]+))/.exec(line);
     const value = pair?.[2] ?? pair?.[3] ?? pair?.[4];
+    if (inEnvVarSection)
+      return;
     if (pair && value !== void 0 && isLiteralSecret(pair[1], value))
       found.push(label);
   });
@@ -12200,6 +12213,80 @@ async function loadState(fs2) {
 }
 var EMPTY_STATE = { schemaVersion: STATE_SCHEMA_VERSION, artifacts: [] };
 
+// ../packages/core/dist/fs/case.js
+function foldPath(relPath) {
+  return relPath.toLowerCase();
+}
+function pathKeyFor(caseInsensitive) {
+  return caseInsensitive ? foldPath : (relPath) => relPath;
+}
+function flipCase(name) {
+  let flipped = "";
+  for (const char of name) {
+    const lower = char.toLowerCase();
+    const upper = char.toUpperCase();
+    flipped += char === lower ? upper : lower;
+  }
+  return flipped;
+}
+async function probeCaseInsensitive(fs2) {
+  let entries;
+  try {
+    entries = await fs2.listDir("");
+  } catch {
+    return false;
+  }
+  const listed = new Set(entries.map((e) => e.name));
+  for (const entry of entries) {
+    if (entry.kind !== "file")
+      continue;
+    const flipped = flipCase(entry.name);
+    if (listed.has(flipped))
+      continue;
+    return await fs2.exists(flipped);
+  }
+  return false;
+}
+
+// ../packages/core/dist/state/compare.js
+async function compareToDisk(state, artifacts, fs2) {
+  const unchanged = [];
+  const changed = [];
+  const missing = [];
+  const untracked = [];
+  const unmanaged = [];
+  const caseInsensitive = await probeCaseInsensitive(fs2);
+  const key = pathKeyFor(caseInsensitive);
+  const planned = new Set(artifacts.map((a) => key(a.path)));
+  const recorded = new Map(state.artifacts.map((a) => [key(a.path), a]));
+  for (const artifact of artifacts) {
+    const onDisk = await fs2.tryReadFile(artifact.path);
+    const record = recorded.get(key(artifact.path));
+    if (onDisk === void 0) {
+      (record === void 0 ? untracked : missing).push(artifact.path);
+      continue;
+    }
+    const diskHash = hashContents(onDisk);
+    if (record === void 0) {
+      (diskHash === hashContents(artifact.contents) ? unchanged : unmanaged).push(artifact.path);
+    } else if (diskHash !== record.hash) {
+      changed.push(artifact.path);
+    } else {
+      unchanged.push(artifact.path);
+    }
+  }
+  const orphaned = state.artifacts.map((a) => a.path).filter((p) => !planned.has(key(p)));
+  return {
+    unchanged: unchanged.sort(compareCodepoint),
+    changed: changed.sort(compareCodepoint),
+    missing: missing.sort(compareCodepoint),
+    untracked: untracked.sort(compareCodepoint),
+    unmanaged: unmanaged.sort(compareCodepoint),
+    orphaned: [...orphaned].sort(compareCodepoint),
+    caseInsensitive
+  };
+}
+
 // ../packages/core/dist/pipeline/plan.js
 async function computePlan(input) {
   const { fs: fs2, repoRoot, adapters } = input;
@@ -12368,80 +12455,6 @@ function allMergedWarnings(level, eligible) {
 }
 function describe2(cause) {
   return cause instanceof Error ? cause.message : String(cause);
-}
-
-// ../packages/core/dist/fs/case.js
-function foldPath(relPath) {
-  return relPath.toLowerCase();
-}
-function pathKeyFor(caseInsensitive) {
-  return caseInsensitive ? foldPath : (relPath) => relPath;
-}
-function flipCase(name) {
-  let flipped = "";
-  for (const char of name) {
-    const lower = char.toLowerCase();
-    const upper = char.toUpperCase();
-    flipped += char === lower ? upper : lower;
-  }
-  return flipped;
-}
-async function probeCaseInsensitive(fs2) {
-  let entries;
-  try {
-    entries = await fs2.listDir("");
-  } catch {
-    return false;
-  }
-  const listed = new Set(entries.map((e) => e.name));
-  for (const entry of entries) {
-    if (entry.kind !== "file")
-      continue;
-    const flipped = flipCase(entry.name);
-    if (listed.has(flipped))
-      continue;
-    return await fs2.exists(flipped);
-  }
-  return false;
-}
-
-// ../packages/core/dist/state/compare.js
-async function compareToDisk(state, artifacts, fs2) {
-  const unchanged = [];
-  const changed = [];
-  const missing = [];
-  const untracked = [];
-  const unmanaged = [];
-  const caseInsensitive = await probeCaseInsensitive(fs2);
-  const key = pathKeyFor(caseInsensitive);
-  const planned = new Set(artifacts.map((a) => key(a.path)));
-  const recorded = new Map(state.artifacts.map((a) => [key(a.path), a]));
-  for (const artifact of artifacts) {
-    const onDisk = await fs2.tryReadFile(artifact.path);
-    const record = recorded.get(key(artifact.path));
-    if (onDisk === void 0) {
-      (record === void 0 ? untracked : missing).push(artifact.path);
-      continue;
-    }
-    const diskHash = hashContents(onDisk);
-    if (record === void 0) {
-      (diskHash === hashContents(artifact.contents) ? unchanged : unmanaged).push(artifact.path);
-    } else if (diskHash !== record.hash) {
-      changed.push(artifact.path);
-    } else {
-      unchanged.push(artifact.path);
-    }
-  }
-  const orphaned = state.artifacts.map((a) => a.path).filter((p) => !planned.has(key(p)));
-  return {
-    unchanged: unchanged.sort(compareCodepoint),
-    changed: changed.sort(compareCodepoint),
-    missing: missing.sort(compareCodepoint),
-    untracked: untracked.sort(compareCodepoint),
-    unmanaged: unmanaged.sort(compareCodepoint),
-    orphaned: [...orphaned].sort(compareCodepoint),
-    caseInsensitive
-  };
 }
 
 // ../packages/core/dist/pipeline/verify.js
@@ -13862,7 +13875,7 @@ var TABLE = "mcp_servers";
 function isSkipped(value) {
   return value.kind === "skipped";
 }
-function serverTable(server) {
+function serverTable(server, envHttpHeaders) {
   const body = { ...server.unknown };
   const { transport } = server;
   if (transport.kind === "stdio") {
@@ -13886,16 +13899,8 @@ function serverTable(server) {
       body["env_vars"] = forwarded.sort();
   } else {
     body["url"] = transport.url;
-    for (const key of Object.keys(server.headers)) {
-      if (key.toLowerCase() !== "authorization") {
-        return {
-          kind: "skipped",
-          id: server.id,
-          why: `header ${key} cannot hold an environment reference; Codex resolves only Authorization, as bearer_token_env_var`,
-          hint: "move the credential to the Authorization header, or exclude codex from this server with a `tools:` selector"
-        };
-      }
-      body["bearer_token_env_var"] = server.headers[key].name;
+    for (const key of Object.keys(server.headers).sort(compareCodepoint)) {
+      envHttpHeaders[key] = server.headers[key].name;
     }
   }
   return body;
@@ -13907,12 +13912,16 @@ function renderConfigToml(servers, marker) {
   const tables = [];
   const skipped = [];
   for (const server of selected) {
-    const body2 = serverTable(server);
+    const envHttpHeaders = {};
+    const body2 = serverTable(server, envHttpHeaders);
     if (isSkipped(body2)) {
       skipped.push(body2);
       continue;
     }
     tables.push(tomlTable([TABLE, server.id], body2));
+    if (Object.keys(envHttpHeaders).length > 0) {
+      tables.push(tomlTable([TABLE, server.id, ENV_HEADERS], envHttpHeaders));
+    }
   }
   if (tables.length === 0)
     return "";
@@ -13921,12 +13930,19 @@ function renderConfigToml(servers, marker) {
   const body = [...notes, ...tables].join("\n\n");
   return withHashMarker(body, marker);
 }
-var INTERPRETED2 = /* @__PURE__ */ new Set(["command", "args", "url", "env_vars", "bearer_token_env_var"]);
+var ENV_HEADERS = "env_http_headers";
+var INTERPRETED2 = /* @__PURE__ */ new Set(["command", "args", "url", "env_vars", ENV_HEADERS]);
 function importConfigToml(contents, file = MCP_FILE2) {
   const tables = parseToml(contents);
   const servers = [];
   const warnings = [];
   const foreign = /* @__PURE__ */ new Set();
+  const envHeaderTables = /* @__PURE__ */ new Map();
+  for (const table of tables) {
+    if (table.path.length === 3 && table.path[0] === TABLE && table.path[2] === ENV_HEADERS) {
+      envHeaderTables.set(table.path[1], table.entries);
+    }
+  }
   for (const table of tables) {
     if (table.path.length === 0) {
       if (Object.keys(table.entries).length > 0)
@@ -13974,9 +13990,13 @@ function importConfigToml(contents, file = MCP_FILE2) {
         env[name] = envRef(name);
     }
     const headers = {};
-    const bearer = entries["bearer_token_env_var"];
-    if (typeof bearer === "string")
-      headers["Authorization"] = envRef(bearer);
+    for (const [name, variable] of Object.entries(envHeaderTables.get(id) ?? {})) {
+      if (typeof variable === "string")
+        headers[name] = envRef(variable);
+    }
+    if (typeof entries["bearer_token_env_var"] === "string") {
+      warnings.push(`${file}: server \`${id}\` uses \`bearer_token_env_var\`, where Codex supplies the \`Bearer \` scheme itself. Canonical headers hold a whole value, so importing it would send other tools a token with no scheme \u2014 the reference is kept verbatim and no \`Authorization\` header was imported. Re-express it as \`env_http_headers\` with the full \`Bearer <token>\` in the variable if you want it shared.`);
+    }
     const unknown = {};
     for (const key of Object.keys(entries).sort()) {
       if (!INTERPRETED2.has(key))
@@ -14073,7 +14093,7 @@ var docs4 = {
   notes: [
     {
       level: "warn",
-      message: "A server Codex cannot express is omitted from .codex/config.toml and named in it as a `# omitted:` comment, rather than failing the run (T083). Codex resolves environment references only through env_vars (which needs the variable and the key to share a name) and bearer_token_env_var (Authorization only), so a renamed reference or a credential in another header has nowhere to go. Check the top of the generated file if a server you configured is missing.",
+      message: "A server Codex cannot express is omitted from .codex/config.toml and named in it as a `# omitted:` comment, rather than failing the run (T083). The remaining case is `env`: Codex forwards variables through `env_vars`, which names one string that is both the key and the variable, so a renamed reference such as `API_KEY: env:MY_TOKEN` has nowhere to go. Headers no longer hit this \u2014 they are written as `env_http_headers`, which takes any header name (T096). Check the top of the generated file if a server you configured is missing.",
       source: CODEX_MCP_DOCS
     },
     {
@@ -14083,7 +14103,7 @@ var docs4 = {
     },
     {
       level: "warn",
-      message: 'Codex has no variable substitution anywhere in config.toml, so an `env:NAME` reference cannot be written as a value the way `${NAME}` and `${env:NAME}` are elsewhere \u2014 it has to become a different key. `env: { NAME: env:NAME }` becomes `env_vars = ["NAME"]`, and an Authorization header becomes `bearer_token_env_var`. A reference those two keys cannot express \u2014 a renamed variable, or any other header \u2014 is refused rather than dropped: a credential that never arrives is a server that starts and fails to authenticate.',
+      message: 'Codex has no variable substitution anywhere in config.toml, so an `env:NAME` reference cannot be written as a value the way `${NAME}` and `${env:NAME}` are elsewhere \u2014 it has to become a different key. `env: { NAME: env:NAME }` becomes `env_vars = ["NAME"]`, and `headers: { Name: env:X }` becomes `env_http_headers = { Name = "X" }`. Rulegate does not write `bearer_token_env_var`: Codex supplies the `Bearer ` scheme for it, so that variable holds a bare token while every other tool needs the whole header value, and one canonical entry cannot mean both (T096). A reference `env_vars` cannot express \u2014 a renamed variable \u2014 is refused rather than dropped: a credential that never arrives is a server that starts and fails to authenticate.',
       source: CODEX_MCP_DOCS
     },
     {
@@ -14642,7 +14662,14 @@ function parseMdc(contents) {
   };
 }
 function splitGlobs(value) {
-  return value.split(",").map((part) => part.trim()).filter((part) => part !== "");
+  const trimmed = value.trim();
+  const flow = trimmed.startsWith("[") && trimmed.endsWith("]");
+  const inner = flow ? trimmed.slice(1, -1) : trimmed;
+  return inner.split(",").map((part) => unquote2(part.trim())).filter((part) => part !== "");
+}
+function unquote2(part) {
+  const quoted = part.length >= 2 && (part.startsWith('"') || part.startsWith("'")) && part.endsWith(part[0]);
+  return quoted ? part.slice(1, -1) : part;
 }
 function joinBody3(lines) {
   const body = stripMarker(lines.join("\n")).replace(/^\n+/, "").replace(/\n+$/, "");

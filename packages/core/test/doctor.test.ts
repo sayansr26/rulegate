@@ -186,6 +186,34 @@ describe('buildDoctorReport — resolution', () => {
     expect(probed.globalProbed).toBe(true);
     expect(probed.tools[0]?.files[0]?.status).toBe('absent');
   });
+  /**
+   * T097. A nested walk is a walk over the *user's* tree. `.rulegate/` is Rulegate's own
+   * directory, and `.rulegate/backup/GEMINI.md` — the copy `init` took of the original —
+   * matches `**` + `/GEMINI.md` exactly. Counting it put a backup and a real artifact in one
+   * row, which made the row's aggregate status `unmanaged` for a file Rulegate had generated,
+   * and billed the user for the same rules twice.
+   */
+  it('never walks into .rulegate/ when resolving a nested pattern', async () => {
+    const r = await report(
+      [
+        ['GEMINI.md', 'root rules'],
+        ['packages/api/GEMINI.md', 'nested rules'],
+        ['.rulegate/backup/GEMINI.md', 'the original, kept for restore'],
+      ],
+      [
+        stub({
+          name: 'gemini',
+          files: [entry('GEMINI.md', { scope: 'nested', nesting: 'all-merged' })],
+        }),
+      ],
+    );
+
+    const paths = r.tools[0]?.files[0]?.paths ?? [];
+    expect(paths).toEqual(['GEMINI.md', 'packages/api/GEMINI.md']);
+    // The vacuity guard: the backup really is on disk, so an empty result would pass the
+    // assertion above for the wrong reason.
+    expect(paths).toHaveLength(2);
+  });
 });
 
 describe('buildDoctorReport — warnings', () => {

@@ -65,6 +65,13 @@ export type RulegateErrorCode =
   // from — MCP, skills, subagents (T054). A warning: `init` completes, and the user is told
   // what did not come across rather than discovering it when a server stops working.
   | 'W_INTEROP_NOT_IMPORTED'
+  // Taking ownership of a file that holds a literal credential copies it verbatim into
+  // `.rulegate/backup/`, and `.rulegate/` is the canonical source users are told to commit
+  // (T095). A **warning**, not an error: the copy is what makes `restore` faithful, the
+  // credential was already on disk, and refusing to onboard a repository over its own
+  // existing file would be T077's shape again. Reported only when `.gitignore` does not
+  // already cover the backup, so a repository that is fine hears nothing.
+  | 'W_BACKUP_SECRET'
   // A nested level redefines a rule id, for a tool that merges nested files rather than
   // overriding them (T062). A warning: it is a correct permanent property of Gemini, Roo
   // Code and Windsurf, not a repository defect, and `check` owns exit 1 for drift alone.

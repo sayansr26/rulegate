@@ -8,6 +8,7 @@ import {
   type McpServer,
   type McpTransport,
   type SecretValue,
+  compareCodepoint,
 } from '@rulegate/adapter-kit';
 import { tomlTable } from './toml.js';
 import { parseToml } from './toml-read.js';
@@ -73,8 +74,11 @@ interface Skipped {
  *   the variable name are the same string. A **renamed** reference — `API_KEY: env:MY_TOKEN`
  *   — has no form here: `[mcp_servers.x.env]` takes literal values, and writing the
  *   reference through would hand the server the text `env:MY_TOKEN` as its credential.
- * - `headers: { Authorization: env:X }` becomes `bearer_token_env_var = "X"`. That is the
- *   only header Codex resolves from the environment; `http_headers` holds static values.
+ * - `headers: { Name: env:X }` becomes `env_http_headers = { Name = "X" }`, which sets the
+ *   header to the raw value of `X` — the same thing a canonical header reference means
+ *   everywhere else. Not `bearer_token_env_var`, which Codex expands to `Authorization:
+ *   Bearer $X` and so needs the bare token while every other writer needs the whole value
+ *   (T096). `http_headers` holds static values and is not used for references.
  *
  * Both inexpressible cases are **refused** rather than dropped, on the split this codebase
  * already uses: a loss that is still functional is a `warn` note (Cursor's `sse`), and a
@@ -85,7 +89,10 @@ interface Skipped {
  * Source: https://learn.chatgpt.com/docs/config-file/config-reference and
  * https://learn.chatgpt.com/docs/extend/mcp (both read 2026-09-04).
  */
-function serverTable(server: McpServer): Record<string, JsonValue> | Skipped {
+function serverTable(
+  server: McpServer,
+  envHttpHeaders: Record<string, JsonValue>,
+): Record<string, JsonValue> | Skipped {
   // Unknown keys first, interpreted keys second — the same ordering as the two JSON
   // writers, so a preserved key can never override one Rulegate computed.
   const body: Record<string, JsonValue> = { ...server.unknown };
@@ -117,16 +124,29 @@ function serverTable(server: McpServer): Record<string, JsonValue> | Skipped {
     // still a working server, so it is a `warn` note in `docs` rather than a refusal.
     body['url'] = transport.url;
 
-    for (const key of Object.keys(server.headers)) {
-      if (key.toLowerCase() !== 'authorization') {
-        return {
-          kind: 'skipped',
-          id: server.id,
-          why: `header ${key} cannot hold an environment reference; Codex resolves only Authorization, as bearer_token_env_var`,
-          hint: 'move the credential to the Authorization header, or exclude codex from this server with a `tools:` selector',
-        };
-      }
-      body['bearer_token_env_var'] = server.headers[key]!.name;
+    // `env_http_headers` rather than `bearer_token_env_var`, and the difference is a
+    // correctness bug, not a preference (T096). Codex expands `bearer_token_env_var = "X"`
+    // to `Authorization: Bearer $X` — it supplies the scheme, so X must hold the bare
+    // token. Every other writer renders a canonical header reference as the header's whole
+    // value: `.mcp.json` emits `"Authorization": "${X}"`, so X must hold `Bearer <token>`.
+    // One canonical `Authorization: env:X` therefore could not be right for both tools;
+    // whichever way the user set X, one of them sent `Bearer Bearer …` or a bare token with
+    // no scheme. `env_http_headers = { Name = "X" }` sets the header to the *raw* value of
+    // X, which is exactly what `headers: Record<string, EnvRef>` already means, so the two
+    // agree with no change to the model.
+    //
+    // It also removes the reason this branch used to refuse: Codex resolves any header name
+    // this way, not just Authorization.
+    //
+    // Source: `build_default_headers` in codex-rs/rmcp-client/src/utils.rs and
+    // `attach_authorization` in codex-rs/codex-mcp/src/executor_environment_http_client.rs,
+    // both read 2026-09-20.
+    // Returned to the caller rather than written into `body`: TOML spells a map as its own
+    // sub-table, and `tomlValue` refuses a nested object on purpose — relocating a
+    // *preserved* key would move it somewhere the user did not put it. This key is one
+    // Rulegate interprets, so its placement is Rulegate's to choose.
+    for (const key of Object.keys(server.headers).sort(compareCodepoint)) {
+      envHttpHeaders[key] = server.headers[key]!.name;
     }
   }
 
@@ -152,12 +172,19 @@ export function renderConfigToml(servers: readonly McpServer[], marker: boolean)
   const skipped: Skipped[] = [];
 
   for (const server of selected) {
-    const body = serverTable(server);
+    const envHttpHeaders: Record<string, JsonValue> = {};
+    const body = serverTable(server, envHttpHeaders);
     if (isSkipped(body)) {
       skipped.push(body);
       continue;
     }
     tables.push(tomlTable([TABLE, server.id], body));
+    // Immediately after its parent. TOML identifies a sub-table by its dotted path, not by
+    // where it sits, so this is readability rather than correctness — but a headers table
+    // separated from its server by two others is a file nobody can check by eye.
+    if (Object.keys(envHttpHeaders).length > 0) {
+      tables.push(tomlTable([TABLE, server.id, ENV_HEADERS], envHttpHeaders));
+    }
   }
 
   // Every server refused, and nothing else to write. Emitting a file of nothing but
@@ -181,14 +208,19 @@ export function unrepresentableServers(
 ): readonly { id: string; why: string; hint: string }[] {
   const out: Skipped[] = [];
   for (const server of selectMcpServers(servers, 'codex')) {
-    const result = serverTable(server);
+    // The sub-table is collected and discarded: this caller reports refusals and renders
+    // nothing, so where the headers would have gone does not matter to it.
+    const result = serverTable(server, {});
     if (isSkipped(result)) out.push(result);
   }
   return out;
 }
 
+/** The sub-table holding this server's header references, written and read by both halves. */
+const ENV_HEADERS = 'env_http_headers';
+
 /** Keys `serverTable` writes and this reader interprets; everything else is preserved. */
-const INTERPRETED = new Set(['command', 'args', 'url', 'env_vars', 'bearer_token_env_var']);
+const INTERPRETED = new Set(['command', 'args', 'url', 'env_vars', ENV_HEADERS]);
 
 /**
  * The inverse of `renderConfigToml`, and the one importer that is not reading JSON.
@@ -197,7 +229,8 @@ const INTERPRETED = new Set(['command', 'args', 'url', 'env_vars', 'bearer_token
  * reference is not a value to unwrap but a *key* to invert. `env_vars = ["NAME"]` becomes
  * `env: { NAME: env:NAME }` — the map key and the variable name are necessarily the same
  * string, which is exactly why the writer refuses a renamed reference — and
- * `bearer_token_env_var = "X"` becomes `headers: { Authorization: env:X }`.
+ * `env_http_headers = { Name = "X" }` becomes `headers: { Name: env:X }`.
+ * `bearer_token_env_var` is preserved in `unknown` and reported rather than imported (T096).
  *
  * Tables outside `mcp_servers.*` are **reported, not imported**. Rulegate owns this whole
  * file once it writes it, so a `[tui]` table the user has today will not survive the first
@@ -208,6 +241,17 @@ export function importConfigToml(contents: string, file = MCP_FILE): ImportedMcp
   const servers: McpServer[] = [];
   const warnings: string[] = [];
   const foreign = new Set<string>();
+
+  // `env_http_headers` arrives as its own table, `[mcp_servers.<id>.env_http_headers]`, so
+  // it has to be collected before the server loop rather than read out of the server's own
+  // entries. Keyed by id, which is the only thing tying the two tables together once the
+  // parser has flattened the file.
+  const envHeaderTables = new Map<string, Record<string, JsonValue>>();
+  for (const table of tables) {
+    if (table.path.length === 3 && table.path[0] === TABLE && table.path[2] === ENV_HEADERS) {
+      envHeaderTables.set(table.path[1]!, table.entries);
+    }
+  }
 
   for (const table of tables) {
     if (table.path.length === 0) {
@@ -264,8 +308,21 @@ export function importConfigToml(contents: string, file = MCP_FILE): ImportedMcp
     }
 
     const headers: Record<string, SecretValue> = {};
-    const bearer = entries['bearer_token_env_var'];
-    if (typeof bearer === 'string') headers['Authorization'] = envRef(bearer);
+    for (const [name, variable] of Object.entries(envHeaderTables.get(id) ?? {})) {
+      if (typeof variable === 'string') headers[name] = envRef(variable);
+    }
+    // `bearer_token_env_var` is deliberately *not* imported as `Authorization: env:X`
+    // (T096). Codex prepends `Bearer ` to that variable, so the header's real value is
+    // `Bearer ` plus a reference — a reference with text around it, which canonical cannot
+    // hold and which `import/mcp.ts` refuses for the same reason. Importing it anyway would
+    // hand every other tool a bare token with no scheme: a server that starts and fails to
+    // authenticate, which is the silent-wrong-answer case this codebase refuses rather than
+    // warns about. The key stays in `unknown`, so the value is preserved and nothing is lost.
+    if (typeof entries['bearer_token_env_var'] === 'string') {
+      warnings.push(
+        `${file}: server \`${id}\` uses \`bearer_token_env_var\`, where Codex supplies the \`Bearer \` scheme itself. Canonical headers hold a whole value, so importing it would send other tools a token with no scheme — the reference is kept verbatim and no \`Authorization\` header was imported. Re-express it as \`env_http_headers\` with the full \`Bearer <token>\` in the variable if you want it shared.`,
+      );
+    }
 
     const unknown: Record<string, JsonValue> = {};
     for (const key of Object.keys(entries).sort()) {

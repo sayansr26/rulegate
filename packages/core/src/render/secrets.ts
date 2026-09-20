@@ -57,6 +57,26 @@ const SECRET_WORDS: readonly string[] = [
  */
 const ENV_VAR_NAME_SUFFIXES: readonly string[] = ['envvar', 'envvariable', 'envvarname'];
 
+/**
+ * Sections whose every value is a variable *name* rather than a value (T096).
+ *
+ * The same idea as `ENV_VAR_NAME_SUFFIXES`, one level up: Codex's
+ * `[mcp_servers.x.env_http_headers]` maps a header name to the variable holding its value,
+ * so `Authorization = "DOCS_API_KEY_PRODUCTION"` is a correct, secret-free line that every
+ * rule here condemns — `Authorization` flattens to contain `auth`, and a variable name long
+ * enough looks generated. It is the `bearer_token_env_var` false positive exactly, arriving
+ * by a different route once that key was replaced.
+ *
+ * The key cannot carry the exemption this time, because the key is whatever the user called
+ * their header. The *section* is what says these are names, so that is what is matched.
+ */
+const ENV_VAR_NAME_SECTIONS: readonly string[] = ['envhttpheaders'];
+
+function sectionNamesEnvVars(header: string): boolean {
+  const last = header.split('.').pop() ?? '';
+  return ENV_VAR_NAME_SECTIONS.includes(last.toLowerCase().replace(/[^a-z0-9]/g, ''));
+}
+
 function namesEnvVar(flatKey: string): boolean {
   return ENV_VAR_NAME_SUFFIXES.some((suffix) => flatKey.endsWith(suffix));
 }
@@ -176,7 +196,15 @@ export function findLiteralSecrets(value: JsonValue, prefix: string): string[] {
  */
 export function scanTextForSecrets(text: string): string[] {
   const found: string[] = [];
+  // One regex on section headers, not a parser: the scanner stays structure-free except for
+  // the one fact it cannot get from a single line — which table a TOML key sits in.
+  let inEnvVarSection = false;
   text.split('\n').forEach((line, i) => {
+    const header = /^\s*\[([^\]]+)\]\s*$/.exec(line);
+    if (header) {
+      inEnvVarSection = sectionNamesEnvVars(header[1]!);
+      return;
+    }
     const label = `line ${String(i + 1)}`;
     if (TOKEN_PATTERNS.some((re) => re.test(line))) {
       found.push(label);
@@ -192,6 +220,7 @@ export function scanTextForSecrets(text: string): string[] {
       line,
     );
     const value = pair?.[2] ?? pair?.[3] ?? pair?.[4];
+    if (inEnvVarSection) return;
     if (pair && value !== undefined && isLiteralSecret(pair[1]!, value)) found.push(label);
   });
   return found;

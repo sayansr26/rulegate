@@ -18,10 +18,12 @@ servers:
 
   alpha-http:
     url: https://mcp.example.com/mcp
-    # An `Authorization` header is the one header Codex can express, as
-    # `bearer_token_env_var`. The name is >= 16 characters on purpose: that is the input
-    # the T044 secret scan's false positive needs, since `bearer_token_env_var` flattens
-    # to a key containing both `bearer` and `token`.
+    # A header reference becomes an `env_http_headers` entry, which sets the header to the
+    # variable's raw value — the same thing a canonical header reference means everywhere
+    # else. Not `bearer_token_env_var`: Codex supplies the `Bearer ` scheme for that one, so
+    # its variable holds a bare token while `.mcp.json` needs the whole value (T096). The
+    # name is >= 16 characters on purpose: that is the input the T044 secret scan's false
+    # positive needs, now reached through the `env_http_headers` section rather than the key.
     headers:
       Authorization: env:DOCS_API_KEY_PRODUCTION
     # Not a key Rulegate interprets. Preserved verbatim (RFC-0001 §11.1) and re-emitted.

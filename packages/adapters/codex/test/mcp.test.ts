@@ -59,7 +59,16 @@ describe('codex MCP output (T047)', () => {
   it('writes the tables in id order, which for TOML is the file order', async () => {
     const contents = (await render()) ?? '';
     const headers = [...contents.matchAll(/^\[mcp_servers\.(.+)\]$/gm)].map((m) => m[1]);
-    expect(headers).toEqual(['alpha-http', 'linear-sse', 'zebra-stdio']);
+    // Sub-tables included deliberately. TOML binds them by dotted path, not by position, so
+    // the file would still parse with them anywhere — this pins the *layout*, which is what
+    // makes the output reviewable by eye, and the layout is a byte contract like any other.
+    expect(headers).toEqual([
+      'alpha-http',
+      'alpha-http.env_http_headers',
+      'linear-sse',
+      'linear-sse.env_http_headers',
+      'zebra-stdio',
+    ]);
   });
 
   it('writes one order whatever order the servers arrive in', async () => {
@@ -79,9 +88,7 @@ describe('codex MCP output (T047)', () => {
     const list = await servers();
     const reversed: readonly McpServer[] = [...list].reverse();
     expect(renderConfigToml(reversed, true)).toBe(renderConfigToml(list, true));
-    expect(renderConfigToml(reversed, true)).toContain(
-      '[mcp_servers.alpha-http]\nbearer_token_env_var',
-    );
+    expect(renderConfigToml(reversed, true)).toContain('[mcp_servers.alpha-http]\ntimeout');
   });
 
   it('carries a `#` comment marker, not an HTML one', async () => {
@@ -112,10 +119,23 @@ describe('codex MCP output (T047)', () => {
     expect(contents).not.toContain('[mcp_servers.zebra-stdio.env]');
   });
 
-  it('maps an Authorization header onto `bearer_token_env_var`', async () => {
+  /**
+   * T096. `bearer_token_env_var` was the obvious mapping and it was wrong: Codex expands it
+   * to `Authorization: Bearer $VAR`, supplying the scheme itself, so the variable holds a
+   * bare token — while `.mcp.json` renders the same canonical entry as `"${VAR}"`, whose
+   * variable must hold the whole `Bearer <token>`. One canonical header could not be right
+   * for both. `env_http_headers` sets the header to the raw value, which is what a canonical
+   * header reference has always meant.
+   */
+  it('maps a header reference onto `env_http_headers`, not `bearer_token_env_var`', async () => {
     const contents = (await render()) ?? '';
-    expect(contents).toContain('bearer_token_env_var = "LINEAR_API_KEY"');
-    expect(contents).toContain('bearer_token_env_var = "DOCS_API_KEY_PRODUCTION"');
+    expect(contents).toContain(
+      '[mcp_servers.linear-sse.env_http_headers]\nAuthorization = "LINEAR_API_KEY"',
+    );
+    expect(contents).toContain(
+      '[mcp_servers.alpha-http.env_http_headers]\nAuthorization = "DOCS_API_KEY_PRODUCTION"',
+    );
+    expect(contents).not.toContain('bearer_token_env_var');
   });
 
   it('loses the sse distinction, because Codex documents no discriminator', async () => {
@@ -134,7 +154,7 @@ describe('codex MCP output (T047)', () => {
         .trim()
         .split('\n')
         .map((l) => l.split(' = ')[0]),
-    ).toEqual(['bearer_token_env_var', 'url']);
+    ).toEqual(['url']);
   });
 
   it('re-emits keys Rulegate does not interpret', async () => {
@@ -203,25 +223,33 @@ describe('codex omits what Codex cannot say, and says so (T047, changed by T083)
     expect(renderConfigToml([stdio], true)).not.toContain('# omitted');
   });
 
-  it('omits an environment reference in a header Codex cannot resolve', async () => {
+  /**
+   * This used to be a refusal: `bearer_token_env_var` is Authorization-only, so any other
+   * header meant omitting the whole server. `env_http_headers` takes any header name, so the
+   * refusal is gone with the key that caused it (T096) — the case is kept as the proof.
+   */
+  it('writes a reference in any header, not only Authorization', async () => {
     const list = await servers();
     const http = serverAt(list, 'alpha-http');
     const other: McpServer = { ...http, headers: { 'X-Api-Key': envRef('DOCS_API_KEY') } };
 
     const rendered = renderConfigToml([other, serverAt(list, 'zebra-stdio')], true);
-    expect(rendered).toContain('# omitted: `alpha-http`');
+    expect(rendered).not.toContain('# omitted');
+    expect(rendered).toContain(
+      '[mcp_servers.alpha-http.env_http_headers]\nX-Api-Key = "DOCS_API_KEY"',
+    );
     expect(rendered).toContain('[mcp_servers.zebra-stdio]');
-
-    // Control: Authorization is the one header it can express.
-    expect(renderConfigToml([http], true)).not.toContain('# omitted');
   });
 
-  it('accepts an Authorization header in any casing', async () => {
+  it('keeps a header name exactly as written, whatever its casing', async () => {
     const list = await servers();
     const http = serverAt(list, 'alpha-http');
     const lower: McpServer = { ...http, headers: { authorization: envRef('DOCS_API_KEY') } };
 
-    expect(renderConfigToml([lower], false)).toContain('bearer_token_env_var = "DOCS_API_KEY"');
+    // Lower-cased on the way in, lower-cased on the way out. Codex builds the header from
+    // this name directly, and header names are case-insensitive on the wire, so there is
+    // nothing to normalize and normalizing would lose what the user wrote.
+    expect(renderConfigToml([lower], false)).toContain('authorization = "DOCS_API_KEY"');
   });
 
   it('writes no file at all when every server is unrepresentable', async () => {

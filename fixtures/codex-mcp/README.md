@@ -8,16 +8,19 @@ assuming JSON semantics.
 `cursor-mcp/` and `copilot-mcp/`, which share one file. Two servers had to change, and
 both changes are the finding:
 
-- `alpha-http`'s header is `Authorization` rather than `X-Api-Key`. Codex has no general
-  header mechanism for a secret — `http_headers` holds static values only — so
-  `Authorization` is the single header an `env:` reference can reach, as
-  `bearer_token_env_var`. Any other env-ref header is **refused**, not dropped: a header
-  silently omitted ships a server that fails to authenticate. That refusal has a unit
-  test rather than a golden, because a render that must fail has no `expected/`.
-- The variable name is 23 characters. `bearer_token_env_var` flattens to a key containing
-  both `bearer` and `token`, so the T044 rendered-bytes scan asks whether the *value*
-  looks generated — and an environment variable name that long does. The name in this
-  file is what makes that a failing test rather than a latent one.
+- `alpha-http`'s header is `Authorization` rather than `X-Api-Key`. That is now a
+  *historical* reason rather than a live constraint (T096): it was once the only header an
+  `env:` reference could reach, as `bearer_token_env_var`, and any other header was refused.
+  Rulegate writes `env_http_headers` instead, which takes any header name, so the refusal is
+  gone with the key that caused it — `bearer_token_env_var` supplies the `Bearer ` scheme
+  itself, so its variable holds a bare token while every other writer needs the whole header
+  value, and one canonical entry could not mean both. The header is left as `Authorization`
+  here because it is what a real config carries; the any-header case has a unit test.
+- The variable name is 23 characters, and it is still what makes the T044 scan's false
+  positive a failing test rather than a latent one — it just arrives by a new route. The
+  exemption used to hang off the `bearer_token_env_var` key; now `Authorization` is an
+  ordinary header name, so it is the `[…env_http_headers]` *section* that says these values
+  are variable names. A name that long still looks generated to the entropy test.
 
 Three more divergences from the JSON targets:
 

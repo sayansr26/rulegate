@@ -245,6 +245,38 @@ describe('generated output carries no secrets', () => {
     expect(scanTextForSecrets(`  "GITHUB_TOKEN": "${FAKE_GITHUB}"\n`)).toEqual(['line 1']);
     expect(scanTextForSecrets(`auth_token = "${FAKE_OPAQUE}"\n`)).toEqual(['line 1']);
   });
+
+  /**
+   * T096. `[mcp_servers.x.env_http_headers]` maps a header name to the *variable* holding
+   * its value, so `Authorization = "DOCS_API_KEY_PRODUCTION"` is secret-free — and every
+   * other rule here condemns it, since `Authorization` contains `auth` and a long variable
+   * name looks generated. The `bearer_token_env_var` false positive, arriving by a new route.
+   */
+  it('exempts a section whose values are variable names, not values', () => {
+    const toml = [
+      '[mcp_servers.alpha.env_http_headers]',
+      'Authorization = "DOCS_API_KEY_PRODUCTION"',
+      '',
+    ].join('\n');
+    expect(scanTextForSecrets(toml)).toEqual([]);
+
+    // The exemption is scoped to the section: the same line in the server's own table is
+    // still a literal, because there it would be a value.
+    const elsewhere = ['[mcp_servers.alpha]', 'Authorization = "DOCS_API_KEY_PRODUCTION"', ''].join(
+      '\n',
+    );
+    expect(scanTextForSecrets(elsewhere)).toEqual(['line 2']);
+  });
+
+  it('still reports a real token inside an env-var-name section', () => {
+    // The vendor-prefix patterns run before the exemption, and must: a variable name never
+    // looks like `ghp_…`, so a value that does is a credential somebody pasted into the
+    // wrong table, and exempting the whole section would be how it reached a commit.
+    const toml = ['[mcp_servers.alpha.env_http_headers]', `Authorization = "${FAKE_GITHUB}"`].join(
+      '\n',
+    );
+    expect(scanTextForSecrets(toml)).toEqual(['line 2']);
+  });
 });
 
 describe('literalToEnvRef', () => {

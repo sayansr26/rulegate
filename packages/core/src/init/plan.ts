@@ -1,4 +1,5 @@
 import { formatterWarnings } from './formatters.js';
+import { backupSecretWarnings } from './backup-secrets.js';
 import { RulegateError } from '../model/errors.js';
 import {
   CANONICAL_SCHEMA_VERSION,
@@ -189,7 +190,9 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   warnings.push(...plan.warnings);
 
   const canonicalFiles = await classify(serializeCanonical(canonical), fs);
-  warnings.push(...(await formatterWarnings({ fs, generated: plan.artifacts.map((a) => a.path) })));
+  const generatedPaths = plan.artifacts.map((a) => a.path);
+  warnings.push(...(await formatterWarnings({ fs, generated: generatedPaths })));
+  warnings.push(...(await backupSecretWarnings({ fs, taking: generatedPaths })));
 
   return {
     adopted: false,

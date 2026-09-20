@@ -1,6 +1,6 @@
 {
   "name": "@rulegate/adapter-claude-code",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Rulegate adapter for claude-code.",
   "type": "module",
   "license": "MIT",

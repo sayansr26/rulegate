@@ -134,11 +134,38 @@ export function parseMdc(contents: string): ParsedMdc {
   };
 }
 
+/**
+ * Cursor's own documentation shows `globs` three ways, and a repository in the wild carries
+ * whichever one its author copied (T099).
+ *
+ * The bare comma-joined string is Cursor's native spelling and the one this adapter writes.
+ * A **flow sequence** — `globs: ["**` + `/*.py"]` — is what the docs show for multiple
+ * patterns, and it used to import as a single glob whose text was the sequence syntax
+ * itself: brackets, quotes and all. That rule then matched nothing, while `init` reported
+ * success and `check` reported `in sync`, because a Cursor-only round trip reproduced the
+ * original bytes by coincidence — the writer printed the string back unquoted and it read
+ * as a sequence again. The damage was invisible until a second tool rendered the same
+ * canonical glob, as Copilot's `applyTo` or as Claude Code's prose scope line.
+ *
+ * Unwrapped textually rather than through a YAML parser, for the reason the comment above
+ * `parseMdc` gives: `globs` is not YAML, and a glob is full of characters a YAML parser
+ * reads as syntax. Quotes are stripped per item, so `["a", 'b']` and `[a, b]` agree.
+ */
 function splitGlobs(value: string): readonly string[] {
-  return value
+  const trimmed = value.trim();
+  const flow = trimmed.startsWith('[') && trimmed.endsWith(']');
+  const inner = flow ? trimmed.slice(1, -1) : trimmed;
+  return inner
     .split(',')
-    .map((part) => part.trim())
+    .map((part) => unquote(part.trim()))
     .filter((part) => part !== '');
+}
+
+/** One layer of matching quotes, which a flow sequence's items usually carry. */
+function unquote(part: string): string {
+  const quoted =
+    part.length >= 2 && (part.startsWith('"') || part.startsWith("'")) && part.endsWith(part[0]!);
+  return quoted ? part.slice(1, -1) : part;
 }
 
 function joinBody(lines: readonly string[]): string {

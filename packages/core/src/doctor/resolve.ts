@@ -8,6 +8,7 @@ import type { ReadOnlyFileSystem } from '../fs/types.js';
 import type { ToolDetection } from '../detect/types.js';
 import type { VerifyStatus } from '../pipeline/verify.js';
 import type { ToolId } from '../model/ids.js';
+import { RULEGATE_DIR } from '../model/paths.js';
 import type { FileDiagnosis, FileSyncStatus } from './types.js';
 
 /** One resolved file, measured. The unit both the table and the warnings are built from. */
@@ -146,7 +147,7 @@ async function measureEntry(
       : entry.pattern;
 
   const paths = pattern.includes('*')
-    ? [...(await ctx.fs.glob(pattern))].sort(compareCodepoint)
+    ? [...(await ctx.fs.glob(pattern))].filter(outsideRulegateDir).sort(compareCodepoint)
     : (await ctx.fs.exists(pattern))
       ? [pattern]
       : [];
@@ -173,6 +174,20 @@ async function measureEntry(
     });
   }
   return out;
+}
+
+/**
+ * `.rulegate/` is Rulegate's own directory, not a level of somebody's configuration.
+ *
+ * A nested walk for `**` + `/GEMINI.md` otherwise matches `.rulegate/backup/GEMINI.md` —
+ * the copy `init` took of the user's original — and the row that should describe one
+ * generated artifact instead describes an artifact *and* a backup, which makes its
+ * aggregate status `unmanaged` and bills the user for tokens twice. The backup is a real
+ * file and a recursively scanning tool would really read it; that is a genuine problem and
+ * it is **not this row's** to state (T097, and T098 owns the problem itself).
+ */
+function outsideRulegateDir(path: string): boolean {
+  return path !== RULEGATE_DIR && !path.startsWith(`${RULEGATE_DIR}/`);
 }
 
 /** `CLAUDE.md` -> `**` + `/CLAUDE.md`, keeping the root copy in scope too. */

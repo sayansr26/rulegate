@@ -101,7 +101,7 @@ export const docs: AdapterDocs = {
     {
       level: 'warn',
       message:
-        'A server Codex cannot express is omitted from .codex/config.toml and named in it as a `# omitted:` comment, rather than failing the run (T083). Codex resolves environment references only through env_vars (which needs the variable and the key to share a name) and bearer_token_env_var (Authorization only), so a renamed reference or a credential in another header has nowhere to go. Check the top of the generated file if a server you configured is missing.',
+        'A server Codex cannot express is omitted from .codex/config.toml and named in it as a `# omitted:` comment, rather than failing the run (T083). The remaining case is `env`: Codex forwards variables through `env_vars`, which names one string that is both the key and the variable, so a renamed reference such as `API_KEY: env:MY_TOKEN` has nowhere to go. Headers no longer hit this — they are written as `env_http_headers`, which takes any header name (T096). Check the top of the generated file if a server you configured is missing.',
       source: CODEX_MCP_DOCS,
     },
     {
@@ -113,7 +113,7 @@ export const docs: AdapterDocs = {
     {
       level: 'warn',
       message:
-        'Codex has no variable substitution anywhere in config.toml, so an `env:NAME` reference cannot be written as a value the way `${NAME}` and `${env:NAME}` are elsewhere — it has to become a different key. `env: { NAME: env:NAME }` becomes `env_vars = ["NAME"]`, and an Authorization header becomes `bearer_token_env_var`. A reference those two keys cannot express — a renamed variable, or any other header — is refused rather than dropped: a credential that never arrives is a server that starts and fails to authenticate.',
+        'Codex has no variable substitution anywhere in config.toml, so an `env:NAME` reference cannot be written as a value the way `${NAME}` and `${env:NAME}` are elsewhere — it has to become a different key. `env: { NAME: env:NAME }` becomes `env_vars = ["NAME"]`, and `headers: { Name: env:X }` becomes `env_http_headers = { Name = "X" }`. Rulegate does not write `bearer_token_env_var`: Codex supplies the `Bearer ` scheme for it, so that variable holds a bare token while every other tool needs the whole header value, and one canonical entry cannot mean both (T096). A reference `env_vars` cannot express — a renamed variable — is refused rather than dropped: a credential that never arrives is a server that starts and fails to authenticate.',
       source: CODEX_MCP_DOCS,
     },
     {

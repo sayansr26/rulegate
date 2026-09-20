@@ -359,6 +359,61 @@ describe('rulegate init', () => {
     expect(warning?.message).toContain('1 generated file(s)');
   });
 
+  /**
+   * T095. Taking ownership copies the original to `.rulegate/backup/` verbatim, which is what
+   * makes `restore` faithful — and for an `.mcp.json` holding a token, that faithful copy is a
+   * plaintext credential inside the directory users are told to commit. Found in the T032
+   * rehearsal on a repository whose `.gitignore` held `.mcp.json` precisely to keep the token
+   * out of git.
+   */
+  const MCP_WITH_LITERAL = JSON.stringify(
+    {
+      mcpServers: {
+        github: {
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-github'],
+          env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_notARealTokenJustLongEnough1234567' },
+        },
+      },
+    },
+    null,
+    2,
+  );
+
+  it('warns that taking ownership copies a credential into the directory you commit', async () => {
+    await seedNativeConfigs();
+    await writeFile(path.join(repo, '.mcp.json'), `${MCP_WITH_LITERAL}\n`);
+
+    const warning = (await plan()).warnings.find((w) => w.code === 'W_BACKUP_SECRET');
+    expect(warning?.message).toContain('.mcp.json');
+    expect(warning?.message).toContain('.rulegate/backup/.mcp.json');
+    // The scanner's whole bargain: key paths, never values. A warning that quoted the
+    // credential would print it into CI logs — the failure it exists to prevent, moved.
+    expect(warning?.message).not.toContain('ghp_');
+    expect(warning?.hint).not.toContain('ghp_');
+  });
+
+  it('stays quiet when .gitignore already covers the backup', async () => {
+    await seedNativeConfigs();
+    await writeFile(path.join(repo, '.mcp.json'), `${MCP_WITH_LITERAL}\n`);
+    // A bare name matches at every depth under gitignore's rules, so this one line covers
+    // `.rulegate/backup/.mcp.json` too. Warning here would be a warning on a repository that
+    // is already correct, which is the T072 lesson.
+    await writeFile(path.join(repo, '.gitignore'), '.mcp.json\n');
+
+    expect((await plan()).warnings.map((w) => w.code)).not.toContain('W_BACKUP_SECRET');
+  });
+
+  it('stays quiet when the file being taken over holds no credential', async () => {
+    await seedNativeConfigs();
+    await writeFile(
+      path.join(repo, '.mcp.json'),
+      `${JSON.stringify({ mcpServers: { docs: { url: 'https://mcp.example.com' } } }, null, 2)}\n`,
+    );
+
+    expect((await plan()).warnings.map((w) => w.code)).not.toContain('W_BACKUP_SECRET');
+  });
+
   // T019's decision, made mechanical: `init` warns about the user's ignore file and never
   // edits it. A tool whose pitch is that it never touches what it did not generate should
   // not open its first conversation by editing something it did not generate.
