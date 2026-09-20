@@ -1,6 +1,6 @@
 {
   "name": "@rulegate/adapter-cursor",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "Rulegate adapter for cursor.",
   "type": "module",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "rulegate",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "One source of truth for your AI coding agents. Sync, verify, and inspect agent config.",
   "type": "module",
   "license": "MIT",

@@ -13311,6 +13311,15 @@ var docs2 = {
         title: "claude-code#6235 \u2014 Support AGENTS.md",
         retrieved: "2026-09-01"
       }
+    },
+    {
+      level: "warn",
+      message: "On a Next.js project, `next dev` writes CLAUDE.md as well \u2014 it upserts its `<!-- BEGIN:nextjs-agent-rules -->` block into AGENTS.md when that file exists, and falls back to CLAUDE.md when it does not. So a repository that generates CLAUDE.md without AGENTS.md hands Next.js this adapter\u2019s artifact as its target. It is harmless while the block is a canonical rule and the generated file already carries it, because Next.js skips a write that would change nothing; it becomes a standing hand-edit if the block is not in `.rulegate/`. Enabling codex alongside this adapter moves Next.js\u2019s attention to AGENTS.md instead.",
+      source: {
+        url: "https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts",
+        title: "Next.js \u2014 generate-agent-files.ts (the `next dev` AGENTS.md writer)",
+        retrieved: "2026-09-20"
+      }
     }
   ]
 };
@@ -13997,6 +14006,11 @@ var CODEX_CONFIG_REFERENCE = {
   title: "Codex \u2014 Config reference",
   retrieved: "2026-09-04"
 };
+var NEXTJS_AGENT_FILES = {
+  url: "https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts",
+  title: "Next.js \u2014 generate-agent-files.ts (the `next dev` AGENTS.md writer)",
+  retrieved: "2026-09-20"
+};
 var AGENTS_MD_SPEC = {
   url: "https://agents.md/",
   title: "AGENTS.md \u2014 a simple, open format for guiding coding agents",
@@ -14081,6 +14095,11 @@ var docs4 = {
       level: "warn",
       message: "AGENTS.md is both a canonical *input* Rulegate accepts and this adapter\u2019s *output*. When a repository has no `.rulegate/` and is using AGENTS.md as its canonical source, this adapter emits nothing rather than generating the file from itself.",
       source: AGENTS_MD_SPEC
+    },
+    {
+      level: "warn",
+      message: "`next dev` writes AGENTS.md too, and it is the one competing writer that cannot be configured away \u2014 it lives in node_modules. It upserts a `<!-- BEGIN:nextjs-agent-rules -->` block into whichever of AGENTS.md or CLAUDE.md already hosts it, replacing only that region and skipping the write entirely when the result is unchanged. So the state `init` leaves behind is stable: the block arrives as a canonical rule, the generated AGENTS.md carries it, and `next dev` leaves the file byte-identical. Drift appears only if the block leaves `.rulegate/` \u2014 Next.js re-adds it, and with AGENTS.md no longer generated it lands in CLAUDE.md instead, where `check` reports a hand-edit, `sync` refuses to overwrite it, and the next `next dev` re-creates it. Keep the imported rule. A Next.js upgrade that changes the block text is the same mechanism and `sync --import` is the recovery.",
+      source: NEXTJS_AGENT_FILES
     },
     {
       level: "info",

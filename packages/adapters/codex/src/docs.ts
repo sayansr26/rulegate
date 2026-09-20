@@ -18,6 +18,12 @@ const CODEX_CONFIG_REFERENCE: SourceLink = {
   retrieved: '2026-09-04',
 };
 
+const NEXTJS_AGENT_FILES: SourceLink = {
+  url: 'https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts',
+  title: 'Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)',
+  retrieved: '2026-09-20',
+};
+
 const AGENTS_MD_SPEC: SourceLink = {
   url: 'https://agents.md/',
   title: 'AGENTS.md — a simple, open format for guiding coding agents',
@@ -121,6 +127,12 @@ export const docs: AdapterDocs = {
       message:
         'AGENTS.md is both a canonical *input* Rulegate accepts and this adapter’s *output*. When a repository has no `.rulegate/` and is using AGENTS.md as its canonical source, this adapter emits nothing rather than generating the file from itself.',
       source: AGENTS_MD_SPEC,
+    },
+    {
+      level: 'warn',
+      message:
+        '`next dev` writes AGENTS.md too, and it is the one competing writer that cannot be configured away — it lives in node_modules. It upserts a `<!-- BEGIN:nextjs-agent-rules -->` block into whichever of AGENTS.md or CLAUDE.md already hosts it, replacing only that region and skipping the write entirely when the result is unchanged. So the state `init` leaves behind is stable: the block arrives as a canonical rule, the generated AGENTS.md carries it, and `next dev` leaves the file byte-identical. Drift appears only if the block leaves `.rulegate/` — Next.js re-adds it, and with AGENTS.md no longer generated it lands in CLAUDE.md instead, where `check` reports a hand-edit, `sync` refuses to overwrite it, and the next `next dev` re-creates it. Keep the imported rule. A Next.js upgrade that changes the block text is the same mechanism and `sync --import` is the recovery.',
+      source: NEXTJS_AGENT_FILES,
     },
     {
       level: 'info',

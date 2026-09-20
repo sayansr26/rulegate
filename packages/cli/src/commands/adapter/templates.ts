@@ -1,5 +1,6 @@
 import type { ScaffoldFile } from '@rulegate/core';
 import { toolNames, type ToolNames } from './names.js';
+import { readVersion } from '../../version.js';
 
 /**
  * Every file `rulegate adapter new <tool>` creates.
@@ -124,9 +125,13 @@ Prefer small modules.
  * the repository is broken.
  */
 function packageJson(n: ToolNames): string {
+  // Read from the CLI's own manifest rather than written as a literal. Every package in this
+  // workspace releases at one version, so a hardcoded one is correct until the next release
+  // and then silently wrong: a scaffolded adapter would be a version island, and
+  // `pnpm publish -r` would put it on the registry under a number nothing else shares.
   return `{
   "name": "${n.packageName}",
-  "version": "0.0.0",
+  "version": "${readVersion()}",
   "description": "Rulegate adapter for ${n.id}.",
   "type": "module",
   "license": "MIT",

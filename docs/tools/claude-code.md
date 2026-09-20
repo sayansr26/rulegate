@@ -67,6 +67,8 @@ No byte cap is documented in the Claude Code memory documentation cited above. T
 - **info** — Rulegate writes CLAUDE.md only. `.claude/settings.json` carries permissions and hooks — a materially different trust surface from instructions — and generating it is deliberately out of scope for v0.
 - **warn** — Claude Code does not read AGENTS.md natively. That gap is the reason this project exists; the generated CLAUDE.md is what closes it.
   Source: [claude-code#6235 — Support AGENTS.md](https://github.com/anthropics/claude-code/issues/6235) — retrieved 2026-09-01
+- **warn** — On a Next.js project, `next dev` writes CLAUDE.md as well — it upserts its `<!-- BEGIN:nextjs-agent-rules -->` block into AGENTS.md when that file exists, and falls back to CLAUDE.md when it does not. So a repository that generates CLAUDE.md without AGENTS.md hands Next.js this adapter’s artifact as its target. It is harmless while the block is a canonical rule and the generated file already carries it, because Next.js skips a write that would change nothing; it becomes a standing hand-edit if the block is not in `.rulegate/`. Enabling codex alongside this adapter moves Next.js’s attention to AGENTS.md instead.
+  Source: [Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts) — retrieved 2026-09-20
 
 ## Sources
 
@@ -74,3 +76,4 @@ No byte cap is documented in the Claude Code memory documentation cited above. T
 - [Claude Code — Manage Claude’s memory](https://docs.claude.com/en/docs/claude-code/memory) — retrieved 2026-09-01
 - [Claude Code — Settings](https://docs.claude.com/en/docs/claude-code/settings) — retrieved 2026-09-01
 - [claude-code#6235 — Support AGENTS.md](https://github.com/anthropics/claude-code/issues/6235) — retrieved 2026-09-01
+- [Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts) — retrieved 2026-09-20

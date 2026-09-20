@@ -66,6 +66,8 @@ Codex stops adding instruction files once the concatenated text reaches `project
   Source: [Codex — Extend with MCP servers](https://learn.chatgpt.com/docs/extend/mcp) — retrieved 2026-09-04
 - **warn** — AGENTS.md is both a canonical *input* Rulegate accepts and this adapter’s *output*. When a repository has no `.rulegate/` and is using AGENTS.md as its canonical source, this adapter emits nothing rather than generating the file from itself.
   Source: [AGENTS.md — a simple, open format for guiding coding agents](https://agents.md/) — retrieved 2026-09-02
+- **warn** — `next dev` writes AGENTS.md too, and it is the one competing writer that cannot be configured away — it lives in node_modules. It upserts a `<!-- BEGIN:nextjs-agent-rules -->` block into whichever of AGENTS.md or CLAUDE.md already hosts it, replacing only that region and skipping the write entirely when the result is unchanged. So the state `init` leaves behind is stable: the block arrives as a canonical rule, the generated AGENTS.md carries it, and `next dev` leaves the file byte-identical. Drift appears only if the block leaves `.rulegate/` — Next.js re-adds it, and with AGENTS.md no longer generated it lands in CLAUDE.md instead, where `check` reports a hand-edit, `sync` refuses to overwrite it, and the next `next dev` re-creates it. Keep the imported rule. A Next.js upgrade that changes the block text is the same mechanism and `sync --import` is the recovery.
+  Source: [Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts) — retrieved 2026-09-20
 - **info** — AGENTS.md is a cross-vendor format, not a Codex format: VS Code, Cursor, Copilot, Jules, Zed and others read it too. Enabling this adapter alongside claude-code or gemini therefore hands some tools the same rules twice, from two files. That is not an error, but it is worth knowing before it shows up as a doubled token count.
   Source: [AGENTS.md — a simple, open format for guiding coding agents](https://agents.md/) — retrieved 2026-09-02
 - **info** — Codex has no per-glob rule mechanism, so a glob-scoped canonical rule is rendered with an "Applies to:" line stating its scope in prose. Lossy, but visibly so; dropping the scope silently would turn a component-only rule into a repo-wide one.
@@ -74,5 +76,6 @@ Codex stops adding instruction files once the concatenated text reaches `project
 
 - [AGENTS.md — a simple, open format for guiding coding agents](https://agents.md/) — retrieved 2026-09-02
 - [Codex — Custom instructions with AGENTS.md](https://developers.openai.com/codex/guides/agents-md) — retrieved 2026-09-02
+- [Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts) — retrieved 2026-09-20
 - [Codex — Config reference](https://learn.chatgpt.com/docs/config-file/config-reference) — retrieved 2026-09-04
 - [Codex — Extend with MCP servers](https://learn.chatgpt.com/docs/extend/mcp) — retrieved 2026-09-04

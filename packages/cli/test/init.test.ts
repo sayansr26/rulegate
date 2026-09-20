@@ -47,6 +47,13 @@ async function seedNativeConfigs(): Promise<void> {
   await cp(path.join(fixtures, 'cursor-import/input'), repo, { recursive: true });
 }
 
+/**
+ * A flat config that has been pointed past JavaScript, which is what makes ESLint a threat
+ * to a generated Markdown file at all. `@eslint/markdown` is the first-party plugin; any of
+ * `ESLINT_NON_JS_SIGNALS` would do.
+ */
+const MARKDOWN_AWARE_FLAT_CONFIG = `import markdown from '@eslint/markdown';\nexport default [...markdown.configs.recommended];\n`;
+
 describe('rulegate init', () => {
   it('writes nothing at all without --yes', async () => {
     await seedNativeConfigs();
@@ -208,7 +215,6 @@ describe('rulegate init', () => {
   it.each([
     ['Biome', 'biome.json', 'files.includes'],
     ['dprint', 'dprint.json', 'excludes'],
-    ['ESLint', 'eslint.config.js', '.eslintignore'],
   ])('warns about %s too, naming where its exclusions live', async (name, config, where) => {
     await seedNativeConfigs();
     await writeFile(path.join(repo, config), '{}\n');
@@ -219,6 +225,91 @@ describe('rulegate init', () => {
     // ignore file at all, so "add these lines to .prettierignore" is wrong advice, which
     // is the same failure as no advice.
     expect(warning?.hint).toContain(where);
+  });
+
+  /**
+   * T092, and the shape of the repository it was found on: a Next.js app with a flat ESLint
+   * config and no Markdown plugin. ESLint lints JavaScript until a plugin says otherwise,
+   * and Rulegate never generates a `.js` file, so the old warning fired on the first run
+   * about files ESLint would never open.
+   */
+  it('stays quiet about ESLint when nothing points it past JavaScript', async () => {
+    await seedNativeConfigs();
+    await writeFile(path.join(repo, 'eslint.config.mjs'), 'export default [];\n');
+
+    const warnings = (await plan()).warnings;
+    expect(warnings.filter((w) => w.message.includes('ESLint'))).toEqual([]);
+
+    // The paired control, and the reason this is a gate rather than a deletion: Prettier
+    // does reformat Markdown by default, so it still warns about the identical artifacts.
+    await writeFile(path.join(repo, '.prettierrc'), '{}\n');
+    const withPrettier = (await plan()).warnings;
+    expect(withPrettier.map((w) => w.code)).toContain('E_FORMATTER_CONFLICT');
+    expect(withPrettier.filter((w) => w.message.includes('ESLint'))).toEqual([]);
+  });
+
+  // The other half: opt in and the warning comes back, because now it is true.
+  it.each([
+    ['the flat config imports a Markdown plugin', MARKDOWN_AWARE_FLAT_CONFIG, undefined],
+    ['package.json depends on one', 'export default [];\n', '@eslint/markdown'],
+  ])('warns about ESLint once %s', async (_label, config, dep) => {
+    await seedNativeConfigs();
+    await writeFile(path.join(repo, 'eslint.config.mjs'), config);
+    if (dep !== undefined) {
+      await writeFile(
+        path.join(repo, 'package.json'),
+        JSON.stringify({ name: 'x', devDependencies: { [dep]: '^6.0.0' } }, null, 2),
+      );
+    }
+
+    const warning = (await plan()).warnings.find((w) => w.message.includes('ESLint'));
+    expect(warning?.code).toBe('E_FORMATTER_CONFLICT');
+    expect(warning?.hint).toContain('ignores');
+  });
+
+  // Found on a Next.js 16 repository during the T032 first-run rehearsal: every ESLint
+  // config shape was pointed at `.eslintignore`, which ESLint 9 does not read under flat
+  // config and *errors* on when it exists. The hint told the user to break their lint run.
+  it('sends a flat config to `ignores` and never to .eslintignore', async () => {
+    await seedNativeConfigs();
+    await writeFile(path.join(repo, 'eslint.config.mjs'), MARKDOWN_AWARE_FLAT_CONFIG);
+
+    const warning = (await plan()).warnings.find((w) => w.message.includes('ESLint'));
+    expect(warning?.code).toBe('E_FORMATTER_CONFLICT');
+    expect(warning?.hint).not.toContain('.eslintignore');
+    // And it names the config that exists, not the first spelling in the table.
+    expect(warning?.hint).toContain('eslint.config.mjs');
+  });
+
+  // Flat config is the one ESLint loads when both shapes are present, so it is the one
+  // answer to give. Two warnings would contradict each other, and the eslintrc one would
+  // be the advice that breaks ESLint 9.
+  it('gives the flat answer once when a repository carries both ESLint config shapes', async () => {
+    await seedNativeConfigs();
+    await writeFile(path.join(repo, 'eslint.config.mjs'), MARKDOWN_AWARE_FLAT_CONFIG);
+    await writeFile(path.join(repo, '.eslintrc.json'), '{}\n');
+
+    const eslint = (await plan()).warnings.filter((w) => w.message.includes('ESLint'));
+    expect(eslint).toHaveLength(1);
+    expect(eslint[0]?.hint).toContain('ignores');
+  });
+
+  // A dependency with no config file at all is an ESLint 9 repository, so the bare-
+  // dependency fallback must reach the flat entry and not the eslintrc one.
+  it('treats a bare eslint dependency as flat config', async () => {
+    await seedNativeConfigs();
+    await writeFile(
+      path.join(repo, 'package.json'),
+      JSON.stringify(
+        { name: 'x', devDependencies: { eslint: '^9.0.0', '@eslint/markdown': '^6.0.0' } },
+        null,
+        2,
+      ),
+    );
+
+    const warning = (await plan()).warnings.find((w) => w.message.includes('ESLint'));
+    expect(warning?.hint).toContain('ignores');
+    expect(warning?.hint).not.toContain('.eslintignore');
   });
 
   it('detects Prettier from package.json when there is no config file', async () => {

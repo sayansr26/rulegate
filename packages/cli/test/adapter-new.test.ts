@@ -154,6 +154,26 @@ describe('rulegate adapter new --yes', () => {
     }
   });
 
+  /**
+   * Every package in this workspace releases at one version, so a scaffolded adapter must
+   * arrive at that version rather than at a literal. A hardcoded one is correct until the
+   * next release and then silently wrong, and the consequence is not cosmetic: the adapter
+   * becomes a version island that `pnpm publish -r` would push to the registry under a
+   * number nothing else in the release shares.
+   */
+  it('scaffolds the adapter at the version the workspace is releasing at', async () => {
+    const cliVersion = JSON.parse(await read('packages/cli/package.json')) as {
+      version: string;
+    };
+    const scaffolded = JSON.parse(await read('packages/adapters/kiro/package.json')) as {
+      version: string;
+    };
+    expect(scaffolded.version).toBe(cliVersion.version);
+    // Reads the real manifest, so this fails rather than passes vacuously if both are '0.0.0'
+    // again for unrelated reasons.
+    expect(scaffolded.version).not.toBe('0.0.0');
+  });
+
   it('registers the adapter in all four places, in sorted position', async () => {
     const registry = await read('packages/cli/src/registry.ts');
     expect(registry).toContain("import { kiro } from '@rulegate/adapter-kiro';");

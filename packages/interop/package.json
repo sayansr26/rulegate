@@ -1,6 +1,6 @@
 {
   "name": "@rulegate/interop",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "Read-only importers for other rule-sync tools (ruler, rulesync).",
   "type": "module",
   "license": "MIT",

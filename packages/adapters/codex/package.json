@@ -1,6 +1,6 @@
 {
   "name": "@rulegate/adapter-codex",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "Rulegate adapter for codex.",
   "type": "module",
   "license": "MIT",

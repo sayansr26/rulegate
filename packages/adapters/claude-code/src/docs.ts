@@ -123,5 +123,15 @@ export const docs: AdapterDocs = {
         retrieved: '2026-09-01',
       },
     },
+    {
+      level: 'warn',
+      message:
+        'On a Next.js project, `next dev` writes CLAUDE.md as well — it upserts its `<!-- BEGIN:nextjs-agent-rules -->` block into AGENTS.md when that file exists, and falls back to CLAUDE.md when it does not. So a repository that generates CLAUDE.md without AGENTS.md hands Next.js this adapter’s artifact as its target. It is harmless while the block is a canonical rule and the generated file already carries it, because Next.js skips a write that would change nothing; it becomes a standing hand-edit if the block is not in `.rulegate/`. Enabling codex alongside this adapter moves Next.js’s attention to AGENTS.md instead.',
+      source: {
+        url: 'https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts',
+        title: 'Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)',
+        retrieved: '2026-09-20',
+      },
+    },
   ],
 };
