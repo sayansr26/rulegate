@@ -1,8 +1,13 @@
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   GIT_DENY,
+  TASK_RULE_FILE,
   TODO_ENV,
+  claudeHome,
+  describeScope,
   insertTaskRule,
+  planScope,
   planSettings,
   planTaskRule,
 } from '../src/lib/settings.js';
@@ -49,6 +54,20 @@ describe('planSettings (T106, pure half of T109)', () => {
   it('refuses invalid JSON rather than planning over it', () => {
     expect(planSettings('{ nope').status).toBe('invalid');
     expect(planSettings('[]').status).toBe('invalid');
+    // A BOM is not JSON; refused, never guessed at.
+    expect(planSettings('\uFEFF{}').status).toBe('invalid');
+  });
+});
+
+describe('claudeHome', () => {
+  it('treats an empty CLAUDE_CONFIG_DIR as unset, not as the working directory', () => {
+    expect(claudeHome({ CLAUDE_CONFIG_DIR: '' }, '/h')).toBe(path.resolve('/h/.claude'));
+  });
+
+  it('resolves a relative CLAUDE_CONFIG_DIR to an absolute path', () => {
+    const dir = claudeHome({ CLAUDE_CONFIG_DIR: 'cfg' }, '/h');
+    expect(path.isAbsolute(dir)).toBe(true);
+    expect(dir).toBe(path.resolve('cfg'));
   });
 });
 
@@ -74,6 +93,17 @@ describe('planTaskRule', () => {
     expect(planTaskRule('project', sb.root, sb.claudeDir).status).toBe('present');
   });
 
+  it('plans no whole-file write over an existing working-agreement.md without the rule', async () => {
+    // A canonical rule is the user's file: planning `add` with a whole-file `next` would have
+    // the writer replace it.
+    await sb.put(TASK_RULE_FILE, '---\ndescription: mine\n---\n\nBe kind.\n');
+    const p = planTaskRule('project', sb.root, sb.claudeDir);
+    expect(p).toEqual({ status: 'exists', file: TASK_RULE_FILE });
+    expect(
+      describeScope(planScope('project', sb.root, sb.claudeDir), { dry: true }).at(-1),
+    ).toMatch(/exists without the task-tracking rule/);
+  });
+
   it('never creates a project CLAUDE.md outside a Rulegate project', () => {
     expect(planTaskRule('project', sb.root, sb.claudeDir).status).toBe('no-file');
   });
@@ -91,5 +121,45 @@ describe('planTaskRule', () => {
     );
     expect(section).toBe('Operator preferences');
     expect(next.indexOf('TaskCreate')).toBeLessThan(next.indexOf('## Later'));
+  });
+
+  it('keeps a CRLF file CRLF throughout, in both placements', () => {
+    for (const input of [
+      '# Proj\r\n\r\nUse pnpm.\r\n',
+      '# A\r\n\r\n## Operator preferences\r\n\r\n- x\r\n\r\n## Later\r\n\r\ny\r\n',
+    ]) {
+      const { next } = insertTaskRule(input);
+      expect(next).toMatch(/TaskCreate/);
+      expect(next).not.toMatch(/(^|[^\r])\n/);
+      expect(next.replace(/\r\n/g, '\n')).toBe(insertTaskRule(input.replace(/\r\n/g, '\n')).next);
+    }
+  });
+
+  it('only inserts: every byte of the original survives, in order and contiguous', () => {
+    // A hard break ("  ") and a blank run inside a fence are content; the old whole-file
+    // trim and newline collapse rewrote both behind a preview that promised an insert.
+    const inputs = [
+      '# A\n\n## Operator preferences\n\n- keep  \n\n## Code\n\n```\na\n\n\n\n\nb\n```\n',
+      '# A\n\n## Operator preferences\n\n- keep  ',
+      '# A\n\n## Operator preferences\n- x\n\n\n\n\n## Later\n',
+      '# A\n\n```\na\n\n\n\n\nb\n```\nlast line  ',
+      '# A\n\n\n\n\n',
+      '',
+      '# A\r\n\r\n## Operator preferences\r\n\r\n- keep  \r\n\r\n## Later\r\n',
+    ];
+    for (const input of inputs) {
+      const { next } = insertTaskRule(input);
+      let p = 0;
+      while (p < input.length && input[p] === next[p]) p++;
+      const rest = input.length - p;
+      expect(next.slice(0, p) + next.slice(next.length - rest)).toBe(input);
+      expect(next.length).toBeGreaterThan(input.length);
+      expect(next).toMatch(/TaskCreate/);
+    }
+  });
+
+  it('leaves the existing lines of a mixed-ending file as they are', () => {
+    const input = '# A\r\nb\nc\r\n';
+    expect(insertTaskRule(input).next.startsWith('# A\r\nb\nc')).toBe(true);
   });
 });

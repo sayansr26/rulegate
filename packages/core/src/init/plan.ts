@@ -193,6 +193,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   const generatedPaths = plan.artifacts.map((a) => a.path);
   warnings.push(...(await formatterWarnings({ fs, generated: generatedPaths })));
   warnings.push(...(await backupSecretWarnings({ fs, taking: generatedPaths })));
+  warnings.push(...leftBehindWarnings(collected.sources, generatedPaths));
 
   return {
     adopted: false,
@@ -252,4 +253,52 @@ async function classify(
     });
   }
   return out.sort((a, b) => compareCodepoint(a.path, b.path));
+}
+
+/**
+ * Imported files that no generated file replaces.
+ *
+ * Taking ownership of a file is what removes the original from play; a file imported from
+ * and then left alone is still read by the tool that reads it, beside the generated copy
+ * of the same rules. Compared case-folded as well, because on APFS and NTFS `API.md` and
+ * `api.md` are one file and deleting the "left-behind" one would delete the output. The
+ * hint cannot be "rename" either: the same text prints on the `--yes` run, and after it on
+ * a case-sensitive filesystem a rename moves the original over the file Rulegate now owns,
+ * which `check` then reports as hand-edited. Which filesystem this is cannot be known from
+ * here, so the hint names what the user can see: a listing, because on a case-insensitive
+ * filesystem a lookup of either name finds the one file and `test -e` would mislead.
+ */
+function leftBehindWarnings(
+  sources: readonly { readonly tool: ToolId; readonly rules: readonly RuleDocument[] }[],
+  generated: readonly string[],
+): readonly RulegateError[] {
+  const written = new Set(generated);
+  const folded = new Map(generated.map((p) => [p.toLowerCase(), p]));
+  const files = new Map<string, ToolId>();
+  for (const source of sources) {
+    for (const rule of source.rules) {
+      if (!files.has(rule.source.file)) files.set(rule.source.file, source.tool);
+    }
+  }
+
+  const out: RulegateError[] = [];
+  for (const [file, tool] of [...files].sort(([a], [b]) => compareCodepoint(a, b))) {
+    if (written.has(file)) continue;
+    const renamed = folded.get(file.toLowerCase());
+    out.push(
+      new RulegateError({
+        code: 'W_IMPORT_LEFT_BEHIND',
+        message:
+          renamed === undefined
+            ? `${file} was imported for ${tool}, but no generated file replaces it: it stays on disk, and any tool that still reads it gets its rules a second time`
+            : `${file} was imported for ${tool} and regenerates as ${renamed}: on a case-sensitive filesystem both stay on disk and its rules load twice`,
+        source: { file },
+        hint:
+          renamed === undefined
+            ? `delete ${file} once init has run; its content is in .rulegate/rules/ now`
+            : `once init has run, list the directory: if it shows both ${file} and ${renamed}, delete ${file}; if it shows one, the filesystem ignores case, they are one file and nothing is left behind`,
+      }),
+    );
+  }
+  return out;
 }

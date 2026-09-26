@@ -160,7 +160,7 @@ Four rules govern this function:
 
 Rules whose `globs` do not apply repo-wide need a decision. If the tool has a native
 per-path mechanism — Copilot's `.github/instructions/*.instructions.md`, Cursor's `.mdc`
-frontmatter — use it, and **split** rather than duplicate: Copilot applies a matching
+frontmatter, Claude Code's `.claude/rules/*.md` with `paths:` — use it, and **split** rather than duplicate: Copilot applies a matching
 path-specific file _in addition to_ the repo-wide one, so writing a rule to both sends it
 twice. If the tool has no such mechanism, `renderConcatenated({ showGlobs: true })` states
 the scope in prose (`**Applies to:** …`), which is documented lossy behavior rather than a

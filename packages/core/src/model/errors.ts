@@ -77,7 +77,14 @@ export type RulegateErrorCode =
   // Code and Windsurf, not a repository defect, and `check` owns exit 1 for drift alone.
   // Silence is the only wrong answer — the tool loads both texts and no byte comparison
   // anywhere can see the contradiction.
-  | 'W_NESTED_MERGE_CONFLICT';
+  | 'W_NESTED_MERGE_CONFLICT'
+  // `init` imported a file that `sync` will not write back to the same path — an unscoped
+  // or nested `.claude/rules` file, a filename that slugs differently, Cursor's legacy
+  // `.cursorrules` (T110). A warning: the import is complete and correct, but the original
+  // stays on disk, unowned, and every tool that still reads it gets its rules twice. Nothing
+  // later can see it — `check` compares only what Rulegate owns, and `doctor`'s duplicate
+  // count keys on provenance the original never had — so `init` is the one place to say so.
+  | 'W_IMPORT_LEFT_BEHIND';
 
 export interface RulegateErrorInit {
   readonly code: RulegateErrorCode;

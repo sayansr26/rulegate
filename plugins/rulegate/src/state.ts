@@ -4,7 +4,7 @@ import { describeState, setupState } from './lib/state.js';
 // `node dist/state.js [projectDir]` — FRESH, REPAIR with the items to fix, or HEALTHY.
 print(
   describeState(
-    setupState(rootArg(process.argv.slice(2)), claudeDirFromEnv(), {
+    await setupState(rootArg(process.argv.slice(2)), claudeDirFromEnv(), {
       expect: bundledVersion(import.meta.url),
     }),
   ),

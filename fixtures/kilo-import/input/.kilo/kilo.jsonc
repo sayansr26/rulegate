@@ -1,0 +1,10 @@
+{
+  // Kilo does not auto-load .kilo/rules/; only the files listed here reach the model.
+  "instructions": [
+    ".kilo/rules/*.md",
+    "https://example.com/team-rules.md",
+    "~/.config/kilo/personal.md",
+    "AGENTS.md",
+    ".kilocode/rules/logging.md",
+  ],
+}

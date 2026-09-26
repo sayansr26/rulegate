@@ -83,6 +83,11 @@ export type {
   ReferenceParse,
 } from '@rulegate/core';
 export { importMcpJson, importedServer } from '@rulegate/core';
+// Added 2026-09-26 (T111). OpenCode and Kilo keep their `instructions` in `opencode.jsonc`
+// and `kilo.jsonc`, and `JSON.parse` throws on the comments those tools load happily. The
+// stripper `importMcpJson` already runs is string-aware; a second one written per adapter
+// is how a `//` inside a URL string ends up read as a comment in one tool and not another.
+export { stripJsonc } from '@rulegate/core';
 
 // Rendering. These exist so that every adapter produces byte-identical output for the
 // same input without reimplementing normalization, ordering, or the generated-file

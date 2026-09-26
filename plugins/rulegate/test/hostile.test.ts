@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { symlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,9 +42,9 @@ describe('hostile repositories (T106 audit)', () => {
     'never reads a device behind a symlinked CLAUDE.md',
     async () => {
       await symlink('/dev/zero', path.join(sb.root, 'CLAUDE.md'));
-      expect(setupState(sb.root, sb.claudeDir).items.find((i) => i.key === 'claude-md')?.ok).toBe(
-        false,
-      );
+      expect(
+        (await setupState(sb.root, sb.claudeDir)).items.find((i) => i.key === 'claude-md')?.ok,
+      ).toBe(false);
       await audit();
     },
   );
@@ -66,7 +67,8 @@ describe('dist/settings.js exit codes', () => {
     try {
       execFileSync(process.execPath, [bin, ...args], {
         stdio: 'ignore',
-        env: { ...process.env, CLAUDE_CONFIG_DIR: sb.claudeDir },
+        // HOME too: an --apply that ignored CLAUDE_CONFIG_DIR must still land in the sandbox.
+        env: { ...process.env, HOME: sb.claudeDir, CLAUDE_CONFIG_DIR: sb.claudeDir },
       });
       return 0;
     } catch (e) {
@@ -74,11 +76,22 @@ describe('dist/settings.js exit codes', () => {
     }
   };
 
-  it('previews with 0, and treats --apply, an unknown flag or a missing value as usage (2)', () => {
+  it('previews and applies with 0, and treats an unknown flag or a missing value as usage (2)', () => {
     expect(run(['--root', sb.root, '--scope', 'project'])).toBe(0);
-    expect(run(['--root', sb.root, '--apply'])).toBe(2);
+    expect(run(['--root', sb.root, '--apply'])).toBe(0);
     expect(run(['--bogus'])).toBe(2);
     expect(run(['--scope'])).toBe(2);
     expect(run(['--scope', 'everywhere'])).toBe(2);
+  });
+
+  it('exits 1 when --apply refuses, and writes nothing through a planted symlink', async () => {
+    await sb.putHome('target.json', '{}\n');
+    await sb.put('.claude/.keep', '');
+    await symlink(
+      path.join(sb.claudeDir, 'target.json'),
+      path.join(sb.root, '.claude/settings.json'),
+    );
+    expect(run(['--root', sb.root, '--scope', 'project', '--apply'])).toBe(1);
+    expect(readFileSync(path.join(sb.claudeDir, 'target.json'), 'utf8')).toBe('{}\n');
   });
 });

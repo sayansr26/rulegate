@@ -9,10 +9,13 @@ const MCP_DOCS = {
   retrieved: '2026-09-04',
 } as const;
 
+// `docs.claude.com/en/docs/claude-code/memory` redirects here; recorded for the same reason
+// as MCP_DOCS. Re-read for T110, which is when `.claude/rules` and the AGENTS.md fallback
+// entered this file.
 const CLAUDE_MEMORY_DOCS = {
-  url: 'https://docs.claude.com/en/docs/claude-code/memory',
-  title: 'Claude Code — Manage Claude’s memory',
-  retrieved: '2026-09-01',
+  url: 'https://code.claude.com/docs/en/memory',
+  title: 'Claude Code — How Claude remembers your project',
+  retrieved: '2026-09-26',
 } as const;
 
 /**
@@ -26,7 +29,7 @@ const CLAUDE_MEMORY_DOCS = {
 export const docs: AdapterDocs = {
   toolName: 'Claude Code',
   homepage: 'https://docs.claude.com/en/docs/claude-code',
-  verifiedAgainst: { version: '2.x', date: '2026-09-01' },
+  verifiedAgainst: { version: '2.1.283', date: '2026-09-26' },
   // A nearer CLAUDE.md supersedes a further one for the same scope.
   resolution: 'override',
   files: [
@@ -50,12 +53,37 @@ export const docs: AdapterDocs = {
       source: CLAUDE_MEMORY_DOCS,
     },
     {
+      pattern: '.claude/rules/**/*.md',
+      scope: 'project',
+      role: 'instructions',
+      managed: true,
+      // Nested `.claude/rules/` directories load on demand, like nested CLAUDE.md files, and
+      // alongside the root ones rather than instead of them. The vendor page does not say
+      // what a nested rule's `paths` are relative to; T117 is the first real check.
+      nesting: 'all-merged',
+      description:
+        'Project rules, discovered recursively. A file with `paths:` frontmatter loads only when Claude reads a file matching one of its globs; a file without it loads at launch with the same priority as `.claude/CLAUDE.md`. Rulegate generates one per glob-scoped canonical rule, and keeps repo-wide rules in CLAUDE.md.',
+      source: CLAUDE_MEMORY_DOCS,
+    },
+    {
       pattern: '~/.claude/CLAUDE.md',
       scope: 'global',
       role: 'instructions',
       managed: false,
       description:
         'User-level memory applied across every project. Read-only context for `doctor`: Rulegate never writes outside the repository.',
+      source: CLAUDE_MEMORY_DOCS,
+    },
+    {
+      // One level, not `**`: the global probe refuses a recursive pattern so that `doctor`
+      // never walks the home directory, and a declared entry nobody probes is worse than a
+      // narrower one that is measured.
+      pattern: '~/.claude/rules/*.md',
+      scope: 'global',
+      role: 'instructions',
+      managed: false,
+      description:
+        'User-level rules applied to every project, loaded before project rules; neither set overrides the other. Read-only context for `doctor`, which counts the top level of the directory only — rule files in its subdirectories load too but are not measured.',
       source: CLAUDE_MEMORY_DOCS,
     },
     {
@@ -106,22 +134,25 @@ export const docs: AdapterDocs = {
     {
       level: 'info',
       message:
-        'Claude Code has no native per-glob rule scoping, so a glob-scoped canonical rule is rendered with an "Applies to:" line stating its scope in prose. This mapping is lossy but visible; dropping the scope silently would turn a component-only rule into a repo-wide one.',
+        'A glob-scoped canonical rule renders to its own `.claude/rules/<id>.md` with a `paths:` list, and Claude Code loads it only when it reads a file matching one of the globs. `paths` is the only frontmatter key Claude Code reads, and the frontmatter is stripped before the rule loads, so the rule’s description is written as a heading in the body. Frontmatter that does not parse is ignored without an error and the rule loads repo-wide — an unquoted glob starting with `*` is enough — which is why every glob is written double-quoted and one per list item: brace expansion puts commas inside a glob, so the comma-separated form cannot carry it.',
+      source: CLAUDE_MEMORY_DOCS,
     },
     {
       level: 'info',
       message:
-        'Rulegate writes CLAUDE.md only. `.claude/settings.json` carries permissions and hooks — a materially different trust surface from instructions — and generating it is deliberately out of scope for v0.',
+        '`doctor` bills a path-scoped rule file as if it were always loaded, as it does Copilot’s and Cursor’s scoped files: it cannot know which files a session will read. The token figure for this tool is an upper bound.',
+      source: CLAUDE_MEMORY_DOCS,
+    },
+    {
+      level: 'info',
+      message:
+        'Rulegate writes CLAUDE.md, `.claude/rules/` and `.mcp.json` only. `.claude/settings.json` carries permissions and hooks — a materially different trust surface from instructions — and generating it is deliberately out of scope for v0.',
     },
     {
       level: 'warn',
       message:
-        'Claude Code does not read AGENTS.md natively. That gap is the reason this project exists; the generated CLAUDE.md is what closes it.',
-      source: {
-        url: 'https://github.com/anthropics/claude-code/issues/6235',
-        title: 'claude-code#6235 — Support AGENTS.md',
-        retrieved: '2026-09-01',
-      },
+        'Since v2.1.277 Claude Code reads AGENTS.md — but only when there is no CLAUDE.md, .claude/CLAUDE.md or CLAUDE.local.md in the working directory or above it; `.claude/rules/` files do not count toward that check. Rulegate emits no CLAUDE.md when every rule selected for this adapter is glob-scoped, so enabling codex alongside it then has Claude Code read AGENTS.md too, and receive each scoped rule twice: once scoped, once as AGENTS.md prose. `doctor` does not model the fallback yet, so it cannot report that double load.',
+      source: CLAUDE_MEMORY_DOCS,
     },
     {
       level: 'warn',

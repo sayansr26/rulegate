@@ -54,6 +54,12 @@ importers:
         specifier: workspace:*
         version: link:../../adapter-kit
 
+  packages/adapters/antigravity:
+    dependencies:
+      '@rulegate/adapter-kit':
+        specifier: workspace:*
+        version: link:../../adapter-kit
+
   packages/adapters/claude-code:
     dependencies:
       '@rulegate/adapter-kit':
@@ -90,6 +96,18 @@ importers:
         specifier: workspace:*
         version: link:../../adapter-kit
 
+  packages/adapters/kilo:
+    dependencies:
+      '@rulegate/adapter-kit':
+        specifier: workspace:*
+        version: link:../../adapter-kit
+
+  packages/adapters/opencode:
+    dependencies:
+      '@rulegate/adapter-kit':
+        specifier: workspace:*
+        version: link:../../adapter-kit
+
   packages/adapters/roo-code:
     dependencies:
       '@rulegate/adapter-kit':
@@ -113,6 +131,9 @@ importers:
       '@rulegate/adapter-aider':
         specifier: workspace:*
         version: link:../adapters/aider
+      '@rulegate/adapter-antigravity':
+        specifier: workspace:*
+        version: link:../adapters/antigravity
       '@rulegate/adapter-claude-code':
         specifier: workspace:*
         version: link:../adapters/claude-code
@@ -131,6 +152,12 @@ importers:
       '@rulegate/adapter-gemini':
         specifier: workspace:*
         version: link:../adapters/gemini
+      '@rulegate/adapter-kilo':
+        specifier: workspace:*
+        version: link:../adapters/kilo
+      '@rulegate/adapter-opencode':
+        specifier: workspace:*
+        version: link:../adapters/opencode
       '@rulegate/adapter-roo-code':
         specifier: workspace:*
         version: link:../adapters/roo-code

@@ -1,0 +1,17 @@
+{
+  // OpenCode loads JSONC, so the importer has to as well.
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-sonnet-4-5",
+  "instructions": [
+    "docs/guidelines.md",
+    "./docs/rules/*.md",
+    /* fetched by OpenCode at startup; never by Rulegate */
+    "https://raw.githubusercontent.com/example/shared-rules/main/style.md",
+    "~/.config/opencode/personal.md",
+    "/etc/opencode/team.md",
+    "../outside.md",
+    "AGENTS.md",
+    ".agent-os/AGENTS.md",
+    ".ruler/AGENTS.md",
+  ],
+}

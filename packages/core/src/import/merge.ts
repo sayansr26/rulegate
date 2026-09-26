@@ -1,7 +1,9 @@
 import { hashContents, loadState } from '../state/state.js';
 import { serializeCanonical } from '../model/serialize.js';
 import { compareCodepoint } from '../render/order.js';
+import { MARKER_TEXT } from '../render/marker.js';
 import { collectImports } from './collect.js';
+import { computePlan } from '../pipeline/plan.js';
 import type { Adapter } from '../adapter/adapter.js';
 import type { RulegateError } from '../model/errors.js';
 import type { Canonical } from '../model/canonical.js';
@@ -10,6 +12,7 @@ import type { Plan } from '../pipeline/plan.js';
 import type { ReadOnlyFileSystem } from '../fs/types.js';
 import type { RuleDocument } from '../model/rule.js';
 import type { ToolId } from '../model/ids.js';
+import type { ImportSource } from './dedupe.js';
 
 /**
  * T051 — merge a hand-edit on a generated file back into `.rulegate/`.
@@ -130,17 +133,27 @@ export async function computeMergePlan(input: MergeInput): Promise<MergePlan> {
   // What does survive is order, and `Artifact.provenance.ruleIds` records exactly which
   // canonical rules produced a file and in what sequence — the field's own comment names
   // this task as its consumer.
-  const bySource = new Map<string, RuleDocument[]>();
-  for (const source of collected.sources) {
-    for (const rule of source.rules) {
-      const list = bySource.get(rule.source.file);
-      if (list === undefined) bySource.set(rule.source.file, [rule]);
-      else list.push(rule);
-    }
-  }
+  const bySource = groupBySource(collected.sources);
+
+  // The ancestor, read back through the same adapter. Neither scope nor body can be
+  // compared to canonical directly: a format that does not carry globs reads every rule
+  // back unscoped, and a render need not read back to the body it came from (see
+  // `recoverBody`), so the comparison would "merge" an edit nobody made. Only a
+  // difference between the edited file and the render it started as is an edit — for
+  // `.claude/rules/`, a changed `paths:` list or body (T110).
+  const ancestors = await collectImports({
+    repoRoot,
+    fs: withRendered(fs, new Map(eligible.map((p) => [p, rendered.get(p) ?? '']))),
+    adapters: adapters.filter((a) => tools.has(a.name)),
+    canonical,
+  });
+  const ancestorBySource = groupBySource(ancestors.sources);
 
   const byId = new Map(canonical.rules.map((r) => [r.id, r]));
-  const proposals = new Map<string, { body: string; from: Set<string> }>();
+  const proposals = new Map<
+    string,
+    { body: string; globs: readonly string[]; from: Set<string>; rescoped: boolean }
+  >();
 
   for (const path of eligible) {
     const artifact = plan.artifacts.find((a) => a.path === path);
@@ -172,12 +185,25 @@ export async function computeMergePlan(input: MergeInput): Promise<MergePlan> {
       const existing = byId.get(id);
       const edited = imported[i];
       if (existing === undefined || edited === undefined) continue;
-      if (edited.body === existing.body) continue;
+      const ancestor = ancestorBySource.get(path)?.[i];
+      const before = ancestor?.frontmatter.globs;
+      const rescoped = before !== undefined && !sameList(before, edited.frontmatter.globs);
+      const body = recoverBody(existing, ancestor, edited, rendered.get(path) ?? '');
+      if (body === undefined) {
+        refusals.push({
+          path,
+          reason: 'unrecoverable',
+          detail: `the text rulegate wrote around rule \`${id}\` — its frontmatter, marker or heading — was edited or no longer parses; edit the rule in .rulegate/rules/ instead`,
+        });
+        continue;
+      }
+      if (body === existing.body && !rescoped) continue;
+      const globs = rescoped ? edited.frontmatter.globs : existing.frontmatter.globs;
 
       const seen = proposals.get(id);
       if (seen === undefined) {
-        proposals.set(id, { body: edited.body, from: new Set([path]) });
-      } else if (seen.body === edited.body) {
+        proposals.set(id, { body, globs, from: new Set([path]), rescoped });
+      } else if (seen.body === body && sameList(seen.globs, globs)) {
         seen.from.add(path);
       } else {
         // Two generated files were edited differently and both feed one rule. Merging
@@ -193,10 +219,56 @@ export async function computeMergePlan(input: MergeInput): Promise<MergePlan> {
     }
   }
 
-  const merged: RuleDocument[] = canonical.rules.map((rule) => {
-    const proposal = proposals.get(rule.id);
-    return proposal === undefined ? rule : { ...rule, body: proposal.body };
-  });
+  const apply = (rules: readonly RuleDocument[]): RuleDocument[] =>
+    rules.map((rule) => {
+      const proposal = proposals.get(rule.id);
+      return proposal === undefined
+        ? rule
+        : {
+            ...rule,
+            body: proposal.body,
+            frontmatter: { ...rule.frontmatter, globs: proposal.globs },
+          };
+    });
+
+  // A new scope can move a rule to another file: for Claude Code, an emptied `paths:`
+  // sends it from `.claude/rules/` into CLAUDE.md, and an `**Applies to:**` line added to
+  // CLAUDE.md sends it the other way. The file the user edited then no longer holds the
+  // rule, so the next `sync` meets a hand-edited orphan it must refuse to delete, or a
+  // hand-edited file it must refuse to overwrite, and the rule loads from both places.
+  // Whether the path moves is the adapter's decision, so the merged model is rendered
+  // through the one renderer and asked, rather than guessed from the globs here. The
+  // render is the root level alone, so only root-level artifacts are judged.
+  if ([...proposals.values()].some((p) => p.rescoped)) {
+    const next = await computePlan({
+      repoRoot,
+      fs,
+      adapters,
+      canonical: { ...canonical, rules: apply(canonical.rules) },
+    });
+    const nested = plan.levels.filter((l) => l.dir !== '').map((l) => `${l.dir}/`);
+    for (const [id, proposal] of [...proposals].sort(([a], [b]) => compareCodepoint(a, b))) {
+      if (!proposal.rescoped) continue;
+      const left = [...proposal.from]
+        .filter((path) => !nested.some((dir) => path.startsWith(dir)))
+        .filter((path) => {
+          const artifact = next.artifacts.find((a) => a.path === path);
+          return artifact?.provenance?.ruleIds?.includes(id) !== true;
+        })
+        .sort(compareCodepoint);
+      if (left.length === 0) continue;
+      for (const path of left) {
+        refusals.push({
+          path,
+          reason: 'unrecoverable',
+          detail: `the new scope moves rule \`${id}\` out of this file, and sync could then neither replace nor delete your edit; run \`rulegate sync --force\` to put the file back (it is backed up first), then change \`globs\` in .rulegate/rules/`,
+        });
+      }
+      proposals.delete(id);
+    }
+  }
+
+  const merged = apply(canonical.rules);
 
   // Serialized both ways rather than assembled by hand: `serializeCanonical` is what
   // `init` writes and what the parser reads back, so a merge that produced bytes by any
@@ -234,4 +306,97 @@ export async function computeMergePlan(input: MergeInput): Promise<MergePlan> {
   refusals.sort((a, b) => compareCodepoint(a.path, b.path));
 
   return { merges, files, refusals, errors: collected.errors };
+}
+
+/**
+ * The canonical body an edited section stands for, or `undefined` when it cannot be told.
+ *
+ * The edit is measured against the ancestor *read back*, not against canonical, because a
+ * render and its read-back need not carry the same body. A rule with no description whose
+ * body opens with `## Server components` renders a file that reads back with that heading
+ * as its description; a file written without the marker keeps the description's heading
+ * in the body it reads back. Compared to canonical, either one looks edited on every
+ * merge, and the proposal then drops the user's heading or writes a second copy of ours.
+ * The difference between canonical and the read-back is a fixed leading run of text, so
+ * it is put back, or taken off, the edited body the same way.
+ */
+function recoverBody(
+  existing: RuleDocument,
+  ancestor: RuleDocument | undefined,
+  edited: RuleDocument,
+  render: string,
+): string | undefined {
+  if (ancestor === undefined) return edited.body;
+  // Frontmatter that no longer parses reads back as one body holding our own marker or
+  // frontmatter: a merge would write the raw YAML into canonical and drop the scope. Both
+  // tests are against the ancestor, because a rule may quote the marker in its own text,
+  // and the second only for a file we wrote with frontmatter: in a plain CLAUDE.md section
+  // a leading `---` is a horizontal rule the user typed. Broken frontmatter also loses the
+  // scope it carried, which a horizontal rule under a still-parsing `paths:` does not.
+  if (edited.body.includes(MARKER_TEXT) && !ancestor.body.includes(MARKER_TEXT)) return undefined;
+  if (
+    render.startsWith('---\n') &&
+    /^---\n/.test(edited.body) &&
+    !/^---\n/.test(ancestor.body) &&
+    edited.frontmatter.globs.length === 0 &&
+    ancestor.frontmatter.globs.length > 0
+  ) {
+    return undefined;
+  }
+
+  const described = edited.frontmatter.description;
+  const was = ancestor.frontmatter.description;
+  if (edited.body === ancestor.body && described === was) return existing.body;
+  if (ancestor.body === existing.body) return edited.body;
+
+  if (existing.body.endsWith(ancestor.body)) {
+    // Canonical text the read-back took as a description: restore it, with the heading
+    // text as edited.
+    const lead = existing.body.slice(0, existing.body.length - ancestor.body.length);
+    if (described === was) return lead + edited.body;
+    if (was === undefined || described === undefined || !lead.includes(was)) return undefined;
+    // A replacer function, because a string replacement expands `$&`, `$'` and `$$` in
+    // what the user typed.
+    return lead.replace(was, () => described) + edited.body;
+  }
+  if (ancestor.body.endsWith(existing.body)) {
+    // Text `write` added that the read-back keeps: take it off again, unless it was edited.
+    const lead = ancestor.body.slice(0, ancestor.body.length - existing.body.length);
+    return edited.body.startsWith(lead) ? edited.body.slice(lead.length) : undefined;
+  }
+  return edited.body;
+}
+
+function groupBySource(sources: readonly ImportSource[]): Map<string, RuleDocument[]> {
+  const bySource = new Map<string, RuleDocument[]>();
+  for (const source of sources) {
+    for (const rule of source.rules) {
+      const list = bySource.get(rule.source.file);
+      if (list === undefined) bySource.set(rule.source.file, [rule]);
+      else list.push(rule);
+    }
+  }
+  return bySource;
+}
+
+function sameList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((item, i) => item === b[i]);
+}
+
+/** `fs` with the given paths reading as the given text: the files as Rulegate wrote them. */
+function withRendered(
+  fs: ReadOnlyFileSystem,
+  rendered: ReadonlyMap<string, string>,
+): ReadOnlyFileSystem {
+  return {
+    readFile: async (p) => rendered.get(p) ?? fs.readFile(p),
+    tryReadFile: async (p) => rendered.get(p) ?? fs.tryReadFile(p),
+    readFileRaw: async (p) => {
+      const text = rendered.get(p);
+      return text === undefined ? fs.readFileRaw(p) : new TextEncoder().encode(text);
+    },
+    exists: (p) => fs.exists(p),
+    listDir: (p) => fs.listDir(p),
+    glob: (p) => fs.glob(p),
+  };
 }

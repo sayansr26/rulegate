@@ -5,6 +5,54 @@ All notable changes to this project are recorded here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- **Adapters for Antigravity, OpenCode and Kilo Code.** Antigravity gets one
+  `.agents/rules/<id>.md` per rule with a native `trigger: glob` for scoped rules. OpenCode gets
+  `.opencode/rules/*.md` plus a `.opencode/opencode.json` that Rulegate owns outright and that
+  lists them; OpenCode appends it to your own `instructions`, and your root `opencode.json` is
+  never touched. Kilo Code gets `.kilocode/rules/*.md`, the one Kilo location loaded without a
+  config entry. `rulegate init` imports each tool's existing rules, and the local files OpenCode
+  and Kilo `instructions` list. It never fetches a remote instruction URL, never follows an entry
+  out of the repository — by `..`, an absolute path or a symlink — and never follows one into
+  `.agent-os/`, `.ruler/` or a file another adapter imports, such as a `.cursor/rules/*.mdc`. It
+  warns when a setting in `.opencode/opencode.json` would stop applying, when an existing file it
+  did not import sits where it renders a rule, when an Antigravity rule is inactive today because
+  of its frontmatter, and names every imported file the tool will keep loading beside its
+  generated copy. `@rulegate/adapter-kit` now exports `stripJsonc`, an additive change with no
+  `ADAPTER_API_VERSION` bump.
+- **`init` warns `W_IMPORT_LEFT_BEHIND`** for every file it imported that no generated file
+  replaces (an unscoped or nested `.claude/rules` file, a filename that slugs differently,
+  Cursor's `.cursorrules`): the original stays on disk and tools that read it get its rules
+  twice. For a case-only difference the hint says to list the directory and delete the old name
+  only if both appear, never to rename.
+
+### Changed
+
+- **Claude Code: glob-scoped rules now render to native `.claude/rules/<id>.md` files** with a
+  double-quoted `paths:` list (loaded only when Claude reads a matching file) and leave
+  `CLAUDE.md`; repo-wide rules stay in `CLAUDE.md`. `read()` and `init` import
+  `.claude/rules/**/*.md` back, one rule per file, reading frontmatter the way Claude Code
+  2.1.283 does, including its retry for tab indentation and unquoted top-level values. After
+  upgrading, `rulegate check` reports drift until `rulegate sync`. A pre-existing hand-written
+  `.claude/rules/<id>.md` at a generated path is refused as unmanaged (`--force` backs it up
+  first). The claude-code docs now record that Claude Code ≥2.1.277 reads `AGENTS.md` when no
+  `CLAUDE.md` exists, and `doctor` now measures user-level `~/.claude/rules/*.md` (top level
+  only). The Copilot docs list `.claude/rules/**/*.md`, which VS Code's Local agent also loads.
+
+### Fixed
+
+- **`W_NESTED_MERGE_CONFLICT` is decided per generated file from its provenance**, at both ends
+  of the override: a repo-wide override of a repo-wide rule no longer warns for Claude Code, and
+  a repo-wide override of a root rule scoped into `.claude/rules/` now does. `doctor` no longer
+  reports `.claude/rules` files as shadowed by `CLAUDE.md`.
+- **`sync --import` recovers an edited `paths:`/globs scope along with the body.** It no longer
+  drops a description-less rule's own leading heading, no longer copies the description heading
+  into the body under `marker: false`, and refuses a file whose frontmatter no longer parses
+  instead of writing raw YAML into canonical. It refuses a scope edit that would move the rule
+  to another file (an emptied `paths:`, an `**Applies to:**` typed into `CLAUDE.md`), which the
+  next `sync` could neither replace nor delete, and names `sync --force` as the recovery.
+
 ### Internal
 
 - **The Claude Code plugin has a home; its hooks and skills are still to come.** agent-os's
@@ -22,8 +70,8 @@ All notable changes to this project are recorded here. This project follows
   from agent-os. `/rulegate:init` audits the project's Claude Code context layer and setup
   (FRESH, REPAIR or HEALTHY) in one read-only call, hands drift to `rulegate check` and token
   cost to `rulegate doctor`, and puts anything bound for `CLAUDE.md` in `.rulegate/rules/`
-  instead, because `CLAUDE.md` is generated. Its settings pass previews in this version and
-  does not apply yet.
+  instead, because `CLAUDE.md` is generated. Its settings pass previews, asks once, and
+  applies.
 - **A SessionStart hook** tells Claude where the work stands — branch, recent commits,
   uncommitted files, the active task and handoff note — and which `rulegate:*` agent to use
   for what, which features are mapped, and that rules are edited in `.rulegate/rules/`.
@@ -36,6 +84,20 @@ All notable changes to this project are recorded here. This project follows
   filesystem is. On the first edit to an unmapped feature it also suggests asking the
   cartographer, once per session; `"cartographerReminder": false` in `.claude/rulegate.json`
   turns that off.
+- **The plugin's settings pass now writes.** `/rulegate:init` merges the git write-protection
+  deny rules and the task tools into the project's `.claude/settings.json`,
+  `~/.claude/settings.json`, or both, after one confirmation. It keeps existing keys, allow and
+  deny rules, a value you set yourself, the file's permissions and a CRLF `CLAUDE.md`'s line
+  endings. The task-tracking rule is only inserted; nothing else in your `CLAUDE.md` changes.
+  Every file it changes is copied to `<file>.rulegate.bak` first, keeping the first backup. In a
+  Rulegate project the task-tracking rule becomes `.rulegate/rules/working-agreement.md` for
+  `rulegate sync` to render, and the generated `CLAUDE.md` is never edited. It refuses and leaves
+  alone: invalid JSON, a file it cannot read, a file that is not UTF-8, symlinks, generated files
+  (including while `state.json` does not parse), a rule file you already wrote, and a project
+  target that is really `~/.claude`. The preview marks each item it will refuse, and the setup
+  state stops pointing a refused item back at the settings pass. A `--root` that is empty or not
+  a directory is a usage error. The commands the plugin has the agent run are
+  `npx --no rulegate …`, so nothing is fetched from the registry.
 
 ## [0.3.0] — unreleased
 

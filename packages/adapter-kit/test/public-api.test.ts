@@ -51,6 +51,8 @@ const FROZEN_V1 = [
   'ReferenceParse (type)',
   'importMcpJson (value)',
   'importedServer (value)',
+  // Added 2026-09-26 (T111): the JSONC reader for OpenCode's and Kilo's config files.
+  'stripJsonc (value)',
   'ADAPTER_API_VERSION (value)',
   'ALL_TOOLS (value)',
   'Adapter (type)',

@@ -1,5 +1,17 @@
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+
+// ../../packages/core/src/fs/glob.ts
+var init_glob = __esm({
+  "../../packages/core/src/fs/glob.ts"() {
+    "use strict";
+  }
+});
+
 // src/lib/audit.ts
-import { basename, join as join5 } from "node:path";
+import { basename as basename3, join as join7 } from "node:path";
 
 // src/lib/features.ts
 import { join as join2 } from "node:path";
@@ -46,7 +58,7 @@ function allowed(args) {
 }
 function runGit(args, cwd) {
   if (!allowed(args)) return Promise.resolve(void 0);
-  return new Promise((resolve) => {
+  return new Promise((resolve3) => {
     execFile(
       "git",
       [...GIT_SAFETY_ARGS, ...args],
@@ -59,29 +71,38 @@ function runGit(args, cwd) {
         timeout: 5e3,
         shell: false
       },
-      (error, stdout) => resolve(error ? void 0 : stdout)
+      (error, stdout) => resolve3(error ? void 0 : stdout)
     );
   });
 }
 
 // src/lib/read.ts
+import { isUtf8 } from "node:buffer";
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 var MAX_READ_BYTES = 4 * 1024 * 1024;
-function read(path) {
+function read(path2) {
   try {
-    const st = statSync(path);
+    const st = statSync(path2);
     if (!st.isFile() || st.size > MAX_READ_BYTES) return void 0;
-    return readFileSync(path, "utf8");
+    return readFileSync(path2, "utf8");
   } catch {
     return void 0;
+  }
+}
+function isUtf8File(path2) {
+  try {
+    const st = statSync(path2);
+    return st.isFile() && st.size <= MAX_READ_BYTES && isUtf8(readFileSync(path2));
+  } catch {
+    return false;
   }
 }
 function readInRepo(root, rel) {
   try {
     const target = realpathSync(join(root, rel));
-    const within = relative(realpathSync(root), target);
-    if (within === "" || within === ".." || within.startsWith(`..${sep}`) || isAbsolute(within)) {
+    const within2 = relative(realpathSync(root), target);
+    if (within2 === "" || within2 === ".." || within2.startsWith(`..${sep}`) || isAbsolute(within2)) {
       return void 0;
     }
     return read(target);
@@ -89,8 +110,8 @@ function readInRepo(root, rel) {
     return void 0;
   }
 }
-function readJson(path) {
-  const text = read(path);
+function readJson(path2) {
+  const text = read(path2);
   if (text === void 0) return void 0;
   try {
     return JSON.parse(text);
@@ -98,37 +119,45 @@ function readJson(path) {
     return "INVALID";
   }
 }
-function ls(path) {
+function ls(path2) {
   try {
-    return readdirSync(path).sort();
+    return readdirSync(path2).sort();
   } catch {
     return [];
   }
 }
-function isDir(path) {
+function isDir(path2) {
   try {
-    return statSync(path).isDirectory();
+    return statSync(path2).isDirectory();
   } catch {
     return false;
   }
 }
-function isRealDir(path) {
+function isRealDir(path2) {
   try {
-    return lstatSync(path).isDirectory();
+    return lstatSync(path2).isDirectory();
   } catch {
     return false;
   }
 }
-function isFile(path) {
+function exists(path2) {
   try {
-    return statSync(path).isFile();
+    lstatSync(path2);
+    return true;
   } catch {
     return false;
   }
 }
-function size(path) {
+function isFile(path2) {
   try {
-    return statSync(path).size;
+    return statSync(path2).isFile();
+  } catch {
+    return false;
+  }
+}
+function size(path2) {
+  try {
+    return statSync(path2).size;
   } catch {
     return 0;
   }
@@ -143,6 +172,7 @@ var isControl = (c) => {
   return n < 32 || n === 127;
 };
 var hasControl = (s) => Array.from(s).some(isControl);
+var stripControl = (s) => Array.from(s, (c) => isControl(c) ? " " : c).join("");
 
 // src/lib/config.ts
 var CONFIG_PATH = ".claude/rulegate.json";
@@ -273,7 +303,7 @@ async function coverage(root, { stale = false } = {}) {
 }
 
 // src/lib/settings.ts
-import { join as join3 } from "node:path";
+import { join as join3, resolve } from "node:path";
 var TODO_ENV = "CLAUDE_CODE_ENABLE_TODO_TOOLS";
 var TASK_RULE = `- **Always track work with the task tool (TaskCreate / TaskUpdate).** Any request
   with more than one step gets a task list before work starts: one task per
@@ -327,12 +357,16 @@ var GIT_DENY = Object.freeze([
 ]);
 var normRule = (r) => r.replace(/:\*\)$/, " *)").replace(/\s+/g, " ");
 function claudeHome(env, home) {
-  return env.CLAUDE_CONFIG_DIR ?? join3(home, ".claude");
+  return resolve(env.CLAUDE_CONFIG_DIR || join3(home, ".claude"));
 }
 function settingsPath(scope, root, claudeDir) {
   return scope === "user" ? join3(claudeDir, "settings.json") : join3(root, ".claude/settings.json");
 }
 var isRulegateProject = (root) => isDir(join3(root, ".rulegate"));
+function ruleTarget(scope, root, claudeDir) {
+  if (scope === "user") return join3(claudeDir, "CLAUDE.md");
+  return isRulegateProject(root) ? join3(root, TASK_RULE_FILE) : join3(root, "CLAUDE.md");
+}
 function planSettings(text, { todo = true } = {}) {
   let settings = {};
   if (text !== void 0) {
@@ -370,29 +404,29 @@ function planSettings(text, { todo = true } = {}) {
 `
   };
 }
-function insertTaskRule(text) {
+function insertTaskRule(input) {
+  const crlf = input.includes("\r\n") && !/(^|[^\r])\n/.test(input);
+  const text = crlf ? input.replace(/\r\n/g, "\n") : input;
   const heading = /^##\s+Operator preferences\s*$/m.exec(text);
   let next;
+  const pad2 = (before) => before === "" || before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
   if (heading) {
     const start = heading.index + heading[0].length;
     const rest = text.slice(start);
     const nextHeading = rest.search(/^##\s+/m);
     const end = nextHeading === -1 ? text.length : start + nextHeading;
-    next = `${text.slice(0, end).trimEnd()}
-
-${TASK_RULE}
-
-${text.slice(end)}`;
+    const before = text.slice(0, end);
+    const after = text.slice(end);
+    next = `${before}${pad2(before)}${TASK_RULE}
+${after === "" ? "" : "\n"}${after}`;
   } else {
-    next = `${text.trimEnd()}
-
-## Working agreement
+    next = `${text}${pad2(text)}## Working agreement
 
 ${TASK_RULE}
 `;
   }
   return {
-    next: next.replace(/\n{4,}/g, "\n\n\n"),
+    next: crlf ? next.replace(/\n/g, "\r\n") : next,
     section: heading ? "Operator preferences" : "Working agreement"
   };
 }
@@ -422,6 +456,7 @@ ${TASK_RULE}
     if (inRules || /TaskCreate/.test(read(join3(root, "CLAUDE.md")) ?? "")) {
       return { status: "present", file: TASK_RULE_FILE };
     }
+    if (exists(join3(root, TASK_RULE_FILE))) return { status: "exists", file: TASK_RULE_FILE };
     return {
       status: "add",
       file: TASK_RULE_FILE,
@@ -452,13 +487,274 @@ function planScope(scope, root, claudeDir) {
 }
 
 // src/lib/state.ts
-import { realpathSync as realpathSync2 } from "node:fs";
-import { join as join4 } from "node:path";
+import { realpathSync as realpathSync4 } from "node:fs";
+import { join as join6 } from "node:path";
+
+// src/lib/refusals.ts
+import { lstatSync as lstatSync2, realpathSync as realpathSync3 } from "node:fs";
+import { basename as basename2, dirname as dirname2, isAbsolute as isAbsolute3, join as join5, relative as relative3, sep as sep3 } from "node:path";
+
+// ../../packages/core/src/model/paths.ts
+var RULEGATE_DIR = ".rulegate";
+var MANIFEST_PATH = `${RULEGATE_DIR}/rulegate.yaml`;
+var RULES_DIR = `${RULEGATE_DIR}/rules`;
+var RULES_GLOB = `${RULES_DIR}/**/*.md`;
+var MCP_DIR = `${RULEGATE_DIR}/mcp`;
+var MCP_SERVERS_PATH = `${MCP_DIR}/servers.yaml`;
+var STATE_PATH = `${RULEGATE_DIR}/state.json`;
+var BACKUP_DIR = `${RULEGATE_DIR}/backup`;
+
+// ../../packages/core/src/fs/case.ts
+function foldPath(relPath) {
+  return relPath.toLowerCase();
+}
+function pathKeyFor(caseInsensitive) {
+  return caseInsensitive ? foldPath : (relPath) => relPath;
+}
+function flipCase(name) {
+  let flipped = "";
+  for (const char of name) {
+    const lower = char.toLowerCase();
+    const upper = char.toUpperCase();
+    flipped += char === lower ? upper : lower;
+  }
+  return flipped;
+}
+async function probeCaseInsensitive(fs) {
+  let entries;
+  try {
+    entries = await fs.listDir("");
+  } catch {
+    return false;
+  }
+  const listed = new Set(entries.map((e) => e.name));
+  for (const entry of entries) {
+    if (entry.kind !== "file") continue;
+    const flipped = flipCase(entry.name);
+    if (listed.has(flipped)) continue;
+    return await fs.exists(flipped);
+  }
+  return false;
+}
+
+// ../../packages/core/src/index.ts
+init_glob();
+
+// ../../packages/core/src/state/state.ts
+function parseState(text) {
+  if (text === void 0 || text.trim() === "") return void 0;
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return void 0;
+  }
+  if (typeof raw !== "object" || raw === null) return void 0;
+  const record = raw;
+  if (typeof record["schemaVersion"] !== "number") return void 0;
+  if (!Array.isArray(record["artifacts"])) return void 0;
+  const artifacts = [];
+  for (const entry of record["artifacts"]) {
+    if (typeof entry !== "object" || entry === null) return void 0;
+    const item = entry;
+    if (typeof item["path"] !== "string" || typeof item["hash"] !== "string" || typeof item["adapter"] !== "string" || typeof item["kind"] !== "string") {
+      return void 0;
+    }
+    artifacts.push({
+      path: item["path"],
+      hash: item["hash"],
+      adapter: item["adapter"],
+      kind: item["kind"]
+    });
+  }
+  return { schemaVersion: record["schemaVersion"], artifacts };
+}
+function findArtifact(state, path2, key = (p) => p) {
+  const wanted = key(path2);
+  return state.artifacts.find((a) => key(a.path) === wanted);
+}
+
+// ../../packages/core/src/io/node.ts
+import { existsSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+function findRepoRoot(startDir) {
+  const start = path.resolve(startDir);
+  const home = path.resolve(os.homedir());
+  let dir = start;
+  let outermost;
+  for (; ; ) {
+    if (probe(path.join(dir, ".git"))) return dir;
+    if (probe(path.join(dir, RULEGATE_DIR))) outermost = dir;
+    const parent = path.dirname(dir);
+    if (parent === dir || dir === home) return outermost ?? start;
+    dir = parent;
+  }
+}
+function probe(absPath) {
+  try {
+    return existsSync(absPath);
+  } catch {
+    return false;
+  }
+}
+
+// src/lib/guard.ts
+import { existsSync as existsSync2, readdirSync as readdirSync2, realpathSync as realpathSync2 } from "node:fs";
+import { basename, dirname, isAbsolute as isAbsolute2, join as join4, relative as relative2, resolve as resolve2, sep as sep2 } from "node:path";
+
+// src/lib/session.ts
+var inline = (s) => stripControl(s).replace(/`/g, "");
+
+// src/lib/guard.ts
+function realish(p) {
+  const rest = [];
+  let dir = p;
+  for (let i = 0; i < 256; i++) {
+    try {
+      return join4(realpathSync2.native(dir), ...[...rest].reverse());
+    } catch {
+      const parent = dirname(dir);
+      if (parent === dir) return p;
+      rest.push(basename(dir));
+      dir = parent;
+    }
+  }
+  return p;
+}
+function within(root, abs) {
+  const rel = relative2(root, abs);
+  if (rel === "" || rel === ".." || rel.startsWith(`..${sep2}`) || isAbsolute2(rel)) return void 0;
+  return rel.split(sep2).join("/");
+}
+function probeView(root) {
+  return {
+    listDir: (rel) => Promise.resolve(
+      readdirSync2(join4(root, rel), { withFileTypes: true }).map((e) => ({
+        name: e.name,
+        kind: e.isSymbolicLink() ? "symlink" : e.isDirectory() ? "dir" : "file"
+      }))
+    ),
+    exists: (rel) => Promise.resolve(existsSync2(join4(root, rel)))
+  };
+}
+function ownerOf(abs) {
+  const root = findRepoRoot(dirname(abs));
+  const state = parseState(read(join4(root, STATE_PATH)));
+  return state === void 0 ? void 0 : { root, state };
+}
+async function judge(abs) {
+  const owner = ownerOf(abs);
+  if (owner === void 0) return void 0;
+  const rel = within(owner.root, abs);
+  if (rel === void 0) return void 0;
+  const key = pathKeyFor(await probeCaseInsensitive(probeView(owner.root)));
+  if (key(rel) === key(STATE_PATH) || key(rel).startsWith(key(".rulegate/backup/"))) {
+    return {
+      kind: "deny",
+      reason: `${inline(rel)} is maintained by \`rulegate sync\` and \`rulegate restore\`, not by hand. Edit .rulegate/rules/ and run \`rulegate sync\`.`
+    };
+  }
+  const artifact = findArtifact(owner.state, rel, key);
+  if (artifact === void 0) return void 0;
+  return {
+    kind: "deny",
+    reason: `${inline(artifact.path)} is generated by Rulegate (${inline(artifact.adapter)}) from .rulegate/rules/, and the next \`rulegate sync\` would revert this edit. Make the change in the rule that produces it, then run \`rulegate sync\`. If the file already carries a hand-edit worth keeping, \`rulegate sync --import\` merges it back into the rule.`
+  };
+}
+async function guard(targetAbs) {
+  const spellings = [.../* @__PURE__ */ new Set([resolve2(targetAbs), realish(targetAbs)])];
+  for (const abs of spellings) {
+    const decision = await judge(abs);
+    if (decision !== void 0) return decision;
+  }
+  return void 0;
+}
+
+// src/lib/refusals.ts
+function real(p) {
+  const rest = [];
+  let at = p;
+  for (; ; ) {
+    try {
+      return join5(realpathSync3.native(at), ...rest.reverse());
+    } catch {
+      const up = dirname2(at);
+      if (up === at) return p;
+      rest.push(basename2(at));
+      at = up;
+    }
+  }
+}
+function inside(dir, abs) {
+  const rel = relative3(real(dir), real(abs));
+  return rel === "" || !(rel === ".." || rel.startsWith(`..${sep3}`) || isAbsolute3(rel));
+}
+function unreadableState(abs) {
+  const state = join5(findRepoRoot(dirname2(abs)), STATE_PATH);
+  if (!exists(state)) return false;
+  const text = read(state);
+  return text?.trim() !== "" && parseState(text) === void 0;
+}
+async function blocked(scope, root, claudeDir, abs) {
+  if (scope === "project") {
+    if (inside(claudeDir, abs)) {
+      return "this is the user-level Claude config \u2014 `--scope user` changes it, backup first";
+    }
+    const rel = relative3(root, abs);
+    let at = root;
+    for (const part of rel.split(sep3)) {
+      at = join5(at, part);
+      if (!exists(at)) break;
+      const st = lstatSync2(at);
+      if (st.isSymbolicLink()) return `${relative3(root, at)} is a symlink`;
+      if (at !== abs && !st.isDirectory()) return `${relative3(root, at)} is not a directory`;
+      if (at === abs && !st.isFile()) return "not a regular file";
+    }
+  } else if (exists(abs)) {
+    const st = lstatSync2(abs);
+    if (st.isSymbolicLink()) return "a symlink \u2014 edit the file it points at by hand";
+    if (!st.isFile()) return "not a regular file";
+  }
+  if (exists(abs) && read(abs) === void 0) {
+    return "could not be read (permissions, or larger than 4 MB) \u2014 left as it is";
+  }
+  if (exists(abs) && !isUtf8File(abs)) {
+    return "not UTF-8 text \u2014 rewriting it would replace the bytes it cannot decode";
+  }
+  if (unreadableState(abs)) {
+    return ".rulegate/state.json does not parse, so ownership cannot be checked \u2014 fix it first";
+  }
+  if ((await guard(abs))?.kind === "deny") {
+    return "generated by Rulegate (recorded in .rulegate/state.json)";
+  }
+  return void 0;
+}
+async function refusals(plan, root, claudeDir) {
+  const out = [];
+  const s = plan.settings;
+  if (s.status === "invalid") {
+    out.push({ item: "settings", file: plan.settingsFile, reason: "not valid JSON" });
+  } else if (s.status === "changed") {
+    const why = await blocked(plan.scope, root, claudeDir, plan.settingsFile);
+    if (why !== void 0) out.push({ item: "settings", file: plan.settingsFile, reason: why });
+  }
+  const r = plan.rule;
+  if (r.status === "exists") {
+    out.push({ item: "rule", file: r.file, reason: "exists without the task-tracking rule" });
+  } else if (r.status === "add") {
+    const why = await blocked(plan.scope, root, claudeDir, ruleTarget(plan.scope, root, claudeDir));
+    if (why !== void 0) out.push({ item: "rule", file: r.file, reason: why });
+  }
+  return out;
+}
+
+// src/lib/state.ts
 var PLUGIN_ID = "rulegate@rulegate";
 var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
-var real = (p) => {
+var real2 = (p) => {
   try {
-    return realpathSync2(p);
+    return realpathSync4(p);
   } catch {
     return p;
   }
@@ -474,9 +770,9 @@ function cmpVersion(a, b) {
 }
 function enabledFlag(root, claudeDir, id) {
   for (const p of [
-    join4(root, ".claude/settings.local.json"),
-    join4(root, ".claude/settings.json"),
-    join4(claudeDir, "settings.json")
+    join6(root, ".claude/settings.local.json"),
+    join6(root, ".claude/settings.json"),
+    join6(claudeDir, "settings.json")
   ]) {
     const s = readJson(p);
     if (isRecord(s) && isRecord(s.enabledPlugins) && typeof s.enabledPlugins[id] === "boolean") {
@@ -486,17 +782,17 @@ function enabledFlag(root, claudeDir, id) {
   return void 0;
 }
 function pluginState(root, claudeDir, id = PLUGIN_ID) {
-  const rootReal = real(root);
-  const file = readJson(join4(claudeDir, "plugins/installed_plugins.json"));
+  const rootReal = real2(root);
+  const file = readJson(join6(claudeDir, "plugins/installed_plugins.json"));
   const all = isRecord(file) && isRecord(file.plugins) ? file.plugins[id] : void 0;
   const records = (Array.isArray(all) ? all : []).filter(isRecord);
   const mine = records.filter(
-    (r) => r.scope === "user" || typeof r.projectPath === "string" && real(r.projectPath) === rootReal
+    (r) => r.scope === "user" || typeof r.projectPath === "string" && real2(r.projectPath) === rootReal
   );
   const pick = mine.find((r) => r.scope === "project" || r.scope === "local") ?? mine[0];
   const [plugin, market] = id.split("@");
   const cached = readJson(
-    join4(
+    join6(
       claudeDir,
       "plugins/marketplaces",
       market ?? "",
@@ -514,13 +810,13 @@ function pluginState(root, claudeDir, id = PLUGIN_ID) {
   };
 }
 var AGENTS_SECTION = /rulegate:(feature-cartographer|builder|reviewer)/;
-function setupState(root, claudeDir, { expect } = {}) {
+async function setupState(root, claudeDir, { expect } = {}) {
   const items = [];
   const add = (key, label, ok, fix) => {
     items.push({ key, label, ok, fix });
   };
-  const hasSource = isDir(join4(root, ".rulegate"));
-  const claudeMd = read(join4(root, "CLAUDE.md"));
+  const hasSource = isDir(join6(root, ".rulegate"));
+  const claudeMd = read(join6(root, "CLAUDE.md"));
   add("source", ".rulegate/ canonical rules", hasSource, "npx rulegate init");
   add(
     "claude-md",
@@ -531,33 +827,39 @@ function setupState(root, claudeDir, { expect } = {}) {
   const scopes = ["project", "user"];
   let taskRuleOk = true;
   let taskRuleFile = "";
+  let taskRuleFix = "/rulegate:init settings";
+  const byHand = (reason) => `the settings pass refuses this \u2014 ${reason}`;
   for (const scope of scopes) {
     const p = planScope(scope, root, claudeDir);
+    const refused = await refusals(p, root, claudeDir);
+    const settingsRefused = refused.find((r) => r.item === "settings");
+    const ruleRefused = refused.find((r) => r.item === "rule");
     const where = scope === "user" ? "~/.claude/settings.json" : ".claude/settings.json";
     if (scope === "project") {
       taskRuleOk = p.rule.status === "present";
       taskRuleFile = p.rule.file;
+      if (p.rule.status === "exists") {
+        taskRuleFix = `add the rule to ${p.rule.file} by hand, then \`rulegate sync\``;
+      } else if (ruleRefused !== void 0) {
+        taskRuleFix = byHand(ruleRefused.reason);
+      }
     }
     if (p.settings.status === "invalid") {
       add(`${scope}-settings`, `${where} is valid JSON`, false, `fix ${where} by hand`);
       continue;
     }
+    const fix = settingsRefused === void 0 ? "/rulegate:init settings" : byHand(settingsRefused.reason);
     const have = GIT_DENY.length - p.settings.denyAdded.length;
     add(
       `${scope}-git`,
       `${where} git write protection (${String(have)}/${String(GIT_DENY.length)})`,
       p.settings.denyAdded.length === 0,
-      "/rulegate:init settings"
+      fix
     );
-    add(
-      `${scope}-todo`,
-      `${where} task tools`,
-      p.settings.env !== "added",
-      "/rulegate:init settings"
-    );
+    add(`${scope}-todo`, `${where} task tools`, p.settings.env !== "added", fix);
   }
   if (claudeMd !== void 0 || hasSource) {
-    add("task-rule", `task-tracking rule (${taskRuleFile})`, taskRuleOk, "/rulegate:init settings");
+    add("task-rule", `task-tracking rule (${taskRuleFile})`, taskRuleOk, taskRuleFix);
     add(
       "agents-section",
       "CLAUDE.md says when to use each agent",
@@ -586,7 +888,7 @@ function setupState(root, claudeDir, { expect } = {}) {
       `claude plugin disable ${LEGACY_PLUGIN_ID}`
     );
   }
-  const setUp = AGENTS_SECTION.test(claudeMd ?? "") || ls(join4(root, ".claude/agent-memory")).some((d) => d.startsWith("rulegate-")) || read(join4(root, ".claude/rulegate.json")) !== void 0;
+  const setUp = AGENTS_SECTION.test(claudeMd ?? "") || ls(join6(root, ".claude/agent-memory")).some((d) => d.startsWith("rulegate-")) || read(join6(root, ".claude/rulegate.json")) !== void 0;
   const missing = items.filter((i) => !i.ok);
   const status = !setUp ? "fresh" : missing.length > 0 ? "repair" : "healthy";
   return { status, items, missing, plugin: pl };
@@ -621,13 +923,13 @@ function dirBytes(p, budget = { left: WALK_BUDGET }) {
   let n = 0;
   for (const f of ls(p)) {
     if (--budget.left < 0) break;
-    const fp = join5(p, f);
+    const fp = join7(p, f);
     n += isRealDir(fp) ? dirBytes(fp, budget) : size(fp);
   }
   return n;
 }
 function recordedPaths(root) {
-  const state = readJson(join5(root, ".rulegate/state.json"));
+  const state = readJson(join7(root, ".rulegate/state.json"));
   const artifacts = isRecord(state) && Array.isArray(state.artifacts) ? state.artifacts : [];
   return new Set(
     artifacts.filter(isRecord).flatMap((a) => typeof a.path === "string" ? [a.path] : [])
@@ -655,7 +957,7 @@ async function runAudit({
   let residentBytes = 0;
   say("ALWAYS-LOADED  (cost on every turn)");
   for (const f of ["CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"]) {
-    const t = read(join5(root, f));
+    const t = read(join7(root, f));
     if (!t) continue;
     const n = lineCount(t);
     residentBytes += t.length;
@@ -673,7 +975,7 @@ async function runAudit({
   }
   if (!residentBytes) {
     flag("WARN", "No CLAUDE.md at all \u2014 this project has no always-loaded instructions.");
-  } else if (!AGENTS_SECTION.test(read(join5(root, "CLAUDE.md")) ?? "")) {
+  } else if (!AGENTS_SECTION.test(read(join7(root, "CLAUDE.md")) ?? "")) {
     flag(
       "INFO",
       'CLAUDE.md does not say when to use the rulegate agents \u2014 add the "Agents in this project" section (references/establishing.md, Step 4b).'
@@ -681,14 +983,14 @@ async function runAudit({
   }
   say();
   if (rulegate) {
-    const rules = ls(join5(root, ".rulegate/rules")).filter((f) => f.endsWith(".md"));
+    const rules = ls(join7(root, ".rulegate/rules")).filter((f) => f.endsWith(".md"));
     say(
       `RULEGATE  .rulegate/  \u2014 ${String(rules.length)} rule(s), ${String(recorded.size)} generated file(s) recorded`
     );
     say(
-      "  drift: run `npx rulegate check` \u2014 exit 1 means a generated file is stale or hand-edited"
+      "  drift: run `npx --no rulegate check` \u2014 exit 1 means a generated file is stale or hand-edited"
     );
-    say("  cost:  `npx rulegate doctor` reports what each tool loads and its token estimate");
+    say("  cost:  `npx --no rulegate doctor` reports what each tool loads and its token estimate");
   } else {
     say("RULEGATE  no .rulegate/ \u2014 rules are not generated here");
     flag(
@@ -696,13 +998,13 @@ async function runAudit({
       "No .rulegate/ \u2014 `npx rulegate init` imports this project's existing agent configs into one canonical source. The plugin's generated-file guard has nothing to protect until then."
     );
   }
-  const rulesDir = join5(root, ".claude/rules");
+  const rulesDir = join7(root, ".claude/rules");
   const ruleFiles = ls(rulesDir).filter((f) => f.endsWith(".md"));
   say();
   say(`RULES  .claude/rules/  \u2014 ${String(ruleFiles.length)} file(s)`);
   if (ruleFiles.length === 0 && !isDir(rulesDir)) say("  (no rules directory)");
   for (const f of ruleFiles) {
-    const t = read(join5(rulesDir, f)) ?? "";
+    const t = read(join7(rulesDir, f)) ?? "";
     const fm = frontmatter(t);
     const scoped = /^paths:/m.test(fm);
     const globs = (fm.match(/-\s+["']/g) ?? []).length;
@@ -717,7 +1019,7 @@ async function runAudit({
       );
     }
   }
-  const projSettings = readJson(join5(root, ".claude/settings.json"));
+  const projSettings = readJson(join7(root, ".claude/settings.json"));
   say();
   say("HOOKS  .claude/settings.json");
   if (projSettings === void 0) say("  (no project settings.json)");
@@ -735,7 +1037,7 @@ async function runAudit({
             continue;
           }
           const target = m[1];
-          const exists = isFile(join5(root, target));
+          const exists2 = isFile(join7(root, target));
           if (/cartographer-reminder/.test(target)) {
             flag(
               "INFO",
@@ -743,9 +1045,9 @@ async function runAudit({
             );
           }
           say(
-            `  ${exists ? "ok  " : "FAIL"} ${pad(evt, 14)} ${target}${exists ? "" : "  <- TARGET MISSING"}`
+            `  ${exists2 ? "ok  " : "FAIL"} ${pad(evt, 14)} ${target}${exists2 ? "" : "  <- TARGET MISSING"}`
           );
-          if (!exists) {
+          if (!exists2) {
             flag(
               "FAIL",
               `${evt} hook points at ${target}, which does not exist. It fires at a missing path every session.`
@@ -767,14 +1069,14 @@ async function runAudit({
     [".agent-os/", ".agent-os"]
   ];
   const generated = (rel) => {
-    const files = isDir(join5(root, rel)) ? ls(join5(root, rel)).map((f) => `${rel}/${f}`) : [rel];
-    const readable = files.filter((f) => isFile(join5(root, f)));
+    const files = isDir(join7(root, rel)) ? ls(join7(root, rel)).map((f) => `${rel}/${f}`) : [rel];
+    const readable = files.filter((f) => isFile(join7(root, f)));
     return readable.length > 0 && readable.every((f) => recorded.has(f));
   };
   let anyLegacy = false;
   let anyListed = false;
   for (const [label, rel] of legacy) {
-    const p = join5(root, rel);
+    const p = join7(root, rel);
     if (!isDir(p) && !isFile(p)) continue;
     const dir = isDir(p);
     const n = dir ? ls(p).length : 1;
@@ -793,7 +1095,7 @@ async function runAudit({
       rel === ".agent-os" ? ".agent-os/ exists \u2014 `npx rulegate init` imports it (T113); references/migrating.md covers the rest." : `${label} exists \u2014 preserve its content in ${rulegate ? ".rulegate/rules/" : "CLAUDE.md or .claude/rules/"} before deleting anything.`
     );
   }
-  const mcp = readJson(join5(root, ".mcp.json"));
+  const mcp = readJson(join7(root, ".mcp.json"));
   const servers = isRecord(mcp) && isRecord(mcp.mcpServers) ? Object.keys(mcp.mcpServers) : [];
   if (isRecord(mcp)) {
     const memoryish = servers.filter((s) => /graphiti|memory|knowledge|mem0|zep|serena/i.test(s));
@@ -809,12 +1111,12 @@ async function runAudit({
   say();
   say("MEMORY");
   for (const base of [".claude/agent-memory", ".claude/agent-memory-local"]) {
-    const dir = join5(root, base);
+    const dir = join7(root, base);
     for (const agent of ls(dir)) {
-      const adir = join5(dir, agent);
+      const adir = join7(dir, agent);
       if (!isDir(adir)) continue;
       const topics = ls(adir).filter((f) => f.endsWith(".md") && f !== "MEMORY.md");
-      const idx = read(join5(adir, "MEMORY.md"));
+      const idx = read(join7(adir, "MEMORY.md"));
       const idxLines = idx ? idx.split("\n").filter((l) => l.trim()).length : 0;
       say(
         `  ${pad(agent, 34)} index ${num(idxLines, 3)} line(s)   ${String(topics.length)} topic file(s)`
@@ -825,7 +1127,7 @@ async function runAudit({
           `${agent}: ${String(topics.length)} topic files but only ${String(idxLines)} indexed in MEMORY.md \u2014 the unindexed ones are invisible next session.`
         );
       }
-      const slugs = topics.map((f) => basename(f, ".md").replace(/[-_]/g, ""));
+      const slugs = topics.map((f) => basename3(f, ".md").replace(/[-_]/g, ""));
       if (slugs.some((s, i) => slugs.indexOf(s) !== i)) {
         flag(
           "WARN",
@@ -838,7 +1140,7 @@ async function runAudit({
           `${agent}: MEMORY.md over 200 lines \u2014 everything past that is dropped at startup.`
         );
       }
-      for (const d of ls(adir).filter((e) => isDir(join5(adir, e)))) {
+      for (const d of ls(adir).filter((e) => isDir(join7(adir, e)))) {
         flag(
           "WARN",
           `${agent}/${d}/ is a folder inside agent memory${d === ".claude" ? " \u2014 a memory write resolved against the wrong root" : ""}. Move any topic files up into ${agent}/ and delete it.`
@@ -852,14 +1154,14 @@ async function runAudit({
       }
     }
   }
-  if (!isDir(join5(root, ".claude/agent-memory")) && !isDir(join5(root, ".claude/agent-memory-local"))) {
+  if (!isDir(join7(root, ".claude/agent-memory")) && !isDir(join7(root, ".claude/agent-memory-local"))) {
     say("  no agent memory yet (agents have not run in this project)");
   }
   say();
   say(`MACHINE  ${claudeDir}`);
-  const gClaude = read(join5(claudeDir, "CLAUDE.md"));
+  const gClaude = read(join7(claudeDir, "CLAUDE.md"));
   say(`  CLAUDE.md${" ".repeat(24)}${gClaude ? `present  ${String(gClaude.length)} B` : "ABSENT"}`);
-  if (!gClaude && residentBytes && /~\/\.claude\/CLAUDE\.md/.test(read(join5(root, "CLAUDE.md")) ?? "")) {
+  if (!gClaude && residentBytes && /~\/\.claude\/CLAUDE\.md/.test(read(join7(root, "CLAUDE.md")) ?? "")) {
     flag(
       "FAIL",
       "Project CLAUDE.md refers to ~/.claude/CLAUDE.md, which does not exist \u2014 a dangling reference."
@@ -869,7 +1171,7 @@ async function runAudit({
     ["agents", PLUGIN_AGENTS],
     ["skills", PLUGIN_SKILLS]
   ]) {
-    const have = ls(join5(claudeDir, d)).map((f) => basename(f, ".md"));
+    const have = ls(join7(claudeDir, d)).map((f) => basename3(f, ".md"));
     say(`  ${pad(`${d}/`, 33)}${have.length > 0 ? have.join(", ") : "absent"}`);
     const clash = have.filter((n) => names.includes(n));
     if (clash.length > 0) {
@@ -879,7 +1181,7 @@ async function runAudit({
       );
     }
   }
-  const projClash = ls(join5(root, ".claude/agents")).map((f) => basename(f, ".md")).filter((n) => PLUGIN_AGENTS.includes(n));
+  const projClash = ls(join7(root, ".claude/agents")).map((f) => basename3(f, ".md")).filter((n) => PLUGIN_AGENTS.includes(n));
   if (projClash.length > 0) {
     flag(
       "FAIL",
@@ -892,7 +1194,7 @@ async function runAudit({
       `${LEGACY_PLUGIN_ID} is still enabled \u2014 its session block prints next to this plugin's and its guard knows nothing of state.json. Disable it: claude plugin disable ${LEGACY_PLUGIN_ID}.`
     );
   }
-  const gs = readJson(join5(claudeDir, "settings.json"));
+  const gs = readJson(join7(claudeDir, "settings.json"));
   if (gs === "INVALID") flag("FAIL", "~/.claude/settings.json is not valid JSON.");
   else if (isRecord(gs)) {
     const perms = isRecord(gs.permissions) ? gs.permissions : {};
@@ -940,7 +1242,7 @@ async function runAudit({
   }
   say();
   say("PROJECT");
-  const pkg = readJson(join5(root, "package.json"));
+  const pkg = readJson(join7(root, "package.json"));
   const deps = isRecord(pkg) ? {
     ...isRecord(pkg.dependencies) ? pkg.dependencies : {},
     ...isRecord(pkg.devDependencies) ? pkg.devDependencies : {}
@@ -963,7 +1265,7 @@ async function runAudit({
     ["Gemfile", "Ruby"],
     ["composer.json", "PHP"]
   ]) {
-    if (isFile(join5(root, f)) && !stacks.includes(label)) stacks.push(label);
+    if (isFile(join7(root, f)) && !stacks.includes(label)) stacks.push(label);
   }
   const SKIP = /* @__PURE__ */ new Set([
     "node_modules",
@@ -986,7 +1288,7 @@ async function runAudit({
     for (const e of ls(d)) {
       if (--budget < 0) return;
       if (SKIP.has(e) || e.startsWith(".")) continue;
-      const fp = join5(d, e);
+      const fp = join7(d, e);
       if (isRealDir(fp)) walk(fp, depth + 1);
       else if (CODE.test(e)) {
         srcFiles++;
@@ -1015,8 +1317,8 @@ async function runAudit({
       `Install code intelligence: /plugin install ${wantLsp[0]}@claude-plugins-official \u2014 lets Claude jump to a definition instead of scanning files.`
     );
   }
-  const gi = read(join5(root, ".gitignore")) ?? "";
-  const unignored = ["dist", "build", "vendor", "generated", "src/generated", ".next"].filter((d) => isDir(join5(root, d))).filter((d) => !gi.split("\n").some((l) => l.trim().replace(/\/$/, "") === d));
+  const gi = read(join7(root, ".gitignore")) ?? "";
+  const unignored = ["dist", "build", "vendor", "generated", "src/generated", ".next"].filter((d) => isDir(join7(root, d))).filter((d) => !gi.split("\n").some((l) => l.trim().replace(/\/$/, "") === d));
   if (unignored.length > 0) {
     flag(
       "INFO",
@@ -1026,8 +1328,8 @@ async function runAudit({
   say();
   say("WHAT THIS PROJECT COULD ADD");
   const rec = [];
-  const pkgDirs = ["packages", "apps", "services", "libs"].filter((d) => isDir(join5(root, d)));
-  const subs = pkgDirs.flatMap((d) => ls(join5(root, d)).filter((s) => isDir(join5(root, d, s))));
+  const pkgDirs = ["packages", "apps", "services", "libs"].filter((d) => isDir(join7(root, d)));
+  const subs = pkgDirs.flatMap((d) => ls(join7(root, d)).filter((s) => isDir(join7(root, d, s))));
   if (subs.length >= 3) {
     rec.push([
       "CLAUDE.md (nested)",
@@ -1041,7 +1343,7 @@ async function runAudit({
     "biome.json",
     "ruff.toml",
     ".golangci.yml"
-  ].find((f) => isFile(join5(root, f)));
+  ].find((f) => isFile(join7(root, f)));
   const hookEvents = isRecord(projSettings) && isRecord(projSettings.hooks) ? Object.keys(projSettings.hooks) : [];
   if (lintCfg !== void 0 && !hookEvents.includes("PostToolUse")) {
     rec.push([
@@ -1064,7 +1366,7 @@ async function runAudit({
       `${fast.slice(0, 3).join(", ")} move faster than model training \u2014 context7 serves current API docs`
     ]);
   }
-  if (ls(join5(root, ".claude/skills")).length === 0 && srcFiles > 100) {
+  if (ls(join7(root, ".claude/skills")).length === 0 && srcFiles > 100) {
     rec.push([
       "skills",
       "no project skills \u2014 a multi-step procedure you repeat (scaffolding a feature, a release) belongs in one, loaded on invoke not every turn"
@@ -1127,7 +1429,7 @@ async function runAudit({
   else if (!mapped) mode = "MAP";
   else mode = "MAINTAIN";
   say();
-  for (const l of describeState(setupState(root, claudeDir, { expect }))) say(l);
+  for (const l of describeState(await setupState(root, claudeDir, { expect }))) say(l);
   say();
   say(`MODE  ${mode}`);
   say(
@@ -1142,7 +1444,7 @@ async function runAudit({
   );
   say();
   say(
-    `STARTUP COST  ~${String(residentBytes)} B always loaded${rulegate ? "  (per-tool token estimate: npx rulegate doctor)" : ""}`
+    `STARTUP COST  ~${String(residentBytes)} B always loaded${rulegate ? "  (per-tool token estimate: npx --no rulegate doctor)" : ""}`
   );
   say();
   if (findings.length === 0) say("VERDICT  no findings \u2014 setup is clean.");

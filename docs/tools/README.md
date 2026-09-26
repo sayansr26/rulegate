@@ -5,12 +5,15 @@
 One page per tool Rulegate supports, generated from the precedence data each adapter carries. Every claim links to the vendor page it came from and the date that page was read.
 
 - [Aider](aider.md) — verified against Aider docs as published 2026-09-04 on 2026-09-04
-- [Claude Code](claude-code.md) — verified against 2.x on 2026-09-01
+- [Antigravity](antigravity.md) — verified against Rules docs as published 2026-09-26 on 2026-09-26
+- [Claude Code](claude-code.md) — verified against 2.1.283 on 2026-09-26
 - [Cline](cline.md) — verified against Cline docs as published 2026-09-04 on 2026-09-04
 - [Codex CLI](codex.md) — verified against CLI docs as published 2026-09-02 on 2026-09-02
 - [GitHub Copilot](copilot.md) — verified against GitHub Docs and VS Code docs as published 2026-09-02 on 2026-09-02
 - [Cursor](cursor.md) — verified against 1.x on 2026-09-01
 - [Gemini CLI](gemini.md) — verified against CLI docs as published 2026-09-02 on 2026-09-02
+- [Kilo Code](kilo.md) — verified against Kilo 1.0.25 (source, main branch) on 2026-09-26
+- [OpenCode](opencode.md) — verified against opencode 1.18.32 (source, dev branch) on 2026-09-26
 - [Roo Code](roo-code.md) — verified against Roo Code docs as published 2026-09-04 on 2026-09-04
 - [Windsurf](windsurf.md) — verified against Cascade docs as published 2026-09-04 on 2026-09-04
 - [Zed](zed.md) — verified against Zed docs as published 2026-09-04 on 2026-09-04

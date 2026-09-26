@@ -1,6 +1,7 @@
 import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { isDir, isRecord, ls, read, readJson } from './read.js';
+import { refusals } from './refusals.js';
 import { GIT_DENY, planScope, type Scope } from './settings.js';
 
 /**
@@ -118,11 +119,11 @@ export const AGENTS_SECTION = /rulegate:(feature-cartographer|builder|reviewer)/
  *   healthy  all of it is
  * `expect` is the minimum plugin version wanted, normally the one this script ships in.
  */
-export function setupState(
+export async function setupState(
   root: string,
   claudeDir: string,
   { expect }: { expect?: string | undefined } = {},
-): SetupState {
+): Promise<SetupState> {
   const items: SetupItem[] = [];
   const add = (key: string, label: string, ok: boolean, fix: string): void => {
     items.push({ key, label, ok, fix });
@@ -142,33 +143,43 @@ export function setupState(
   const scopes: Scope[] = ['project', 'user'];
   let taskRuleOk = true;
   let taskRuleFile = '';
+  let taskRuleFix = '/rulegate:init settings';
+  // An item the writer refuses is not the settings pass's to fix: sending it back there
+  // would loop, refusing again on every run. It names the refusal instead, which says what
+  // to do by hand — the writer's own reasons, from the same check.
+  const byHand = (reason: string): string => `the settings pass refuses this — ${reason}`;
   for (const scope of scopes) {
     const p = planScope(scope, root, claudeDir);
+    const refused = await refusals(p, root, claudeDir);
+    const settingsRefused = refused.find((r) => r.item === 'settings');
+    const ruleRefused = refused.find((r) => r.item === 'rule');
     const where = scope === 'user' ? '~/.claude/settings.json' : '.claude/settings.json';
     if (scope === 'project') {
       taskRuleOk = p.rule.status === 'present';
       taskRuleFile = p.rule.file;
+      if (p.rule.status === 'exists') {
+        taskRuleFix = `add the rule to ${p.rule.file} by hand, then \`rulegate sync\``;
+      } else if (ruleRefused !== undefined) {
+        taskRuleFix = byHand(ruleRefused.reason);
+      }
     }
     if (p.settings.status === 'invalid') {
       add(`${scope}-settings`, `${where} is valid JSON`, false, `fix ${where} by hand`);
       continue;
     }
+    const fix =
+      settingsRefused === undefined ? '/rulegate:init settings' : byHand(settingsRefused.reason);
     const have = GIT_DENY.length - p.settings.denyAdded.length;
     add(
       `${scope}-git`,
       `${where} git write protection (${String(have)}/${String(GIT_DENY.length)})`,
       p.settings.denyAdded.length === 0,
-      '/rulegate:init settings',
+      fix,
     );
-    add(
-      `${scope}-todo`,
-      `${where} task tools`,
-      p.settings.env !== 'added',
-      '/rulegate:init settings',
-    );
+    add(`${scope}-todo`, `${where} task tools`, p.settings.env !== 'added', fix);
   }
   if (claudeMd !== undefined || hasSource) {
-    add('task-rule', `task-tracking rule (${taskRuleFile})`, taskRuleOk, '/rulegate:init settings');
+    add('task-rule', `task-tracking rule (${taskRuleFile})`, taskRuleOk, taskRuleFix);
     add(
       'agents-section',
       'CLAUDE.md says when to use each agent',
