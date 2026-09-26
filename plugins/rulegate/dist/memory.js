@@ -2,7 +2,7 @@
 import { homedir } from "node:os";
 
 // src/lib/read.ts
-import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 var MAX_READ_BYTES = 4 * 1024 * 1024;
 function read(path) {
   try {

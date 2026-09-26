@@ -64,17 +64,27 @@ function runGit(args, cwd) {
   });
 }
 
-// src/lib/config.ts
-import { join } from "node:path";
-
 // src/lib/read.ts
-import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, join, relative, sep } from "node:path";
 var MAX_READ_BYTES = 4 * 1024 * 1024;
 function read(path) {
   try {
     const st = statSync(path);
     if (!st.isFile() || st.size > MAX_READ_BYTES) return void 0;
     return readFileSync(path, "utf8");
+  } catch {
+    return void 0;
+  }
+}
+function readInRepo(root, rel) {
+  try {
+    const target = realpathSync(join(root, rel));
+    const within = relative(realpathSync(root), target);
+    if (within === "" || within === ".." || within.startsWith(`..${sep}`) || isAbsolute(within)) {
+      return void 0;
+    }
+    return read(target);
   } catch {
     return void 0;
   }
@@ -127,18 +137,39 @@ function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// src/lib/text.ts
+var isControl = (c) => {
+  const n = c.charCodeAt(0);
+  return n < 32 || n === 127;
+};
+var hasControl = (s) => Array.from(s).some(isControl);
+
 // src/lib/config.ts
 var CONFIG_PATH = ".claude/rulegate.json";
 var strings = (value) => Array.isArray(value) ? value.filter((v) => typeof v === "string") : void 0;
+var inRepo = (p) => p !== "" && !hasControl(p) && !/^([/\\]|[A-Za-z]:)/.test(p) && !p.split(/[/\\]/).includes("..");
+var MAX_ENTRIES = 20;
+var paths = (value) => strings(value)?.filter(inRepo).slice(0, MAX_ENTRIES);
+function rawConfig(root) {
+  const text = readInRepo(root, CONFIG_PATH);
+  if (text === void 0) return void 0;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return void 0;
+  }
+}
 function pluginConfig(root) {
-  const raw = readJson(join(root, CONFIG_PATH));
+  const raw = rawConfig(root);
   if (!isRecord(raw)) return {};
-  const features = strings(raw.features);
-  const handoff = strings(raw.handoff);
+  const features = paths(raw.features);
+  const handoff = paths(raw.handoff);
+  const activeTask = paths(raw.activeTask);
   return {
     ...features ? { features } : {},
     ...typeof raw.cartographerReminder === "boolean" ? { cartographerReminder: raw.cartographerReminder } : {},
-    ...handoff ? { handoff } : {}
+    ...handoff ? { handoff } : {},
+    ...activeTask ? { activeTask } : {}
   };
 }
 
@@ -164,10 +195,12 @@ function featureParents(root) {
   const found = DEFAULT_PARENTS.find((d) => isDir(join2(root, d)));
   return found ? [found] : [];
 }
+var MAX_FEATURES = 500;
 function listFeatures(root) {
   const out = [];
   for (const parent of featureParents(root)) {
     for (const name of ls(join2(root, parent))) {
+      if (out.length >= MAX_FEATURES) return out;
       if (!name.startsWith(".") && isDir(join2(root, parent, name))) {
         out.push({ name, dir: `${parent}/${name}` });
       }
@@ -419,13 +452,13 @@ function planScope(scope, root, claudeDir) {
 }
 
 // src/lib/state.ts
-import { realpathSync } from "node:fs";
+import { realpathSync as realpathSync2 } from "node:fs";
 import { join as join4 } from "node:path";
 var PLUGIN_ID = "rulegate@rulegate";
 var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
 var real = (p) => {
   try {
-    return realpathSync(p);
+    return realpathSync2(p);
   } catch {
     return p;
   }
