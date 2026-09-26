@@ -54,10 +54,14 @@ export function featureParents(root: string): string[] {
   return found ? [found] : [];
 }
 
+/** Enough for any real project; a bound so a huge parent cannot outlast a hook timeout. */
+export const MAX_FEATURES = 500;
+
 export function listFeatures(root: string): Feature[] {
   const out: Feature[] = [];
   for (const parent of featureParents(root)) {
     for (const name of ls(join(root, parent))) {
+      if (out.length >= MAX_FEATURES) return out;
       if (!name.startsWith('.') && isDir(join(root, parent, name))) {
         out.push({ name, dir: `${parent}/${name}` });
       }

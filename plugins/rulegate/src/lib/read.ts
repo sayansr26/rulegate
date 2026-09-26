@@ -1,4 +1,5 @@
-import { lstatSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { isAbsolute, join, relative, sep } from 'node:path';
 
 /**
  * Filesystem reads that never throw. Every plugin script is advisory and hooks must never
@@ -21,6 +22,24 @@ export function read(path: string): string | undefined {
     const st = statSync(path);
     if (!st.isFile() || st.size > MAX_READ_BYTES) return undefined;
     return readFileSync(path, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * `read(join(root, rel))`, but only when the file's real path is inside the root. For files
+ * whose contents go into Claude's context on the repository's say-so — the session hook's
+ * handoff note — a committed symlink to `~/.ssh/id_rsa` must read as absent.
+ */
+export function readInRepo(root: string, rel: string): string | undefined {
+  try {
+    const target = realpathSync(join(root, rel));
+    const within = relative(realpathSync(root), target);
+    if (within === '' || within === '..' || within.startsWith(`..${sep}`) || isAbsolute(within)) {
+      return undefined;
+    }
+    return read(target);
   } catch {
     return undefined;
   }
@@ -71,6 +90,16 @@ export function isFile(path: string): boolean {
     return statSync(path).isFile();
   } catch {
     return false;
+  }
+}
+
+/** Modification time in ms since the epoch, for a regular file; `undefined` otherwise. */
+export function mtimeMs(path: string): number | undefined {
+  try {
+    const st = statSync(path);
+    return st.isFile() ? st.mtimeMs : undefined;
+  } catch {
+    return undefined;
   }
 }
 

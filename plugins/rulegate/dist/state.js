@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 // src/lib/read.ts
-import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 var MAX_READ_BYTES = 4 * 1024 * 1024;
 function read(path) {
   try {
@@ -237,13 +237,13 @@ function print(lines) {
 }
 
 // src/lib/state.ts
-import { realpathSync } from "node:fs";
+import { realpathSync as realpathSync2 } from "node:fs";
 import { join as join2 } from "node:path";
 var PLUGIN_ID = "rulegate@rulegate";
 var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
 var real = (p) => {
   try {
-    return realpathSync(p);
+    return realpathSync2(p);
   } catch {
     return p;
   }

@@ -24,6 +24,11 @@ All notable changes to this project are recorded here. This project follows
   cost to `rulegate doctor`, and puts anything bound for `CLAUDE.md` in `.rulegate/rules/`
   instead, because `CLAUDE.md` is generated. Its settings pass previews in this version and
   does not apply yet.
+- **A SessionStart hook** tells Claude where the work stands — branch, recent commits,
+  uncommitted files, the active task and handoff note — and which `rulegate:*` agent to use
+  for what, which features are mapped, and that rules are edited in `.rulegate/rules/`.
+  Handoff and task paths are configurable in `.claude/rulegate.json` and must stay inside
+  the repository.
 
 ## [0.3.0] — unreleased
 
