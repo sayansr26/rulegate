@@ -72,6 +72,15 @@ export function readJson(path: string): unknown {
   }
 }
 
+/**
+ * A memory topic file, not an index. `MEMORY.md` is the index Claude Code loads, and the
+ * agent-os migration keeps agent-os's own index beside it as `MEMORY.agent-os[.<n>].md` —
+ * an index too, and one that names feature directories, so counting it as a topic would
+ * make it pass for a cartographer map.
+ */
+export const isTopicFile = (f: string): boolean =>
+  f.endsWith('.md') && !/^MEMORY(\..+)?\.md$/.test(f);
+
 /** Directory entries, sorted by code point so output is stable across platforms. */
 export function ls(path: string): string[] {
   try {

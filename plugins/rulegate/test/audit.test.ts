@@ -58,8 +58,44 @@ describe('runAudit (T106)', () => {
     await sb.putHome('settings.json', { enabledPlugins: { 'agent-os@sayan-plugins': true } });
     await sb.put('.claude/agent-memory/agent-os-feature-cartographer/MEMORY.md', '');
     const text = await audit();
-    expect(text).toContain('FAIL  agent-os@sayan-plugins is still enabled');
+    expect(text).toContain('FAIL  agent-os@sayan-plugins is still enabled — both plugins enabled');
+    expect(text).toContain('claude plugin disable agent-os@sayan-plugins --scope local');
     expect(text).toContain('moves it to rulegate-feature-cartographer');
+  });
+
+  it('warns about a split cartographer, whose agent-os maps the agent cannot see', async () => {
+    await sb.put('.claude/agent-memory/agent-os-feature-cartographer/MEMORY.md', '');
+    await sb.put('.claude/agent-memory/rulegate-feature-cartographer/MEMORY.md', '');
+    expect(await audit()).toContain(
+      'WARN  .claude/agent-memory/agent-os-feature-cartographer and rulegate-feature-cartographer both exist',
+    );
+  });
+
+  it('names the refusal for memory the migration will not move', async () => {
+    await sb.put('.claude/agent-memory/agent-os-feature-cartographer/_architecture.md', 'a\n');
+    await sb.put('.claude/agent-memory/rulegate-feature-cartographer/_architecture.md', 'b\n');
+    expect(await audit()).toContain(
+      'WARN  .claude/agent-memory/agent-os-feature-cartographer: the migration refuses it — _architecture.md differs',
+    );
+  });
+
+  it('warns when the committed settings still enable agent-os under a local opt-out', async () => {
+    await sb.put('.claude/settings.json', { enabledPlugins: { 'agent-os@sayan-plugins': true } });
+    await sb.put('.claude/settings.local.json', {
+      enabledPlugins: { 'agent-os@sayan-plugins': false },
+    });
+    const text = await audit();
+    expect(text).toContain('.claude/settings.json still enables agent-os@sayan-plugins');
+    expect(text).toContain('claude plugin disable agent-os@sayan-plugins --scope project');
+  });
+
+  it('calls an imported .agent-os/ safe to delete, and no longer legacy', async () => {
+    await sb.put('.agent-os/config.json', '{}');
+    expect(await audit()).toContain('`npx rulegate init` imports it into .rulegate/');
+    await sb.put('.rulegate/rulegate.yaml', 'schemaVersion: 1\n');
+    const text = await audit();
+    expect(text).toContain('.agent-os/ is already imported into .rulegate/ — safe to delete');
+    expect(text).not.toContain('FOUND .agent-os');
   });
 
   it('fails a hook whose target is missing', async () => {

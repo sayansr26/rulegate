@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "plugins": {
+    "agent-os@sayan-plugins": [
+      {
+        "scope": "user",
+        "version": "0.5.0",
+        "installPath": "/cache/sayan-plugins/agent-os/0.5.0"
+      }
+    ],
+    "rulegate@rulegate": [
+      {
+        "scope": "user",
+        "version": "0.3.0",
+        "installPath": "/cache/rulegate/rulegate/0.3.0"
+      }
+    ]
+  }
+}

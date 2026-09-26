@@ -109,8 +109,13 @@ agents every session; `CLAUDE.md` makes it part of the project's own contract,
 so it survives a machine without the plugin's hooks. Add this section once
 (skip it if `CLAUDE.md` already has one), trimmed to the agents this project
 actually needs. In a Rulegate project `CLAUDE.md` is generated, so the section
-is a rule: `.rulegate/rules/agents.md` with `tools: [claude-code]` in its
-frontmatter — the other tools have no such agents — then `rulegate sync`.
+is a rule: `.rulegate/rules/claude-agents.md` with `tools: [claude-code]` in its
+frontmatter — the other tools have no such agents — then `rulegate sync`. Not
+`agents.md`: that is where `rulegate init` imports an `AGENTS.md`, and writing
+over it loses the project's own rules. A project migrated from agent-os already
+has the section, as `## Agents in this project (agent-os)` in the rule `init`
+imported from `CLAUDE.md`: rewrite it there — `rulegate:` for `agent-os:`, no
+`(agent-os)` in the heading — rather than adding a second one beside it.
 
 ```markdown
 ## Agents in this project

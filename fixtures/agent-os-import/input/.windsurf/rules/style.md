@@ -1,0 +1,8 @@
+---
+trigger: always_on
+description: Code style
+---
+
+<!-- agent-os: generated from .agent-os/ — edit the source, then run `npx @sayansr26/agent-os sync` -->
+
+Prefer named exports. No default exports.

@@ -1,0 +1,23 @@
+{
+  "artifacts": [
+    {
+      "adapter": "claude-code",
+      "hash": "sha256:df29f2514f85b77d73441a8eb39489e4e19f3881a7cb47074169598541170fa8",
+      "kind": "rules",
+      "path": ".claude/rules/20-api.md"
+    },
+    {
+      "adapter": "codex",
+      "hash": "sha256:a4191b00aace3ae43826c3daacad1233798355586ac3215c890b43bb0d8d53b7",
+      "kind": "rules",
+      "path": "AGENTS.md"
+    },
+    {
+      "adapter": "claude-code",
+      "hash": "sha256:bb0d7887ab8e5d7fe06af3148364f633eec75a10f8dc58c09a662c04c57aa3c1",
+      "kind": "rules",
+      "path": "CLAUDE.md"
+    }
+  ],
+  "schemaVersion": 1
+}

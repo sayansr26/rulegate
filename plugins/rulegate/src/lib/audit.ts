@@ -1,14 +1,28 @@
 import { basename, join } from 'node:path';
 import { coverage } from './features.js';
-import { isDir, isFile, isRealDir, isRecord, ls, read, readJson, size } from './read.js';
-import { GIT_DENY, TODO_ENV, isRulegateProject, normRule } from './settings.js';
+import { agentOsInstall, disableCommand } from './legacy.js';
+import { planMemoryMigration } from './migrate.js';
 import {
-  AGENTS_SECTION,
+  isDir,
+  isFile,
+  isRealDir,
+  isRecord,
+  isTopicFile,
+  ls,
+  read,
+  readJson,
+  size,
+} from './read.js';
+import {
+  GIT_DENY,
+  LEGACY_MARKETPLACE,
   LEGACY_PLUGIN_ID,
-  describeState,
-  enabledFlag,
-  setupState,
-} from './state.js';
+  MARKETPLACE_NAME,
+  TODO_ENV,
+  isRulegateProject,
+  normRule,
+} from './settings.js';
+import { AGENTS_SECTION, describeState, setupState } from './state.js';
 
 /**
  * The audit behind `/rulegate:init` — one call, whole picture.
@@ -91,6 +105,7 @@ export async function runAudit({
   };
   const rulegate = isRulegateProject(root);
   const recorded = recordedPaths(root);
+  const legacyOs = agentOsInstall(root, claudeDir);
 
   say(`RULEGATE AUDIT   ${root}`);
   say(`                 ${today}`);
@@ -219,7 +234,6 @@ export async function runAudit({
     ['.cursor/rules/', '.cursor/rules'],
     ['.windsurfrules', '.windsurfrules'],
     ['.clinerules', '.clinerules'],
-    ['.agent-os/', '.agent-os'],
   ];
   // A store Rulegate generated is not legacy — telling someone to fold `sync`'s own output
   // back into CLAUDE.md and delete it would destroy what `sync` just wrote. `state.json`
@@ -249,9 +263,7 @@ export async function runAudit({
     say(`  FOUND ${pad(label, 22)} ${String(n)} file(s)  ${String(b)} B`);
     flag(
       'INFO',
-      rel === '.agent-os'
-        ? '.agent-os/ exists — `npx rulegate init` imports it (T113); references/migrating.md covers the rest.'
-        : `${label} exists — preserve its content in ${rulegate ? '.rulegate/rules/' : 'CLAUDE.md or .claude/rules/'} before deleting anything.`,
+      `${label} exists — preserve its content in ${rulegate ? '.rulegate/rules/' : 'CLAUDE.md or .claude/rules/'} before deleting anything.`,
     );
   }
   const mcp = readJson(join(root, '.mcp.json'));
@@ -267,6 +279,9 @@ export async function runAudit({
     }
   }
   if (!anyListed) say('  none');
+  // `.agent-os/` is reported under AGENT-OS; it is legacy for MODE until imported, and an
+  // imported one is only waiting to be deleted.
+  if (legacyOs.source && !legacyOs.imported) anyLegacy = true;
 
   // ---------------------------------------------------------- agent memory
   say();
@@ -276,7 +291,7 @@ export async function runAudit({
     for (const agent of ls(dir)) {
       const adir = join(dir, agent);
       if (!isDir(adir)) continue;
-      const topics = ls(adir).filter((f) => f.endsWith('.md') && f !== 'MEMORY.md');
+      const topics = ls(adir).filter(isTopicFile);
       const idx = read(join(adir, 'MEMORY.md'));
       const idxLines = idx ? idx.split('\n').filter((l) => l.trim()).length : 0;
       say(
@@ -309,12 +324,6 @@ export async function runAudit({
           `${agent}/${d}/ is a folder inside agent memory${d === '.claude' ? ' — a memory write resolved against the wrong root' : ''}. Move any topic files up into ${agent}/ and delete it.`,
         );
       }
-      if (agent.startsWith('agent-os-')) {
-        flag(
-          'INFO',
-          `${agent} is agent-os's memory — /rulegate:init moves it to rulegate-${agent.slice('agent-os-'.length)} (T114).`,
-        );
-      }
     }
   }
   if (
@@ -322,6 +331,65 @@ export async function runAudit({
     !isDir(join(root, '.claude/agent-memory-local'))
   ) {
     say('  no agent memory yet (agents have not run in this project)');
+  }
+
+  // ---------------------------------------------------------- agent-os
+  // Everything an agent-os install left, from the one detector the setup state and the
+  // session hook also read. `/rulegate:init` migrates it in one confirmation.
+  say();
+  say('AGENT-OS');
+  if (!legacyOs.found) say('  none');
+  if (legacyOs.plugin !== undefined) {
+    say(`  plugin ${pad(LEGACY_PLUGIN_ID, 26)} enabled (${legacyOs.plugin} settings)`);
+    flag(
+      'FAIL',
+      `${LEGACY_PLUGIN_ID} is still enabled${legacyOs.bothEnabled ? ' — both plugins enabled' : ''}: its session block prints next to this plugin's and its guard knows nothing of state.json. /rulegate:init disables it: ${disableCommand(legacyOs.plugin)}.`,
+    );
+  }
+  if (legacyOs.shared) {
+    say(`  plugin ${pad(LEGACY_PLUGIN_ID, 26)} off here, enabled in .claude/settings.json`);
+    flag(
+      'WARN',
+      `.claude/settings.json still enables ${LEGACY_PLUGIN_ID} for everyone who pulls — only this machine turns it off. /rulegate:init disables it where it was turned on: ${disableCommand('project')}.`,
+    );
+  }
+  // Planned, so an agent the migration will refuse is named with the reason rather than
+  // pointed back at a migration that refuses it again.
+  const memoryPlan =
+    legacyOs.memory.length > 0 ? (await planMemoryMigration(root, claudeDir)).agents : [];
+  for (const m of legacyOs.memory) {
+    say(
+      `  memory ${pad(`${m.base}/${m.name}`, 50)} → ${m.target}${m.split ? '  (both exist)' : ''}`,
+    );
+    const refused = memoryPlan.find(
+      (a) => a.base === m.base && a.from === m.name && a.kind === 'refused',
+    );
+    flag(
+      m.split || refused !== undefined ? 'WARN' : 'INFO',
+      refused !== undefined
+        ? `${m.base}/${m.name}: the migration refuses it — ${refused.reason ?? ''}. agent-os stays enabled until it is merged: its agent is the only one reading this memory.`
+        : m.split
+          ? `${m.base}/${m.name} and ${m.target} both exist — the agent reads only ${m.target}, so agent-os's entries are invisible to it. /rulegate:init merges them (migrate-memory.js).`
+          : `${m.base}/${m.name} is agent-os's memory — /rulegate:init moves it to ${m.target} (migrate-memory.js).`,
+    );
+  }
+  if (legacyOs.source) {
+    say(
+      `  source .agent-os/  ${legacyOs.imported ? 'already imported into .rulegate/' : 'not imported'}`,
+    );
+    flag(
+      'INFO',
+      legacyOs.imported
+        ? '.agent-os/ is already imported into .rulegate/ — safe to delete once `npx --no rulegate check` is clean.'
+        : '.agent-os/ exists — `npx rulegate init` imports it into .rulegate/; references/migrating.md covers the rest.',
+    );
+  }
+  if (legacyOs.marketplace) {
+    say(`  marketplace ${LEGACY_MARKETPLACE} declared in .claude/settings.json`);
+    flag(
+      'INFO',
+      `.claude/settings.json declares agent-os's marketplace (${LEGACY_MARKETPLACE}) — once agent-os is disabled, the settings pass replaces it with ${MARKETPLACE_NAME}.`,
+    );
   }
 
   // ---------------------------------------------------------- machine layer
@@ -360,12 +428,6 @@ export async function runAudit({
     flag(
       'FAIL',
       `.claude/agents/ contains ${projClash.join(', ')} — shadows the plugin agent of the same name.`,
-    );
-  }
-  if (enabledFlag(root, claudeDir, LEGACY_PLUGIN_ID) === true) {
-    flag(
-      'FAIL',
-      `${LEGACY_PLUGIN_ID} is still enabled — its session block prints next to this plugin's and its guard knows nothing of state.json. Disable it: claude plugin disable ${LEGACY_PLUGIN_ID}.`,
     );
   }
 

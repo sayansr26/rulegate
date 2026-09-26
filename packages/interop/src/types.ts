@@ -1,4 +1,4 @@
-import type { AdapterContext, RuleDocument } from '@rulegate/adapter-kit';
+import type { AdapterContext, RulegateError, RuleDocument } from '@rulegate/adapter-kit';
 
 /**
  * A read-only importer for a *competing* rule-sync tool.
@@ -44,4 +44,29 @@ export interface InteropResult {
    * come across, not to discover it when a server stops working.
    */
   readonly notImported: readonly string[];
+  /**
+   * Rulegate tool ids the other tool was configured to generate for (T113).
+   *
+   * A repository's detected tools are only what is on disk today; a config naming its
+   * targets is the user's own statement of which tools they use, and dropping it would
+   * leave `rulegate.yaml` enabling fewer tools than the setup it replaces. Filtered by
+   * `computeInitPlan` against the adapters this build has, so a name no adapter answers to
+   * never reaches the manifest. Optional, so ruler and rulesync are unchanged.
+   */
+  readonly tools?: readonly string[];
+  /**
+   * Findings that need more than "copy it across by hand" — a setting with a new home, a
+   * config left pointing at a directory the migration makes removable. Printed by `init`
+   * with its own message, under the same code as `notImported`.
+   */
+  readonly notes?: readonly { readonly path: string; readonly message: string }[];
+  /**
+   * Reasons the import cannot go ahead at all (T113, T120).
+   *
+   * A source tree built out of some generator's output has no honest import: the real
+   * source is gone, and canonical made from its rendering would carry the rendering's
+   * losses forward. `init` writes nothing while this is non-empty, the same gate every
+   * other error goes through.
+   */
+  readonly errors?: readonly RulegateError[];
 }

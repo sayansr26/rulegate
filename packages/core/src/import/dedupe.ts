@@ -62,7 +62,7 @@ export interface DedupeResult {
 const SIMILARITY_THRESHOLD = 0.7;
 
 /** Rules are spaced so a person can insert one between two imported ones without renumbering. */
-const ORDER_STEP = 10;
+export const ORDER_STEP = 10;
 
 const FIELD_SEPARATOR = '\u0000';
 const RECORD_SEPARATOR = '\u0001';

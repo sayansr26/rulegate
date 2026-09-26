@@ -11,7 +11,7 @@ var init_glob = __esm({
 });
 
 // src/lib/audit.ts
-import { basename as basename3, join as join7 } from "node:path";
+import { basename as basename3, join as join9 } from "node:path";
 
 // src/lib/features.ts
 import { join as join2 } from "node:path";
@@ -119,6 +119,7 @@ function readJson(path2) {
     return "INVALID";
   }
 }
+var isTopicFile = (f) => f.endsWith(".md") && !/^MEMORY(\..+)?\.md$/.test(f);
 function ls(path2) {
   try {
     return readdirSync(path2).sort();
@@ -250,7 +251,7 @@ function cartographerDir(root) {
 function mapFiles(root) {
   const dir = cartographerDir(root);
   if (dir === void 0) return [];
-  return ls(dir).filter((f) => f.endsWith(".md") && f !== "MEMORY.md").map((file) => {
+  return ls(dir).filter(isTopicFile).map((file) => {
     const text = read(join2(dir, file)) ?? "";
     const m = /^mapped:\s*["']?(\d{4}-\d{2}-\d{2})/m.exec(text);
     return { file, text, mapped: m?.[1] };
@@ -301,6 +302,9 @@ async function coverage(root, { stale = false } = {}) {
     dir: cartographerDir(root)
   };
 }
+
+// src/lib/legacy.ts
+import { join as join4 } from "node:path";
 
 // src/lib/settings.ts
 import { join as join3, resolve } from "node:path";
@@ -355,6 +359,31 @@ var GIT_DENY = Object.freeze([
   "Bash(git update-ref *)",
   "Bash(git worktree *)"
 ]);
+var PLUGIN_ID = "rulegate@rulegate";
+var MARKETPLACE_NAME = "rulegate";
+var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
+var LEGACY_MARKETPLACE = "sayan-plugins";
+var MARKETPLACE_ENTRY = {
+  source: { source: "github", repo: "sayansr26/rulegate" }
+};
+function enabledAt(root, claudeDir, id) {
+  for (const [scope, p] of [
+    ["local", join3(root, ".claude/settings.local.json")],
+    ["project", join3(root, ".claude/settings.json")],
+    ["user", join3(claudeDir, "settings.json")]
+  ]) {
+    const value = enabledIn(p, id);
+    if (value !== void 0) return { value, scope };
+  }
+  return void 0;
+}
+function enabledIn(file, id) {
+  const s = readJson(file);
+  return isRecord(s) && isRecord(s.enabledPlugins) && typeof s.enabledPlugins[id] === "boolean" ? s.enabledPlugins[id] : void 0;
+}
+function enabledFlag(root, claudeDir, id) {
+  return enabledAt(root, claudeDir, id)?.value;
+}
 var normRule = (r) => r.replace(/:\*\)$/, " *)").replace(/\s+/g, " ");
 function claudeHome(env, home) {
   return resolve(env.CLAUDE_CONFIG_DIR || join3(home, ".claude"));
@@ -367,7 +396,13 @@ function ruleTarget(scope, root, claudeDir) {
   if (scope === "user") return join3(claudeDir, "CLAUDE.md");
   return isRulegateProject(root) ? join3(root, TASK_RULE_FILE) : join3(root, "CLAUDE.md");
 }
-function planSettings(text, { todo = true } = {}) {
+function swapMarketplace(markets) {
+  const out = {};
+  for (const [k, v] of Object.entries(markets)) if (k !== LEGACY_MARKETPLACE) out[k] = v;
+  if (!(MARKETPLACE_NAME in out)) out[MARKETPLACE_NAME] = MARKETPLACE_ENTRY;
+  return out;
+}
+function planSettings(text, { todo = true, retireMarketplace } = {}) {
   let settings = {};
   if (text !== void 0) {
     try {
@@ -378,6 +413,9 @@ function planSettings(text, { todo = true } = {}) {
       return { status: "invalid", denyAdded: [], env: void 0, current: void 0 };
     }
   }
+  const markets = isRecord(settings.extraKnownMarketplaces) ? settings.extraKnownMarketplaces : void 0;
+  const marketplace = retireMarketplace === void 0 || markets === void 0 || !(LEGACY_MARKETPLACE in markets) ? void 0 : retireMarketplace ? "retire" : "blocked";
+  const withMarket = marketplace === void 0 ? {} : { marketplace };
   const perms = isRecord(settings.permissions) ? settings.permissions : {};
   const deny = Array.isArray(perms.deny) ? perms.deny.filter((r) => typeof r === "string") : [];
   const have = new Set(deny.map(normRule));
@@ -389,17 +427,21 @@ function planSettings(text, { todo = true } = {}) {
     if (current === void 0) env = "added";
     else env = current === "1" || current === "true" || current === true ? "present" : "conflict";
   }
-  if (denyAdded.length === 0 && env !== "added") {
-    return { status: "unchanged", denyAdded, env, current };
+  if (denyAdded.length === 0 && env !== "added" && marketplace !== "retire") {
+    return { status: "unchanged", denyAdded, env, current, ...withMarket };
   }
   const next = { ...settings };
   if (denyAdded.length > 0) next.permissions = { ...perms, deny: [...deny, ...denyAdded] };
   if (env === "added") next.env = { ...envBlock, [TODO_ENV]: "1" };
+  if (marketplace === "retire" && markets !== void 0) {
+    next.extraKnownMarketplaces = swapMarketplace(markets);
+  }
   return {
     status: "changed",
     denyAdded,
     env,
     current,
+    ...withMarket,
     next: `${JSON.stringify(next, null, 2)}
 `
   };
@@ -478,21 +520,60 @@ ${TASK_RULE}
 }
 function planScope(scope, root, claudeDir) {
   const settingsFile = settingsPath(scope, root, claudeDir);
+  const retireMarketplace = scope === "project" ? enabledFlag(root, claudeDir, LEGACY_PLUGIN_ID) !== true && enabledIn(settingsFile, LEGACY_PLUGIN_ID) !== true : void 0;
   return {
     scope,
     settingsFile,
-    settings: planSettings(read(settingsFile)),
+    settings: planSettings(read(settingsFile), { retireMarketplace }),
     rule: planTaskRule(scope, root, claudeDir)
   };
 }
 
-// src/lib/state.ts
-import { realpathSync as realpathSync4 } from "node:fs";
-import { join as join6 } from "node:path";
+// src/lib/legacy.ts
+var MEMORY_BASES = [".claude/agent-memory", ".claude/agent-memory-local"];
+var LEGACY_PREFIX = "agent-os-";
+var MEMORY_PREFIX = "rulegate-";
+function agentOsInstall(root, claudeDir) {
+  const at = enabledAt(root, claudeDir, LEGACY_PLUGIN_ID);
+  const plugin = at?.value === true ? at.scope : void 0;
+  const shared = plugin === void 0 && enabledIn(join4(root, ".claude/settings.json"), LEGACY_PLUGIN_ID) === true;
+  const memory = [];
+  for (const base of MEMORY_BASES) {
+    const names = ls(join4(root, base));
+    for (const name of names) {
+      if (!name.startsWith(LEGACY_PREFIX) || !isDir(join4(root, base, name))) continue;
+      const target = `${MEMORY_PREFIX}${name.slice(LEGACY_PREFIX.length)}`;
+      memory.push({ base, name, target, split: names.includes(target) });
+    }
+  }
+  const source = isDir(join4(root, ".agent-os"));
+  const project = readJson(join4(root, ".claude/settings.json"));
+  const marketplace = isRecord(project) && isRecord(project.extraKnownMarketplaces) && LEGACY_MARKETPLACE in project.extraKnownMarketplaces;
+  return {
+    plugin,
+    shared,
+    // Installed goes without saying — this runs from the installed plugin — so enabled is
+    // anything short of an explicit `false`.
+    bothEnabled: plugin !== void 0 && enabledFlag(root, claudeDir, PLUGIN_ID) !== false,
+    memory,
+    source,
+    imported: source && isDir(join4(root, ".rulegate")),
+    marketplace,
+    found: plugin !== void 0 || shared || memory.length > 0 || source || marketplace
+  };
+}
+function disableCommand(scope) {
+  return `claude plugin disable ${LEGACY_PLUGIN_ID} --scope ${scope === "project" ? "project" : "local"}`;
+}
+
+// src/lib/migrate.ts
+import { createHash } from "node:crypto";
+import { lstatSync as lstatSync3, readFileSync as readFileSync2 } from "node:fs";
+import { join as join8 } from "node:path";
 
 // src/lib/refusals.ts
-import { lstatSync as lstatSync2, realpathSync as realpathSync3 } from "node:fs";
-import { basename as basename2, dirname as dirname2, isAbsolute as isAbsolute3, join as join5, relative as relative3, sep as sep3 } from "node:path";
+import { lstatSync as lstatSync2, realpathSync as realpathSync4 } from "node:fs";
+import { basename as basename2, dirname as dirname2, isAbsolute as isAbsolute3, join as join7, relative as relative3, sep as sep3 } from "node:path";
 
 // ../../packages/core/src/model/paths.ts
 var RULEGATE_DIR = ".rulegate";
@@ -600,161 +681,15 @@ function probe(absPath) {
 }
 
 // src/lib/guard.ts
-import { existsSync as existsSync2, readdirSync as readdirSync2, realpathSync as realpathSync2 } from "node:fs";
-import { basename, dirname, isAbsolute as isAbsolute2, join as join4, relative as relative2, resolve as resolve2, sep as sep2 } from "node:path";
-
-// src/lib/session.ts
-var inline = (s) => stripControl(s).replace(/`/g, "");
-
-// src/lib/guard.ts
-function realish(p) {
-  const rest = [];
-  let dir = p;
-  for (let i = 0; i < 256; i++) {
-    try {
-      return join4(realpathSync2.native(dir), ...[...rest].reverse());
-    } catch {
-      const parent = dirname(dir);
-      if (parent === dir) return p;
-      rest.push(basename(dir));
-      dir = parent;
-    }
-  }
-  return p;
-}
-function within(root, abs) {
-  const rel = relative2(root, abs);
-  if (rel === "" || rel === ".." || rel.startsWith(`..${sep2}`) || isAbsolute2(rel)) return void 0;
-  return rel.split(sep2).join("/");
-}
-function probeView(root) {
-  return {
-    listDir: (rel) => Promise.resolve(
-      readdirSync2(join4(root, rel), { withFileTypes: true }).map((e) => ({
-        name: e.name,
-        kind: e.isSymbolicLink() ? "symlink" : e.isDirectory() ? "dir" : "file"
-      }))
-    ),
-    exists: (rel) => Promise.resolve(existsSync2(join4(root, rel)))
-  };
-}
-function ownerOf(abs) {
-  const root = findRepoRoot(dirname(abs));
-  const state = parseState(read(join4(root, STATE_PATH)));
-  return state === void 0 ? void 0 : { root, state };
-}
-async function judge(abs) {
-  const owner = ownerOf(abs);
-  if (owner === void 0) return void 0;
-  const rel = within(owner.root, abs);
-  if (rel === void 0) return void 0;
-  const key = pathKeyFor(await probeCaseInsensitive(probeView(owner.root)));
-  if (key(rel) === key(STATE_PATH) || key(rel).startsWith(key(".rulegate/backup/"))) {
-    return {
-      kind: "deny",
-      reason: `${inline(rel)} is maintained by \`rulegate sync\` and \`rulegate restore\`, not by hand. Edit .rulegate/rules/ and run \`rulegate sync\`.`
-    };
-  }
-  const artifact = findArtifact(owner.state, rel, key);
-  if (artifact === void 0) return void 0;
-  return {
-    kind: "deny",
-    reason: `${inline(artifact.path)} is generated by Rulegate (${inline(artifact.adapter)}) from .rulegate/rules/, and the next \`rulegate sync\` would revert this edit. Make the change in the rule that produces it, then run \`rulegate sync\`. If the file already carries a hand-edit worth keeping, \`rulegate sync --import\` merges it back into the rule.`
-  };
-}
-async function guard(targetAbs) {
-  const spellings = [.../* @__PURE__ */ new Set([resolve2(targetAbs), realish(targetAbs)])];
-  for (const abs of spellings) {
-    const decision = await judge(abs);
-    if (decision !== void 0) return decision;
-  }
-  return void 0;
-}
-
-// src/lib/refusals.ts
-function real(p) {
-  const rest = [];
-  let at = p;
-  for (; ; ) {
-    try {
-      return join5(realpathSync3.native(at), ...rest.reverse());
-    } catch {
-      const up = dirname2(at);
-      if (up === at) return p;
-      rest.push(basename2(at));
-      at = up;
-    }
-  }
-}
-function inside(dir, abs) {
-  const rel = relative3(real(dir), real(abs));
-  return rel === "" || !(rel === ".." || rel.startsWith(`..${sep3}`) || isAbsolute3(rel));
-}
-function unreadableState(abs) {
-  const state = join5(findRepoRoot(dirname2(abs)), STATE_PATH);
-  if (!exists(state)) return false;
-  const text = read(state);
-  return text?.trim() !== "" && parseState(text) === void 0;
-}
-async function blocked(scope, root, claudeDir, abs) {
-  if (scope === "project") {
-    if (inside(claudeDir, abs)) {
-      return "this is the user-level Claude config \u2014 `--scope user` changes it, backup first";
-    }
-    const rel = relative3(root, abs);
-    let at = root;
-    for (const part of rel.split(sep3)) {
-      at = join5(at, part);
-      if (!exists(at)) break;
-      const st = lstatSync2(at);
-      if (st.isSymbolicLink()) return `${relative3(root, at)} is a symlink`;
-      if (at !== abs && !st.isDirectory()) return `${relative3(root, at)} is not a directory`;
-      if (at === abs && !st.isFile()) return "not a regular file";
-    }
-  } else if (exists(abs)) {
-    const st = lstatSync2(abs);
-    if (st.isSymbolicLink()) return "a symlink \u2014 edit the file it points at by hand";
-    if (!st.isFile()) return "not a regular file";
-  }
-  if (exists(abs) && read(abs) === void 0) {
-    return "could not be read (permissions, or larger than 4 MB) \u2014 left as it is";
-  }
-  if (exists(abs) && !isUtf8File(abs)) {
-    return "not UTF-8 text \u2014 rewriting it would replace the bytes it cannot decode";
-  }
-  if (unreadableState(abs)) {
-    return ".rulegate/state.json does not parse, so ownership cannot be checked \u2014 fix it first";
-  }
-  if ((await guard(abs))?.kind === "deny") {
-    return "generated by Rulegate (recorded in .rulegate/state.json)";
-  }
-  return void 0;
-}
-async function refusals(plan, root, claudeDir) {
-  const out = [];
-  const s = plan.settings;
-  if (s.status === "invalid") {
-    out.push({ item: "settings", file: plan.settingsFile, reason: "not valid JSON" });
-  } else if (s.status === "changed") {
-    const why = await blocked(plan.scope, root, claudeDir, plan.settingsFile);
-    if (why !== void 0) out.push({ item: "settings", file: plan.settingsFile, reason: why });
-  }
-  const r = plan.rule;
-  if (r.status === "exists") {
-    out.push({ item: "rule", file: r.file, reason: "exists without the task-tracking rule" });
-  } else if (r.status === "add") {
-    const why = await blocked(plan.scope, root, claudeDir, ruleTarget(plan.scope, root, claudeDir));
-    if (why !== void 0) out.push({ item: "rule", file: r.file, reason: why });
-  }
-  return out;
-}
+import { existsSync as existsSync2, readdirSync as readdirSync2, realpathSync as realpathSync3 } from "node:fs";
+import { basename, dirname, isAbsolute as isAbsolute2, join as join6, relative as relative2, resolve as resolve2, sep as sep2 } from "node:path";
 
 // src/lib/state.ts
-var PLUGIN_ID = "rulegate@rulegate";
-var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
-var real2 = (p) => {
+import { realpathSync as realpathSync2 } from "node:fs";
+import { join as join5 } from "node:path";
+var real = (p) => {
   try {
-    return realpathSync4(p);
+    return realpathSync2(p);
   } catch {
     return p;
   }
@@ -768,31 +703,18 @@ function cmpVersion(a, b) {
   }
   return 0;
 }
-function enabledFlag(root, claudeDir, id) {
-  for (const p of [
-    join6(root, ".claude/settings.local.json"),
-    join6(root, ".claude/settings.json"),
-    join6(claudeDir, "settings.json")
-  ]) {
-    const s = readJson(p);
-    if (isRecord(s) && isRecord(s.enabledPlugins) && typeof s.enabledPlugins[id] === "boolean") {
-      return s.enabledPlugins[id];
-    }
-  }
-  return void 0;
-}
 function pluginState(root, claudeDir, id = PLUGIN_ID) {
-  const rootReal = real2(root);
-  const file = readJson(join6(claudeDir, "plugins/installed_plugins.json"));
+  const rootReal = real(root);
+  const file = readJson(join5(claudeDir, "plugins/installed_plugins.json"));
   const all = isRecord(file) && isRecord(file.plugins) ? file.plugins[id] : void 0;
   const records = (Array.isArray(all) ? all : []).filter(isRecord);
   const mine = records.filter(
-    (r) => r.scope === "user" || typeof r.projectPath === "string" && real2(r.projectPath) === rootReal
+    (r) => r.scope === "user" || typeof r.projectPath === "string" && real(r.projectPath) === rootReal
   );
   const pick = mine.find((r) => r.scope === "project" || r.scope === "local") ?? mine[0];
   const [plugin, market] = id.split("@");
   const cached = readJson(
-    join6(
+    join5(
       claudeDir,
       "plugins/marketplaces",
       market ?? "",
@@ -815,8 +737,8 @@ async function setupState(root, claudeDir, { expect } = {}) {
   const add = (key, label, ok, fix) => {
     items.push({ key, label, ok, fix });
   };
-  const hasSource = isDir(join6(root, ".rulegate"));
-  const claudeMd = read(join6(root, "CLAUDE.md"));
+  const hasSource = isDir(join5(root, ".rulegate"));
+  const claudeMd = read(join5(root, "CLAUDE.md"));
   add("source", ".rulegate/ canonical rules", hasSource, "npx rulegate init");
   add(
     "claude-md",
@@ -828,6 +750,7 @@ async function setupState(root, claudeDir, { expect } = {}) {
   let taskRuleOk = true;
   let taskRuleFile = "";
   let taskRuleFix = "/rulegate:init settings";
+  let marketplace;
   const byHand = (reason) => `the settings pass refuses this \u2014 ${reason}`;
   for (const scope of scopes) {
     const p = planScope(scope, root, claudeDir);
@@ -835,6 +758,12 @@ async function setupState(root, claudeDir, { expect } = {}) {
     const settingsRefused = refused.find((r) => r.item === "settings");
     const ruleRefused = refused.find((r) => r.item === "rule");
     const where = scope === "user" ? "~/.claude/settings.json" : ".claude/settings.json";
+    if (scope === "project" && p.settings.marketplace !== void 0) {
+      marketplace = {
+        state: p.settings.marketplace,
+        fix: settingsRefused === void 0 ? "/rulegate:init settings" : byHand(settingsRefused.reason)
+      };
+    }
     if (scope === "project") {
       taskRuleOk = p.rule.status === "present";
       taskRuleFile = p.rule.file;
@@ -880,15 +809,35 @@ async function setupState(root, claudeDir, { expect } = {}) {
       `/plugin update ${PLUGIN_ID}, then /reload-plugins`
     );
   }
-  if (enabledFlag(root, claudeDir, LEGACY_PLUGIN_ID) === true) {
+  const legacy = agentOsInstall(root, claudeDir);
+  if (legacy.plugin !== void 0 || legacy.shared) {
     add(
       "legacy-plugin",
       "agent-os plugin disabled",
       false,
-      `claude plugin disable ${LEGACY_PLUGIN_ID}`
+      disableCommand(legacy.plugin ?? "project")
     );
   }
-  const setUp = AGENTS_SECTION.test(claudeMd ?? "") || ls(join6(root, ".claude/agent-memory")).some((d) => d.startsWith("rulegate-")) || read(join6(root, ".claude/rulegate.json")) !== void 0;
+  if (legacy.memory.length > 0) {
+    const refused = (await planMemoryMigration(root, claudeDir)).agents.filter(
+      (a) => a.kind === "refused"
+    );
+    add(
+      "legacy-memory",
+      `agent-os memory moved to rulegate-* (${String(legacy.memory.length)} left)`,
+      false,
+      refused.length === 0 ? "/rulegate:init (migrate-memory.js)" : `the migration refuses ${refused.map((a) => `${a.base}/${a.from} \u2014 ${a.reason ?? ""}`).join("; ")}`
+    );
+  }
+  if (marketplace !== void 0) {
+    add(
+      "legacy-marketplace",
+      `.claude/settings.json declares ${MARKETPLACE_NAME}, not ${LEGACY_MARKETPLACE}`,
+      false,
+      marketplace.state === "retire" ? marketplace.fix : `${disableCommand(legacy.plugin ?? "project")}, then ${marketplace.fix}`
+    );
+  }
+  const setUp = legacy.found || AGENTS_SECTION.test(claudeMd ?? "") || ls(join5(root, ".claude/agent-memory")).some((d) => d.startsWith("rulegate-")) || read(join5(root, ".claude/rulegate.json")) !== void 0;
   const missing = items.filter((i) => !i.ok);
   const status = !setUp ? "fresh" : missing.length > 0 ? "repair" : "healthy";
   return { status, items, missing, plugin: pl };
@@ -901,6 +850,355 @@ function describeState(st) {
     lines.push(`  ${i.ok ? "ok     " : "MISSING"} ${i.label}${i.ok ? "" : `  \u2192 ${i.fix}`}`);
   }
   return lines;
+}
+
+// src/lib/session.ts
+var inline = (s) => stripControl(s).replace(/`/g, "");
+
+// src/lib/guard.ts
+function realish(p) {
+  const rest = [];
+  let dir = p;
+  for (let i = 0; i < 256; i++) {
+    try {
+      return join6(realpathSync3.native(dir), ...[...rest].reverse());
+    } catch {
+      const parent = dirname(dir);
+      if (parent === dir) return p;
+      rest.push(basename(dir));
+      dir = parent;
+    }
+  }
+  return p;
+}
+function within(root, abs) {
+  const rel = relative2(root, abs);
+  if (rel === "" || rel === ".." || rel.startsWith(`..${sep2}`) || isAbsolute2(rel)) return void 0;
+  return rel.split(sep2).join("/");
+}
+function probeView(root) {
+  return {
+    listDir: (rel) => Promise.resolve(
+      readdirSync2(join6(root, rel), { withFileTypes: true }).map((e) => ({
+        name: e.name,
+        kind: e.isSymbolicLink() ? "symlink" : e.isDirectory() ? "dir" : "file"
+      }))
+    ),
+    exists: (rel) => Promise.resolve(existsSync2(join6(root, rel)))
+  };
+}
+function ownerOf(abs) {
+  const root = findRepoRoot(dirname(abs));
+  const state = parseState(read(join6(root, STATE_PATH)));
+  return state === void 0 ? void 0 : { root, state };
+}
+async function judge(abs) {
+  const owner = ownerOf(abs);
+  if (owner === void 0) return void 0;
+  const rel = within(owner.root, abs);
+  if (rel === void 0) return void 0;
+  const key = pathKeyFor(await probeCaseInsensitive(probeView(owner.root)));
+  if (key(rel) === key(STATE_PATH) || key(rel).startsWith(key(".rulegate/backup/"))) {
+    return {
+      kind: "deny",
+      reason: `${inline(rel)} is maintained by \`rulegate sync\` and \`rulegate restore\`, not by hand. Edit .rulegate/rules/ and run \`rulegate sync\`.`
+    };
+  }
+  const artifact = findArtifact(owner.state, rel, key);
+  if (artifact === void 0) return void 0;
+  return {
+    kind: "deny",
+    reason: `${inline(artifact.path)} is generated by Rulegate (${inline(artifact.adapter)}) from .rulegate/rules/, and the next \`rulegate sync\` would revert this edit. Make the change in the rule that produces it, then run \`rulegate sync\`. If the file already carries a hand-edit worth keeping, \`rulegate sync --import\` merges it back into the rule.`
+  };
+}
+async function guard(targetAbs) {
+  const spellings = [.../* @__PURE__ */ new Set([resolve2(targetAbs), realish(targetAbs)])];
+  for (const abs of spellings) {
+    const decision = await judge(abs);
+    if (decision !== void 0) return decision;
+  }
+  return void 0;
+}
+
+// src/lib/refusals.ts
+function real2(p) {
+  const rest = [];
+  let at = p;
+  for (; ; ) {
+    try {
+      return join7(realpathSync4.native(at), ...rest.reverse());
+    } catch {
+      const up = dirname2(at);
+      if (up === at) return p;
+      rest.push(basename2(at));
+      at = up;
+    }
+  }
+}
+function inside(dir, abs) {
+  const rel = relative3(real2(dir), real2(abs));
+  return rel === "" || !(rel === ".." || rel.startsWith(`..${sep3}`) || isAbsolute3(rel));
+}
+function unreadableState(abs) {
+  const state = join7(findRepoRoot(dirname2(abs)), STATE_PATH);
+  if (!exists(state)) return false;
+  const text = read(state);
+  return text?.trim() !== "" && parseState(text) === void 0;
+}
+async function blocked(scope, root, claudeDir, abs, { bytes = false } = {}) {
+  if (scope === "project") {
+    if (inside(claudeDir, abs)) {
+      return "this is the user-level Claude config \u2014 `--scope user` changes it, backup first";
+    }
+    const rel = relative3(root, abs);
+    let at = root;
+    for (const part of rel.split(sep3)) {
+      at = join7(at, part);
+      if (!exists(at)) break;
+      const st = lstatSync2(at);
+      if (st.isSymbolicLink()) return `${relative3(root, at)} is a symlink`;
+      if (at !== abs && !st.isDirectory()) return `${relative3(root, at)} is not a directory`;
+      if (at === abs && !st.isFile()) return "not a regular file";
+    }
+  } else if (exists(abs)) {
+    const st = lstatSync2(abs);
+    if (st.isSymbolicLink()) return "a symlink \u2014 edit the file it points at by hand";
+    if (!st.isFile()) return "not a regular file";
+  }
+  if (!bytes && exists(abs) && read(abs) === void 0) {
+    return "could not be read (permissions, or larger than 4 MB) \u2014 left as it is";
+  }
+  if (!bytes && exists(abs) && !isUtf8File(abs)) {
+    return "not UTF-8 text \u2014 rewriting it would replace the bytes it cannot decode";
+  }
+  if (unreadableState(abs)) {
+    return ".rulegate/state.json does not parse, so ownership cannot be checked \u2014 fix it first";
+  }
+  if ((await guard(abs))?.kind === "deny") {
+    return "generated by Rulegate (recorded in .rulegate/state.json)";
+  }
+  return void 0;
+}
+async function refusals(plan, root, claudeDir) {
+  const out = [];
+  const s = plan.settings;
+  if (s.status === "invalid") {
+    out.push({ item: "settings", file: plan.settingsFile, reason: "not valid JSON" });
+  } else if (s.status === "changed") {
+    const why = await blocked(plan.scope, root, claudeDir, plan.settingsFile);
+    if (why !== void 0) out.push({ item: "settings", file: plan.settingsFile, reason: why });
+  }
+  const r = plan.rule;
+  if (r.status === "exists") {
+    out.push({ item: "rule", file: r.file, reason: "exists without the task-tracking rule" });
+  } else if (r.status === "add") {
+    const why = await blocked(plan.scope, root, claudeDir, ruleTarget(plan.scope, root, claudeDir));
+    if (why !== void 0) out.push({ item: "rule", file: r.file, reason: why });
+  }
+  return out;
+}
+
+// src/lib/migrate.ts
+var AGENT_NAME = /^agent-os-[a-z0-9][a-z0-9_-]*$/i;
+var KEPT_INDEX = "MEMORY.agent-os.md";
+var MAX_KEPT = 100;
+var keptName = (n) => n === 1 ? KEPT_INDEX : `MEMORY.agent-os.${String(n)}.md`;
+var keptPointer = (name) => `- [agent-os index](${name}) \u2014 agent-os's MEMORY.md, kept whole when the two were merged`;
+var MAX_ENTRIES2 = 5e3;
+var sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+function stat(p) {
+  try {
+    return lstatSync3(p);
+  } catch {
+    return void 0;
+  }
+}
+function walk(dir) {
+  const dirs = [];
+  const files = [];
+  let left = MAX_ENTRIES2;
+  const visit = (rel) => {
+    for (const name of ls(rel === "" ? dir : join8(dir, rel))) {
+      if (--left < 0) return `more than ${String(MAX_ENTRIES2)} entries`;
+      const r = rel === "" ? name : `${rel}/${name}`;
+      const st = stat(join8(dir, r));
+      if (st === void 0) return `${r} vanished while being read`;
+      if (st.isSymbolicLink()) return `${r} is a symlink`;
+      if (st.isDirectory()) {
+        dirs.push(r);
+        const why2 = visit(r);
+        if (why2 !== void 0) return why2;
+      } else if (st.isFile()) files.push(r);
+      else return `${r} is not a regular file`;
+    }
+    return void 0;
+  };
+  const why = visit("");
+  return why === void 0 ? { dirs, files } : { reason: why };
+}
+var norm = (line) => line.replace(/^\uFEFF/, "").replace(/\r$/, "").trimEnd();
+function unionIndex(target, source, first = []) {
+  const have = new Set(target.split("\n").map(norm));
+  const take = (lines) => {
+    const out = [];
+    for (const raw of lines) {
+      const line = norm(raw);
+      if (line.trim() === "" || line.trimStart().startsWith("#") || have.has(line)) continue;
+      have.add(line);
+      out.push(line);
+    }
+    return out;
+  };
+  const top = take(first);
+  const tail = take(source.split("\n"));
+  const added = [...top, ...tail];
+  if (added.length === 0) return { added };
+  const crlf = target.includes("\r\n") && !/(^|[^\r])\n/.test(target);
+  const eol = crlf ? "\r\n" : "\n";
+  let head = "";
+  let rest = target;
+  if (top.length > 0) {
+    let at = 0;
+    for (const line of target.split("\n")) {
+      const l = norm(line);
+      if (l.trim() !== "" && !l.trimStart().startsWith("#")) break;
+      at += line.length + 1;
+    }
+    if (at < target.length) {
+      head = `${target.slice(0, at)}${top.join(eol)}${eol}`;
+      rest = target.slice(at);
+    } else tail.unshift(...top);
+  }
+  const body = `${head}${rest}`;
+  if (tail.length === 0) return { added, next: body };
+  const lead = body === "" || body.endsWith("\n") ? "" : eol;
+  return { added, next: `${body}${lead}${tail.join(eol)}${eol}` };
+}
+async function planAgent(root, claudeDir, base, from, to) {
+  const srcDir = join8(root, base, from);
+  const dstDir = join8(root, base, to);
+  const shell = { base, from, to, srcDir, dstDir, dirs: [], files: [] };
+  const refuse = (reason) => ({ ...shell, kind: "refused", reason });
+  if (!AGENT_NAME.test(from)) return refuse("not a plain agent name");
+  const parts = [...base.split("/"), from];
+  for (let i = 1; i <= parts.length; i++) {
+    const rel = parts.slice(0, i).join("/");
+    if (stat(join8(root, rel))?.isSymbolicLink() === true) return refuse(`${rel} is a symlink`);
+  }
+  if (inside(claudeDir, srcDir)) {
+    return refuse("this is the user-level Claude config, not a project \u2014 run from the project");
+  }
+  const target = stat(dstDir);
+  if (target !== void 0 && (target.isSymbolicLink() || !target.isDirectory())) {
+    return refuse(`${to} exists and is not a directory`);
+  }
+  const tree = walk(srcDir);
+  if ("reason" in tree) return refuse(tree.reason);
+  for (const d of tree.dirs) {
+    const st = stat(join8(dstDir, d));
+    if (st !== void 0 && (st.isSymbolicLink() || !st.isDirectory())) {
+      return refuse(`${to}/${d} exists and is not a directory`);
+    }
+  }
+  const files = [];
+  const conflicts = [];
+  for (const rel of tree.files) {
+    const src = join8(srcDir, rel);
+    const dst = join8(dstDir, rel);
+    for (const p of [src, dst]) {
+      const why = await blocked("project", root, claudeDir, p, { bytes: true });
+      if (why !== void 0) return refuse(`${p === src ? from : to}/${rel}: ${why}`);
+    }
+    let bytes;
+    try {
+      bytes = readFileSync2(src);
+    } catch {
+      return refuse(`${from}/${rel} could not be read`);
+    }
+    const sha = sha256(bytes);
+    const there = stat(dst);
+    if (there === void 0) {
+      files.push({ rel, action: "copy", src, dst, sha });
+      continue;
+    }
+    let theirs;
+    try {
+      theirs = readFileSync2(dst);
+    } catch {
+      return refuse(`${to}/${rel} could not be read`);
+    }
+    if (theirs.equals(bytes)) files.push({ rel, action: "same", src, dst, sha });
+    else if (rel === "MEMORY.md") {
+      for (const p of [src, dst]) {
+        const why = await blocked("project", root, claudeDir, p);
+        if (why !== void 0) return refuse(`${p === src ? from : to}/${rel}: ${why}`);
+      }
+      let name;
+      let keptBytes;
+      for (let n = 1; n <= MAX_KEPT && name === void 0; n++) {
+        const candidate = keptName(n);
+        if (tree.files.includes(candidate)) continue;
+        const kept = join8(dstDir, candidate);
+        const why = await blocked("project", root, claudeDir, kept, { bytes: true });
+        if (why !== void 0) return refuse(`${to}/${candidate}: ${why}`);
+        if (stat(kept) === void 0) {
+          name = candidate;
+          keptBytes = void 0;
+          break;
+        }
+        try {
+          keptBytes = readFileSync2(kept);
+        } catch {
+          return refuse(`${to}/${candidate} could not be read`);
+        }
+        if (keptBytes.equals(bytes)) name = candidate;
+      }
+      if (name === void 0) {
+        return refuse(`${String(MAX_KEPT)} kept agent-os indexes already \u2014 merge them by hand`);
+      }
+      files.push({
+        rel: name,
+        action: keptBytes === void 0 ? "copy" : "same",
+        src,
+        dst: join8(dstDir, name),
+        sha,
+        alias: true
+      });
+      const { next, added } = unionIndex(theirs.toString("utf8"), read(src) ?? "", [
+        keptPointer(name)
+      ]);
+      files.push({
+        rel,
+        action: "union",
+        src,
+        dst,
+        sha,
+        added,
+        dstSha: sha256(theirs),
+        ...next === void 0 ? {} : { next }
+      });
+    } else conflicts.push(rel);
+  }
+  if (conflicts.length > 0) {
+    return refuse(
+      `${conflicts.join(", ")} differ${conflicts.length === 1 ? "s" : ""} from ${to}/ \u2014 merge by hand (/rulegate:memory), then re-run`
+    );
+  }
+  const dirs = tree.dirs.map((rel) => ({ rel, src: join8(srcDir, rel), dst: join8(dstDir, rel) }));
+  return { ...shell, kind: target === void 0 ? "move" : "merge", dirs, files };
+}
+async function planMemoryMigration(root, claudeDir) {
+  const agents = [];
+  for (const m of agentOsInstall(root, claudeDir).memory) {
+    agents.push(await planAgent(root, claudeDir, m.base, m.name, m.target));
+  }
+  const gitignore = [];
+  for (const f of [".gitignore", ".claude/.gitignore"]) {
+    (read(join8(root, f)) ?? "").split("\n").forEach((line, i) => {
+      if (line.includes(LEGACY_PREFIX)) gitignore.push(`${f}:${String(i + 1)}  ${norm(line)}`);
+    });
+  }
+  return { agents, gitignore };
 }
 
 // src/lib/audit.ts
@@ -923,13 +1221,13 @@ function dirBytes(p, budget = { left: WALK_BUDGET }) {
   let n = 0;
   for (const f of ls(p)) {
     if (--budget.left < 0) break;
-    const fp = join7(p, f);
+    const fp = join9(p, f);
     n += isRealDir(fp) ? dirBytes(fp, budget) : size(fp);
   }
   return n;
 }
 function recordedPaths(root) {
-  const state = readJson(join7(root, ".rulegate/state.json"));
+  const state = readJson(join9(root, ".rulegate/state.json"));
   const artifacts = isRecord(state) && Array.isArray(state.artifacts) ? state.artifacts : [];
   return new Set(
     artifacts.filter(isRecord).flatMap((a) => typeof a.path === "string" ? [a.path] : [])
@@ -951,13 +1249,14 @@ async function runAudit({
   };
   const rulegate = isRulegateProject(root);
   const recorded = recordedPaths(root);
+  const legacyOs = agentOsInstall(root, claudeDir);
   say(`RULEGATE AUDIT   ${root}`);
   say(`                 ${today}`);
   say();
   let residentBytes = 0;
   say("ALWAYS-LOADED  (cost on every turn)");
   for (const f of ["CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"]) {
-    const t = read(join7(root, f));
+    const t = read(join9(root, f));
     if (!t) continue;
     const n = lineCount(t);
     residentBytes += t.length;
@@ -975,7 +1274,7 @@ async function runAudit({
   }
   if (!residentBytes) {
     flag("WARN", "No CLAUDE.md at all \u2014 this project has no always-loaded instructions.");
-  } else if (!AGENTS_SECTION.test(read(join7(root, "CLAUDE.md")) ?? "")) {
+  } else if (!AGENTS_SECTION.test(read(join9(root, "CLAUDE.md")) ?? "")) {
     flag(
       "INFO",
       'CLAUDE.md does not say when to use the rulegate agents \u2014 add the "Agents in this project" section (references/establishing.md, Step 4b).'
@@ -983,7 +1282,7 @@ async function runAudit({
   }
   say();
   if (rulegate) {
-    const rules = ls(join7(root, ".rulegate/rules")).filter((f) => f.endsWith(".md"));
+    const rules = ls(join9(root, ".rulegate/rules")).filter((f) => f.endsWith(".md"));
     say(
       `RULEGATE  .rulegate/  \u2014 ${String(rules.length)} rule(s), ${String(recorded.size)} generated file(s) recorded`
     );
@@ -998,13 +1297,13 @@ async function runAudit({
       "No .rulegate/ \u2014 `npx rulegate init` imports this project's existing agent configs into one canonical source. The plugin's generated-file guard has nothing to protect until then."
     );
   }
-  const rulesDir = join7(root, ".claude/rules");
+  const rulesDir = join9(root, ".claude/rules");
   const ruleFiles = ls(rulesDir).filter((f) => f.endsWith(".md"));
   say();
   say(`RULES  .claude/rules/  \u2014 ${String(ruleFiles.length)} file(s)`);
   if (ruleFiles.length === 0 && !isDir(rulesDir)) say("  (no rules directory)");
   for (const f of ruleFiles) {
-    const t = read(join7(rulesDir, f)) ?? "";
+    const t = read(join9(rulesDir, f)) ?? "";
     const fm = frontmatter(t);
     const scoped = /^paths:/m.test(fm);
     const globs = (fm.match(/-\s+["']/g) ?? []).length;
@@ -1019,7 +1318,7 @@ async function runAudit({
       );
     }
   }
-  const projSettings = readJson(join7(root, ".claude/settings.json"));
+  const projSettings = readJson(join9(root, ".claude/settings.json"));
   say();
   say("HOOKS  .claude/settings.json");
   if (projSettings === void 0) say("  (no project settings.json)");
@@ -1037,7 +1336,7 @@ async function runAudit({
             continue;
           }
           const target = m[1];
-          const exists2 = isFile(join7(root, target));
+          const exists2 = isFile(join9(root, target));
           if (/cartographer-reminder/.test(target)) {
             flag(
               "INFO",
@@ -1065,18 +1364,17 @@ async function runAudit({
     [".cursorrules", ".cursorrules"],
     [".cursor/rules/", ".cursor/rules"],
     [".windsurfrules", ".windsurfrules"],
-    [".clinerules", ".clinerules"],
-    [".agent-os/", ".agent-os"]
+    [".clinerules", ".clinerules"]
   ];
   const generated = (rel) => {
-    const files = isDir(join7(root, rel)) ? ls(join7(root, rel)).map((f) => `${rel}/${f}`) : [rel];
-    const readable = files.filter((f) => isFile(join7(root, f)));
+    const files = isDir(join9(root, rel)) ? ls(join9(root, rel)).map((f) => `${rel}/${f}`) : [rel];
+    const readable = files.filter((f) => isFile(join9(root, f)));
     return readable.length > 0 && readable.every((f) => recorded.has(f));
   };
   let anyLegacy = false;
   let anyListed = false;
   for (const [label, rel] of legacy) {
-    const p = join7(root, rel);
+    const p = join9(root, rel);
     if (!isDir(p) && !isFile(p)) continue;
     const dir = isDir(p);
     const n = dir ? ls(p).length : 1;
@@ -1092,10 +1390,10 @@ async function runAudit({
     say(`  FOUND ${pad(label, 22)} ${String(n)} file(s)  ${String(b)} B`);
     flag(
       "INFO",
-      rel === ".agent-os" ? ".agent-os/ exists \u2014 `npx rulegate init` imports it (T113); references/migrating.md covers the rest." : `${label} exists \u2014 preserve its content in ${rulegate ? ".rulegate/rules/" : "CLAUDE.md or .claude/rules/"} before deleting anything.`
+      `${label} exists \u2014 preserve its content in ${rulegate ? ".rulegate/rules/" : "CLAUDE.md or .claude/rules/"} before deleting anything.`
     );
   }
-  const mcp = readJson(join7(root, ".mcp.json"));
+  const mcp = readJson(join9(root, ".mcp.json"));
   const servers = isRecord(mcp) && isRecord(mcp.mcpServers) ? Object.keys(mcp.mcpServers) : [];
   if (isRecord(mcp)) {
     const memoryish = servers.filter((s) => /graphiti|memory|knowledge|mem0|zep|serena/i.test(s));
@@ -1108,15 +1406,16 @@ async function runAudit({
     }
   }
   if (!anyListed) say("  none");
+  if (legacyOs.source && !legacyOs.imported) anyLegacy = true;
   say();
   say("MEMORY");
   for (const base of [".claude/agent-memory", ".claude/agent-memory-local"]) {
-    const dir = join7(root, base);
+    const dir = join9(root, base);
     for (const agent of ls(dir)) {
-      const adir = join7(dir, agent);
+      const adir = join9(dir, agent);
       if (!isDir(adir)) continue;
-      const topics = ls(adir).filter((f) => f.endsWith(".md") && f !== "MEMORY.md");
-      const idx = read(join7(adir, "MEMORY.md"));
+      const topics = ls(adir).filter(isTopicFile);
+      const idx = read(join9(adir, "MEMORY.md"));
       const idxLines = idx ? idx.split("\n").filter((l) => l.trim()).length : 0;
       say(
         `  ${pad(agent, 34)} index ${num(idxLines, 3)} line(s)   ${String(topics.length)} topic file(s)`
@@ -1140,28 +1439,68 @@ async function runAudit({
           `${agent}: MEMORY.md over 200 lines \u2014 everything past that is dropped at startup.`
         );
       }
-      for (const d of ls(adir).filter((e) => isDir(join7(adir, e)))) {
+      for (const d of ls(adir).filter((e) => isDir(join9(adir, e)))) {
         flag(
           "WARN",
           `${agent}/${d}/ is a folder inside agent memory${d === ".claude" ? " \u2014 a memory write resolved against the wrong root" : ""}. Move any topic files up into ${agent}/ and delete it.`
         );
       }
-      if (agent.startsWith("agent-os-")) {
-        flag(
-          "INFO",
-          `${agent} is agent-os's memory \u2014 /rulegate:init moves it to rulegate-${agent.slice("agent-os-".length)} (T114).`
-        );
-      }
     }
   }
-  if (!isDir(join7(root, ".claude/agent-memory")) && !isDir(join7(root, ".claude/agent-memory-local"))) {
+  if (!isDir(join9(root, ".claude/agent-memory")) && !isDir(join9(root, ".claude/agent-memory-local"))) {
     say("  no agent memory yet (agents have not run in this project)");
   }
   say();
+  say("AGENT-OS");
+  if (!legacyOs.found) say("  none");
+  if (legacyOs.plugin !== void 0) {
+    say(`  plugin ${pad(LEGACY_PLUGIN_ID, 26)} enabled (${legacyOs.plugin} settings)`);
+    flag(
+      "FAIL",
+      `${LEGACY_PLUGIN_ID} is still enabled${legacyOs.bothEnabled ? " \u2014 both plugins enabled" : ""}: its session block prints next to this plugin's and its guard knows nothing of state.json. /rulegate:init disables it: ${disableCommand(legacyOs.plugin)}.`
+    );
+  }
+  if (legacyOs.shared) {
+    say(`  plugin ${pad(LEGACY_PLUGIN_ID, 26)} off here, enabled in .claude/settings.json`);
+    flag(
+      "WARN",
+      `.claude/settings.json still enables ${LEGACY_PLUGIN_ID} for everyone who pulls \u2014 only this machine turns it off. /rulegate:init disables it where it was turned on: ${disableCommand("project")}.`
+    );
+  }
+  const memoryPlan = legacyOs.memory.length > 0 ? (await planMemoryMigration(root, claudeDir)).agents : [];
+  for (const m of legacyOs.memory) {
+    say(
+      `  memory ${pad(`${m.base}/${m.name}`, 50)} \u2192 ${m.target}${m.split ? "  (both exist)" : ""}`
+    );
+    const refused = memoryPlan.find(
+      (a) => a.base === m.base && a.from === m.name && a.kind === "refused"
+    );
+    flag(
+      m.split || refused !== void 0 ? "WARN" : "INFO",
+      refused !== void 0 ? `${m.base}/${m.name}: the migration refuses it \u2014 ${refused.reason ?? ""}. agent-os stays enabled until it is merged: its agent is the only one reading this memory.` : m.split ? `${m.base}/${m.name} and ${m.target} both exist \u2014 the agent reads only ${m.target}, so agent-os's entries are invisible to it. /rulegate:init merges them (migrate-memory.js).` : `${m.base}/${m.name} is agent-os's memory \u2014 /rulegate:init moves it to ${m.target} (migrate-memory.js).`
+    );
+  }
+  if (legacyOs.source) {
+    say(
+      `  source .agent-os/  ${legacyOs.imported ? "already imported into .rulegate/" : "not imported"}`
+    );
+    flag(
+      "INFO",
+      legacyOs.imported ? ".agent-os/ is already imported into .rulegate/ \u2014 safe to delete once `npx --no rulegate check` is clean." : ".agent-os/ exists \u2014 `npx rulegate init` imports it into .rulegate/; references/migrating.md covers the rest."
+    );
+  }
+  if (legacyOs.marketplace) {
+    say(`  marketplace ${LEGACY_MARKETPLACE} declared in .claude/settings.json`);
+    flag(
+      "INFO",
+      `.claude/settings.json declares agent-os's marketplace (${LEGACY_MARKETPLACE}) \u2014 once agent-os is disabled, the settings pass replaces it with ${MARKETPLACE_NAME}.`
+    );
+  }
+  say();
   say(`MACHINE  ${claudeDir}`);
-  const gClaude = read(join7(claudeDir, "CLAUDE.md"));
+  const gClaude = read(join9(claudeDir, "CLAUDE.md"));
   say(`  CLAUDE.md${" ".repeat(24)}${gClaude ? `present  ${String(gClaude.length)} B` : "ABSENT"}`);
-  if (!gClaude && residentBytes && /~\/\.claude\/CLAUDE\.md/.test(read(join7(root, "CLAUDE.md")) ?? "")) {
+  if (!gClaude && residentBytes && /~\/\.claude\/CLAUDE\.md/.test(read(join9(root, "CLAUDE.md")) ?? "")) {
     flag(
       "FAIL",
       "Project CLAUDE.md refers to ~/.claude/CLAUDE.md, which does not exist \u2014 a dangling reference."
@@ -1171,7 +1510,7 @@ async function runAudit({
     ["agents", PLUGIN_AGENTS],
     ["skills", PLUGIN_SKILLS]
   ]) {
-    const have = ls(join7(claudeDir, d)).map((f) => basename3(f, ".md"));
+    const have = ls(join9(claudeDir, d)).map((f) => basename3(f, ".md"));
     say(`  ${pad(`${d}/`, 33)}${have.length > 0 ? have.join(", ") : "absent"}`);
     const clash = have.filter((n) => names.includes(n));
     if (clash.length > 0) {
@@ -1181,20 +1520,14 @@ async function runAudit({
       );
     }
   }
-  const projClash = ls(join7(root, ".claude/agents")).map((f) => basename3(f, ".md")).filter((n) => PLUGIN_AGENTS.includes(n));
+  const projClash = ls(join9(root, ".claude/agents")).map((f) => basename3(f, ".md")).filter((n) => PLUGIN_AGENTS.includes(n));
   if (projClash.length > 0) {
     flag(
       "FAIL",
       `.claude/agents/ contains ${projClash.join(", ")} \u2014 shadows the plugin agent of the same name.`
     );
   }
-  if (enabledFlag(root, claudeDir, LEGACY_PLUGIN_ID) === true) {
-    flag(
-      "FAIL",
-      `${LEGACY_PLUGIN_ID} is still enabled \u2014 its session block prints next to this plugin's and its guard knows nothing of state.json. Disable it: claude plugin disable ${LEGACY_PLUGIN_ID}.`
-    );
-  }
-  const gs = readJson(join7(claudeDir, "settings.json"));
+  const gs = readJson(join9(claudeDir, "settings.json"));
   if (gs === "INVALID") flag("FAIL", "~/.claude/settings.json is not valid JSON.");
   else if (isRecord(gs)) {
     const perms = isRecord(gs.permissions) ? gs.permissions : {};
@@ -1242,7 +1575,7 @@ async function runAudit({
   }
   say();
   say("PROJECT");
-  const pkg = readJson(join7(root, "package.json"));
+  const pkg = readJson(join9(root, "package.json"));
   const deps = isRecord(pkg) ? {
     ...isRecord(pkg.dependencies) ? pkg.dependencies : {},
     ...isRecord(pkg.devDependencies) ? pkg.devDependencies : {}
@@ -1265,7 +1598,7 @@ async function runAudit({
     ["Gemfile", "Ruby"],
     ["composer.json", "PHP"]
   ]) {
-    if (isFile(join7(root, f)) && !stacks.includes(label)) stacks.push(label);
+    if (isFile(join9(root, f)) && !stacks.includes(label)) stacks.push(label);
   }
   const SKIP = /* @__PURE__ */ new Set([
     "node_modules",
@@ -1283,20 +1616,20 @@ async function runAudit({
   let srcFiles = 0;
   let srcBytes = 0;
   let budget = WALK_BUDGET;
-  const walk = (d, depth) => {
+  const walk2 = (d, depth) => {
     if (depth > 8 || srcFiles > 2e4) return;
     for (const e of ls(d)) {
       if (--budget < 0) return;
       if (SKIP.has(e) || e.startsWith(".")) continue;
-      const fp = join7(d, e);
-      if (isRealDir(fp)) walk(fp, depth + 1);
+      const fp = join9(d, e);
+      if (isRealDir(fp)) walk2(fp, depth + 1);
       else if (CODE.test(e)) {
         srcFiles++;
         srcBytes += size(fp);
       }
     }
   };
-  walk(root, 0);
+  walk2(root, 0);
   say(`  stack${" ".repeat(28)}${stacks.join(", ") || "not detected"}`);
   say(
     `  source files${" ".repeat(21)}${String(srcFiles)}  (~${String(Math.round(srcBytes / 1024))} KB)`
@@ -1317,8 +1650,8 @@ async function runAudit({
       `Install code intelligence: /plugin install ${wantLsp[0]}@claude-plugins-official \u2014 lets Claude jump to a definition instead of scanning files.`
     );
   }
-  const gi = read(join7(root, ".gitignore")) ?? "";
-  const unignored = ["dist", "build", "vendor", "generated", "src/generated", ".next"].filter((d) => isDir(join7(root, d))).filter((d) => !gi.split("\n").some((l) => l.trim().replace(/\/$/, "") === d));
+  const gi = read(join9(root, ".gitignore")) ?? "";
+  const unignored = ["dist", "build", "vendor", "generated", "src/generated", ".next"].filter((d) => isDir(join9(root, d))).filter((d) => !gi.split("\n").some((l) => l.trim().replace(/\/$/, "") === d));
   if (unignored.length > 0) {
     flag(
       "INFO",
@@ -1328,8 +1661,8 @@ async function runAudit({
   say();
   say("WHAT THIS PROJECT COULD ADD");
   const rec = [];
-  const pkgDirs = ["packages", "apps", "services", "libs"].filter((d) => isDir(join7(root, d)));
-  const subs = pkgDirs.flatMap((d) => ls(join7(root, d)).filter((s) => isDir(join7(root, d, s))));
+  const pkgDirs = ["packages", "apps", "services", "libs"].filter((d) => isDir(join9(root, d)));
+  const subs = pkgDirs.flatMap((d) => ls(join9(root, d)).filter((s) => isDir(join9(root, d, s))));
   if (subs.length >= 3) {
     rec.push([
       "CLAUDE.md (nested)",
@@ -1343,7 +1676,7 @@ async function runAudit({
     "biome.json",
     "ruff.toml",
     ".golangci.yml"
-  ].find((f) => isFile(join7(root, f)));
+  ].find((f) => isFile(join9(root, f)));
   const hookEvents = isRecord(projSettings) && isRecord(projSettings.hooks) ? Object.keys(projSettings.hooks) : [];
   if (lintCfg !== void 0 && !hookEvents.includes("PostToolUse")) {
     rec.push([
@@ -1366,7 +1699,7 @@ async function runAudit({
       `${fast.slice(0, 3).join(", ")} move faster than model training \u2014 context7 serves current API docs`
     ]);
   }
-  if (ls(join7(root, ".claude/skills")).length === 0 && srcFiles > 100) {
+  if (ls(join9(root, ".claude/skills")).length === 0 && srcFiles > 100) {
     rec.push([
       "skills",
       "no project skills \u2014 a multi-step procedure you repeat (scaffolding a feature, a release) belongs in one, loaded on invoke not every turn"

@@ -29,6 +29,9 @@ import { ruleTarget, type Refusal, type Scope, type ScopePlan } from './settings
  *     planner sees it as absent and plans a fresh file, which would replace the user's;
  *   - a file that is not UTF-8. The planner's text has U+FFFD where its bytes were, and
  *     writing that back is a loss no backup should be needed to undo.
+ *
+ * The last two are text gates. A caller that only copies bytes (`{ bytes: true }`, the
+ * memory migration) skips them: nothing it writes was ever decoded.
  */
 
 /** `realpath` of the nearest existing ancestor, plus the segments below it. */
@@ -47,7 +50,7 @@ function real(p: string): string {
   }
 }
 
-function inside(dir: string, abs: string): boolean {
+export function inside(dir: string, abs: string): boolean {
   const rel = relative(real(dir), real(abs));
   return rel === '' || !(rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel));
 }
@@ -71,6 +74,7 @@ export async function blocked(
   root: string,
   claudeDir: string,
   abs: string,
+  { bytes = false }: { bytes?: boolean } = {},
 ): Promise<string | undefined> {
   if (scope === 'project') {
     if (inside(claudeDir, abs)) {
@@ -94,10 +98,12 @@ export async function blocked(
     if (st.isSymbolicLink()) return 'a symlink — edit the file it points at by hand';
     if (!st.isFile()) return 'not a regular file';
   }
-  if (exists(abs) && read(abs) === undefined) {
+  // A byte copy (the memory migration's) never decodes the file, so neither text gate
+  // protects anything there — and would refuse a harmless `.DS_Store` with a false reason.
+  if (!bytes && exists(abs) && read(abs) === undefined) {
     return 'could not be read (permissions, or larger than 4 MB) — left as it is';
   }
-  if (exists(abs) && !isUtf8File(abs)) {
+  if (!bytes && exists(abs) && !isUtf8File(abs)) {
     return 'not UTF-8 text — rewriting it would replace the bytes it cannot decode';
   }
   if (unreadableState(abs)) {

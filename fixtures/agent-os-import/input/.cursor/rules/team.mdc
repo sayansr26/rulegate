@@ -1,0 +1,6 @@
+---
+description: Team conventions
+alwaysApply: true
+---
+
+Write commit messages in the imperative.

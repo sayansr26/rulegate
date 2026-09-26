@@ -1,0 +1,11 @@
+schemaVersion: 1
+tools:
+  - antigravity
+  - claude-code
+  - cline
+  - codex
+  - cursor
+  - gemini
+  - kilo
+  - opencode
+  - windsurf

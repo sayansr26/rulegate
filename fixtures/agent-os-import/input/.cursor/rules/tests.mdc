@@ -1,0 +1,9 @@
+---
+description: tests
+globs: src/**/*.test.ts
+alwaysApply: false
+---
+
+<!-- agent-os: generated from .agent-os/ — edit the source, then run `npx @sayansr26/agent-os sync` -->
+
+Colocate tests with the code they test.

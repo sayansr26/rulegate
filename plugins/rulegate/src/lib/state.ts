@@ -1,8 +1,20 @@
 import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
+import { agentOsInstall, disableCommand } from './legacy.js';
+import { planMemoryMigration } from './migrate.js';
 import { isDir, isRecord, ls, read, readJson } from './read.js';
 import { refusals } from './refusals.js';
-import { GIT_DENY, planScope, type Scope } from './settings.js';
+import {
+  GIT_DENY,
+  LEGACY_MARKETPLACE,
+  LEGACY_PLUGIN_ID,
+  MARKETPLACE_NAME,
+  PLUGIN_ID,
+  enabledFlag,
+  planScope,
+  type MarketplaceState,
+  type Scope,
+} from './settings.js';
 
 /**
  * Setup state — is this a fresh setup, a repair, or already healthy?
@@ -16,10 +28,9 @@ import { GIT_DENY, planScope, type Scope } from './settings.js';
  * from inside a session and spawns nothing.
  */
 
-export const PLUGIN_ID = 'rulegate@rulegate';
-export const MARKETPLACE_NAME = 'rulegate';
-/** An agent-os install still enabled next to this one prints the session block twice (T114). */
-export const LEGACY_PLUGIN_ID = 'agent-os@sayan-plugins';
+// The ids and the `enabledPlugins` walk live with the settings files they read, where the
+// settings planner needs them too; re-exported so callers keep one import.
+export { LEGACY_PLUGIN_ID, MARKETPLACE_NAME, PLUGIN_ID, enabledFlag };
 
 const real = (p: string): string => {
   try {
@@ -38,21 +49,6 @@ export function cmpVersion(a: string | undefined, b: string | undefined): number
     if (d !== 0) return d > 0 ? 1 : -1;
   }
   return 0;
-}
-
-/** `enabledPlugins[id]` from the first settings file that sets it, most local first. */
-export function enabledFlag(root: string, claudeDir: string, id: string): boolean | undefined {
-  for (const p of [
-    join(root, '.claude/settings.local.json'),
-    join(root, '.claude/settings.json'),
-    join(claudeDir, 'settings.json'),
-  ]) {
-    const s = readJson(p);
-    if (isRecord(s) && isRecord(s.enabledPlugins) && typeof s.enabledPlugins[id] === 'boolean') {
-      return s.enabledPlugins[id];
-    }
-  }
-  return undefined;
 }
 
 export interface PluginState {
@@ -144,6 +140,7 @@ export async function setupState(
   let taskRuleOk = true;
   let taskRuleFile = '';
   let taskRuleFix = '/rulegate:init settings';
+  let marketplace: { state: MarketplaceState; fix: string } | undefined;
   // An item the writer refuses is not the settings pass's to fix: sending it back there
   // would loop, refusing again on every run. It names the refusal instead, which says what
   // to do by hand — the writer's own reasons, from the same check.
@@ -154,6 +151,15 @@ export async function setupState(
     const settingsRefused = refused.find((r) => r.item === 'settings');
     const ruleRefused = refused.find((r) => r.item === 'rule');
     const where = scope === 'user' ? '~/.claude/settings.json' : '.claude/settings.json';
+    if (scope === 'project' && p.settings.marketplace !== undefined) {
+      marketplace = {
+        state: p.settings.marketplace,
+        fix:
+          settingsRefused === undefined
+            ? '/rulegate:init settings'
+            : byHand(settingsRefused.reason),
+      };
+    }
     if (scope === 'project') {
       taskRuleOk = p.rule.status === 'present';
       taskRuleFile = p.rule.file;
@@ -203,12 +209,39 @@ export async function setupState(
       `/plugin update ${PLUGIN_ID}, then /reload-plugins`,
     );
   }
-  if (enabledFlag(root, claudeDir, LEGACY_PLUGIN_ID) === true) {
+  const legacy = agentOsInstall(root, claudeDir);
+  if (legacy.plugin !== undefined || legacy.shared) {
     add(
       'legacy-plugin',
       'agent-os plugin disabled',
       false,
-      `claude plugin disable ${LEGACY_PLUGIN_ID}`,
+      disableCommand(legacy.plugin ?? 'project'),
+    );
+  }
+  if (legacy.memory.length > 0) {
+    // The same planner the migration runs: an agent it refuses is named with its reason,
+    // since sending the user back to the migration would only refuse it again.
+    const refused = (await planMemoryMigration(root, claudeDir)).agents.filter(
+      (a) => a.kind === 'refused',
+    );
+    add(
+      'legacy-memory',
+      `agent-os memory moved to rulegate-* (${String(legacy.memory.length)} left)`,
+      false,
+      refused.length === 0
+        ? '/rulegate:init (migrate-memory.js)'
+        : `the migration refuses ${refused.map((a) => `${a.base}/${a.from} — ${a.reason ?? ''}`).join('; ')}`,
+    );
+  }
+  if (marketplace !== undefined) {
+    // Retired only once agent-os is off here, so while it is on the disable comes first.
+    add(
+      'legacy-marketplace',
+      `.claude/settings.json declares ${MARKETPLACE_NAME}, not ${LEGACY_MARKETPLACE}`,
+      false,
+      marketplace.state === 'retire'
+        ? marketplace.fix
+        : `${disableCommand(legacy.plugin ?? 'project')}, then ${marketplace.fix}`,
     );
   }
 
@@ -216,7 +249,10 @@ export async function setupState(
   // this runs from the installed plugin, so it always would — and neither does
   // `.rulegate/`: a project that uses the CLI and has never set up the plugin still wants
   // the full pass. Settings alone do not count either; deny rules may be the user's own.
+  // An agent-os project counts as set up too: it has the plugin's layer under the old name,
+  // and FRESH would re-scaffold over it instead of naming what to migrate.
   const setUp =
+    legacy.found ||
     AGENTS_SECTION.test(claudeMd ?? '') ||
     ls(join(root, '.claude/agent-memory')).some((d) => d.startsWith('rulegate-')) ||
     read(join(root, '.claude/rulegate.json')) !== undefined;

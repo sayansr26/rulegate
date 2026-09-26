@@ -1,0 +1,59 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git -C*)",
+      "Bash(git -c*)",
+      "Bash(git --git-dir*)",
+      "Bash(git --work-tree*)",
+      "Bash(git --exec-path*)",
+      "Bash(git add *)",
+      "Bash(git am *)",
+      "Bash(git apply *)",
+      "Bash(git bisect *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git cherry-pick *)",
+      "Bash(git clean *)",
+      "Bash(git clone *)",
+      "Bash(git commit *)",
+      "Bash(git config *)",
+      "Bash(git fast-import *)",
+      "Bash(git filter-branch *)",
+      "Bash(git gc *)",
+      "Bash(git init *)",
+      "Bash(git merge *)",
+      "Bash(git mv *)",
+      "Bash(git notes *)",
+      "Bash(git prune *)",
+      "Bash(git pull *)",
+      "Bash(git push *)",
+      "Bash(git rebase *)",
+      "Bash(git reflog *)",
+      "Bash(git remote *)",
+      "Bash(git repack *)",
+      "Bash(git replace *)",
+      "Bash(git reset *)",
+      "Bash(git restore *)",
+      "Bash(git revert *)",
+      "Bash(git rm *)",
+      "Bash(git stash *)",
+      "Bash(git submodule *)",
+      "Bash(git switch *)",
+      "Bash(git symbolic-ref *)",
+      "Bash(git tag *)",
+      "Bash(git update-ref *)",
+      "Bash(git worktree *)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_ENABLE_TODO_TOOLS": "1"
+  },
+  "extraKnownMarketplaces": {
+    "sayan-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "sayansr26/agent-os"
+      }
+    }
+  }
+}

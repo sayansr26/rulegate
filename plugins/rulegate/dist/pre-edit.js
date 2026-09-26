@@ -169,6 +169,7 @@ function readInRepo(root, rel) {
     return void 0;
   }
 }
+var isTopicFile = (f) => f.endsWith(".md") && !/^MEMORY(\..+)?\.md$/.test(f);
 function ls(path2) {
   try {
     return readdirSync(path2).sort();
@@ -328,7 +329,7 @@ function cartographerDir(root) {
 function mapFiles(root) {
   const dir = cartographerDir(root);
   if (dir === void 0) return [];
-  return ls(dir).filter((f) => f.endsWith(".md") && f !== "MEMORY.md").map((file) => {
+  return ls(dir).filter(isTopicFile).map((file) => {
     const text = read(join3(dir, file)) ?? "";
     const m = /^mapped:\s*["']?(\d{4}-\d{2}-\d{2})/m.exec(text);
     return { file, text, mapped: m?.[1] };

@@ -21,6 +21,20 @@ All notable changes to this project are recorded here. This project follows
   of its frontmatter, and names every imported file the tool will keep loading beside its
   generated copy. `@rulegate/adapter-kit` now exports `stripJsonc`, an additive change with no
   `ADAPTER_API_VERSION` bump.
+- **`rulegate init` migrates an agent-os project.** `.agent-os/` is an import source beside
+  ruler and rulesync: `.agent-os/AGENTS.md` becomes a repo-wide rule, each `rules/*.md` a rule
+  (`paths:` → `globs`, `always: true` → repo-wide), and `config.json`'s `targets` pick the
+  adapters to enable. A rule's frontmatter fence is read exactly as agent-os 0.6.0 reads it, so a
+  CRLF, BOM or unterminated fence stays unscoped, as agent-os compiled it, with a note naming the
+  file. The files agent-os generated carry its banner and are taken over rather than imported
+  again, each copied to `.rulegate/backup/` first. agent-os's `claude` block is printed as the
+  exact `.claude/rulegate.json` payload — `features`, `cartographerReminder`, `handoff`,
+  `activeTask` — and never written. Imported frontmatter keys that Rulegate also reads (`globs`,
+  `tools`, `order`) are kept under the importer's prefix (`agent-os-globs`, `rulesync-order`),
+  with a `-2` suffix if that name is taken; block lists are kept too. Interop rules rank first and
+  share one id space with the rules adapters import. `init` refuses a `.agent-os/` that was
+  itself built from Rulegate output (either tool's banner), and warns `W_INTEROP_OUTPUT_LEFT`
+  when an interop tool's outputs stay on disk beside the generated files.
 - **`init` warns `W_IMPORT_LEFT_BEHIND`** for every file it imported that no generated file
   replaces (an unscoped or nested `.claude/rules` file, a filename that slugs differently,
   Cursor's `.cursorrules`): the original stays on disk and tools that read it get its rules
@@ -98,6 +112,22 @@ All notable changes to this project are recorded here. This project follows
   state stops pointing a refused item back at the settings pass. A `--root` that is empty or not
   a directory is a usage error. The commands the plugin has the agent run are
   `npx --no rulegate …`, so nothing is fetched from the registry.
+- **`/rulegate:init` migrates an agent-os install.** `dist/migrate-memory.js` (preview by
+  default, `--apply` to write) moves each `.claude/agent-memory/agent-os-*` directory to
+  `rulegate-*`: every file is copied, verified and only then removed, binary files and files
+  over 4 MB included, as bytes. When both directories have a `MEMORY.md`, the index lines are
+  union-merged and agent-os's index is kept whole as `MEMORY.agent-os.md` (then
+  `MEMORY.agent-os.<n>.md` on a later merge), with a pointer line before the first entry. Each
+  merge backs up the index it replaces as `MEMORY.md.rulegate[.<n>].bak`, refuses if that index
+  changed while the migration ran, and warns when the merged index runs past 200 lines.
+  agent-os is disabled with `claude plugin disable … --scope local|project`, and the settings
+  pass replaces `sayan-plugins` with `rulegate` in the project's `extraKnownMarketplaces` only
+  once the committed settings no longer enable agent-os. The audit gains an AGENT-OS section,
+  and a kept `MEMORY*.md` index never counts as a feature map or a memory topic. Step 4b writes
+  the agents section to `.rulegate/rules/claude-agents.md` — never `agents.md`, which is the id
+  `init` gives an imported `AGENTS.md` — and rewrites an imported agent-os `(agent-os)` section
+  in place. A cross-check test holds the migration fixture to the real `rulegate init --yes`
+  output.
 
 ## [0.3.0] — unreleased
 

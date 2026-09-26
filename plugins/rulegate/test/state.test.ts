@@ -134,6 +134,68 @@ describe('setupState (T106)', () => {
     expect(await missing(sb.root, sb.claudeDir)).toEqual(['legacy-plugin']);
   });
 
+  it('names the scoped disable: local for a user-scope install, project for a project one', async () => {
+    await healthy();
+    await sb.putHome('settings.json', {
+      ...(JSON.parse(planSettings(undefined).next!) as object),
+      enabledPlugins: { 'agent-os@sayan-plugins': true },
+    });
+    const fix = async (): Promise<string | undefined> =>
+      (await setupState(sb.root, sb.claudeDir)).missing.find((i) => i.key === 'legacy-plugin')?.fix;
+    expect(await fix()).toBe('claude plugin disable agent-os@sayan-plugins --scope local');
+    await sb.put('.claude/settings.json', {
+      ...(JSON.parse(planSettings(undefined).next!) as object),
+      enabledPlugins: { 'agent-os@sayan-plugins': true },
+    });
+    expect(await fix()).toBe('claude plugin disable agent-os@sayan-plugins --scope project');
+  });
+
+  it('routes an agent-os project to REPAIR, not FRESH, and keeps HEALTHY out of reach while its memory remains', async () => {
+    await sb.put('.claude/agent-memory/agent-os-feature-cartographer/MEMORY.md', '');
+    expect((await setupState(sb.root, sb.claudeDir)).status).toBe('repair');
+    await healthy();
+    expect(await missing(sb.root, sb.claudeDir)).toEqual(['legacy-memory']);
+  });
+
+  it('names the migration refusal instead of sending the user back to it', async () => {
+    await healthy();
+    await sb.put('.claude/agent-memory/agent-os-feature-cartographer/_architecture.md', 'a\n');
+    await sb.put('.claude/agent-memory/rulegate-feature-cartographer/_architecture.md', 'b\n');
+    const item = (await setupState(sb.root, sb.claudeDir)).missing.find(
+      (i) => i.key === 'legacy-memory',
+    );
+    expect(item?.fix).toMatch(
+      /^the migration refuses \.claude\/agent-memory\/agent-os-feature-cartographer — _architecture\.md differs/,
+    );
+  });
+
+  it('flags a committed settings file that still enables agent-os under a local opt-out', async () => {
+    await healthy();
+    await sb.put('.claude/settings.json', {
+      ...(JSON.parse(planSettings(undefined).next!) as object),
+      enabledPlugins: { 'agent-os@sayan-plugins': true },
+    });
+    await sb.put('.claude/settings.local.json', {
+      enabledPlugins: { 'agent-os@sayan-plugins': false },
+    });
+    const item = (await setupState(sb.root, sb.claudeDir)).missing;
+    expect(item.map((i) => [i.key, i.fix])).toEqual([
+      ['legacy-plugin', 'claude plugin disable agent-os@sayan-plugins --scope project'],
+    ]);
+  });
+
+  it("wants agent-os's marketplace retired from the project settings", async () => {
+    await healthy();
+    await sb.put('.claude/settings.json', {
+      ...(JSON.parse(planSettings(undefined).next!) as object),
+      extraKnownMarketplaces: { 'sayan-plugins': { source: { source: 'github', repo: 'x/y' } } },
+    });
+    const item = (await setupState(sb.root, sb.claudeDir)).missing;
+    expect(item.map((i) => [i.key, i.fix])).toEqual([
+      ['legacy-marketplace', '/rulegate:init settings'],
+    ]);
+  });
+
   it('reports invalid settings JSON instead of throwing', async () => {
     await healthy();
     await sb.put('.claude/settings.json', '{ nope');

@@ -14,7 +14,14 @@ const fixtures = fileURLToPath(new URL('../../../fixtures/', import.meta.url));
  * `malformed/` exists to make the parser fail, so linting it asserts nothing about
  * false positives. Everything else is a repository someone could really have.
  */
-const DELIBERATELY_BROKEN = new Set(['malformed']);
+const DELIBERATELY_BROKEN = new Set([
+  'malformed',
+  // The T120 seed, captured verbatim: agent-os imported this repository's generated
+  // CLAUDE.md, so AGENTS.md and .agent-os/AGENTS.md are genuinely oversized for Codex,
+  // Antigravity and Windsurf. It is a real broken state kept as evidence, not a
+  // repository that is fine.
+  'agent-os-import-adopted',
+]);
 
 async function inputRoots(): Promise<string[]> {
   const out: string[] = [];

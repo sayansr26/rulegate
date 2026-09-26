@@ -7,6 +7,7 @@ import {
   type RuleDocument,
   type ToolSelector,
 } from '@rulegate/adapter-kit';
+import { FRONTMATTER, readFrontmatter } from './frontmatter.js';
 import type { InteropImporter, InteropResult } from './types.js';
 
 const RULESYNC_DIR = '.rulesync';
@@ -36,8 +37,6 @@ const TARGET_TO_TOOL: Readonly<Record<string, string>> = {
   augmentcode: 'augmentcode',
 };
 
-const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
-
 /** Files rulesync is known to generate, hidden from the adapter pass when it wrote them. */
 const KNOWN_OUTPUTS = [
   'AGENTS.md',
@@ -53,13 +52,9 @@ async function detect(ctx: AdapterContext): Promise<boolean> {
 }
 
 /**
- * A deliberately small YAML reader for the handful of keys rulesync's frontmatter uses.
- *
- * The kit exposes no YAML parser and this package may not reach past it, exactly as an
- * adapter may not. The keys are `description` (a scalar), `globs` and `targets` (inline or
- * block sequences of scalars) — the same subset the `.mdc` and `.instructions.md` readers
- * handle, and for the same reason: a dependency here would be a supply-chain surface in a
- * tool whose pitch is a thin dependency tree.
+ * rulesync's frontmatter keys: `description`, and `globs` and `targets` as lists. The
+ * reader itself is shared with agent-os's importer (`frontmatter.ts`); this keeps the
+ * shape rulesync's callers already use.
  */
 export function parseFrontmatter(block: string): {
   description?: string;
@@ -67,55 +62,13 @@ export function parseFrontmatter(block: string): {
   targets: string[];
   unknown: Record<string, JsonValue>;
 } {
-  const globs: string[] = [];
-  const targets: string[] = [];
-  const unknown: Record<string, JsonValue> = {};
-  let description: string | undefined;
-  let list: string[] | undefined;
-
-  const scalar = (raw: string): string => raw.trim().replace(/^["']|["']$/g, '');
-
-  for (const line of block.split(/\r?\n/)) {
-    const item = /^\s*-\s+(.*)$/.exec(line);
-    if (item !== null && list !== undefined) {
-      list.push(scalar(item[1]!));
-      continue;
-    }
-
-    const pair = /^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$/.exec(line);
-    if (pair === null) continue;
-    list = undefined;
-    const [, key, rest] = pair;
-    const value = (rest ?? '').trim();
-
-    const inline = (): string[] | undefined => {
-      if (!value.startsWith('[')) return undefined;
-      return value
-        .replace(/^\[|\]$/g, '')
-        .split(',')
-        .map(scalar)
-        .filter((v) => v !== '');
-    };
-
-    if (key === 'globs' || key === 'targets') {
-      const target = key === 'globs' ? globs : targets;
-      const items = inline();
-      if (items !== undefined) target.push(...items);
-      else if (value === '') list = target;
-      else target.push(scalar(value));
-      continue;
-    }
-    if (key === 'description') {
-      if (value !== '') description = scalar(value);
-      continue;
-    }
-    // Everything else — `root`, `localRoot`, and the per-tool objects — is preserved rather
-    // than interpreted. A key this reader does not understand is not a key the user should
-    // lose.
-    if (value !== '') unknown[key!] = scalar(value);
-  }
-
-  return { ...(description === undefined ? {} : { description }), globs, targets, unknown };
+  const { description, lists, unknown } = readFrontmatter(block, ['globs', 'targets'], 'rulesync');
+  return {
+    ...(description === undefined ? {} : { description }),
+    globs: [...lists['globs']!],
+    targets: [...lists['targets']!],
+    unknown: { ...unknown },
+  };
 }
 
 /** `targets: ["*"]` is rulesync's default and means every tool — canonical's `all`. */

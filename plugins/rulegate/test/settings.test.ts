@@ -59,6 +59,87 @@ describe('planSettings (T106, pure half of T109)', () => {
   });
 });
 
+describe("retiring agent-os's marketplace (T114)", () => {
+  const protectedText = (extra: object): string =>
+    JSON.stringify({ ...(JSON.parse(planSettings(undefined).next!) as object), ...extra });
+  const markets = {
+    extraKnownMarketplaces: {
+      'team-tools': { source: { source: 'github', repo: 'org/tools' } },
+      'sayan-plugins': { source: { source: 'github', repo: 'sayansr26/agent-os' } },
+    },
+  };
+
+  it('swaps sayan-plugins for rulegate and keeps every other marketplace in place', () => {
+    const p = planSettings(protectedText(markets), { retireMarketplace: true });
+    expect(p).toMatchObject({ status: 'changed', marketplace: 'retire' });
+    const next = JSON.parse(p.next!) as { extraKnownMarketplaces: object };
+    expect(next.extraKnownMarketplaces).toEqual({
+      'team-tools': { source: { source: 'github', repo: 'org/tools' } },
+      rulegate: { source: { source: 'github', repo: 'sayansr26/rulegate' } },
+    });
+    expect(planSettings(p.next, { retireMarketplace: true }).status).toBe('unchanged');
+  });
+
+  it('keeps a rulegate entry the user already wrote', () => {
+    const mine = { source: { source: 'directory', path: '/src/rulegate' } };
+    const p = planSettings(
+      protectedText({ extraKnownMarketplaces: { rulegate: mine, 'sayan-plugins': {} } }),
+      { retireMarketplace: true },
+    );
+    expect(JSON.parse(p.next!)).toMatchObject({ extraKnownMarketplaces: { rulegate: mine } });
+  });
+
+  it('only reports it while agent-os is enabled, and never looks unless asked', () => {
+    expect(planSettings(protectedText(markets), { retireMarketplace: false })).toMatchObject({
+      status: 'unchanged',
+      marketplace: 'blocked',
+    });
+    expect(planSettings(protectedText(markets)).marketplace).toBeUndefined();
+  });
+
+  describe('planScope', () => {
+    let sb: Sandbox;
+    beforeEach(async () => {
+      sb = await sandbox();
+    });
+    afterEach(async () => {
+      await sb.dispose();
+    });
+
+    it('never touches the user file: other agent-os projects on the machine still need it', async () => {
+      await sb.putHome('settings.json', protectedText(markets));
+      expect(planScope('user', sb.root, sb.claudeDir).settings.marketplace).toBeUndefined();
+    });
+
+    it('retires it in the project file once agent-os is disabled here', async () => {
+      await sb.put('.claude/settings.json', protectedText(markets));
+      await sb.putHome('settings.json', { enabledPlugins: { 'agent-os@sayan-plugins': true } });
+      expect(planScope('project', sb.root, sb.claudeDir).settings.marketplace).toBe('blocked');
+      await sb.put('.claude/settings.local.json', {
+        enabledPlugins: { 'agent-os@sayan-plugins': false },
+      });
+      const p = planScope('project', sb.root, sb.claudeDir);
+      expect(p.settings.marketplace).toBe('retire');
+      expect(describeScope(p, { dry: true }).join('\n')).toContain(
+        'extraKnownMarketplaces  would replace sayan-plugins (agent-os) with rulegate',
+      );
+    });
+
+    it('keeps it while the committed file still enables agent-os, whatever this machine says', async () => {
+      // One developer's local `false` hides the shared `true`; retiring would ship every
+      // teammate who pulls an enabled agent-os with no marketplace.
+      await sb.put('.claude/settings.json', {
+        ...markets,
+        enabledPlugins: { 'agent-os@sayan-plugins': true },
+      });
+      await sb.put('.claude/settings.local.json', {
+        enabledPlugins: { 'agent-os@sayan-plugins': false },
+      });
+      expect(planScope('project', sb.root, sb.claudeDir).settings.marketplace).toBe('blocked');
+    });
+  });
+});
+
 describe('claudeHome', () => {
   it('treats an empty CLAUDE_CONFIG_DIR as unset, not as the working directory', () => {
     expect(claudeHome({ CLAUDE_CONFIG_DIR: '' }, '/h')).toBe(path.resolve('/h/.claude'));
