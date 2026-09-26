@@ -15,7 +15,8 @@ Every file below that is present is **sent to the model**, all together. The ord
 | 3 | `.github/copilot-instructions.md` | project | instructions | yes | root only |
 | 4 | `AGENTS.md` | project | instructions | no | nearest-wins |
 | 5 | `CLAUDE.md` | project | instructions | no | root only |
-| 6 | `~/.copilot/instructions/*.instructions.md` | user-level | instructions | no | root only |
+| 6 | `.claude/rules/**/*.md` | project | instructions | no | root only |
+| 7 | `~/.copilot/instructions/*.instructions.md` | user-level | instructions | no | root only |
 
 ## What each file is
 
@@ -47,13 +48,19 @@ Source: [GitHub Docs — Adding repository custom instructions for GitHub Copilo
 
 VS Code additionally reads CLAUDE.md (root, .claude/, or ~/.claude/) for Claude-tool compatibility. Owned by the claude-code adapter here, and listed so `doctor` can account for a file Copilot loads that nothing in Copilot’s own documentation mentions.
 
-Source: [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-02
+Source: [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-26
+
+### `.claude/rules/**/*.md`
+
+VS Code’s Local agent also reads Claude Code’s rule files when `chat.useClaudeMdFile` is on, scoping them by `paths` instead of `applyTo`. Owned by the claude-code adapter, which writes one per glob-scoped rule — so with both adapters enabled Copilot receives each scoped rule twice, and listing the file here is what lets `doctor` say so.
+
+Source: [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-26
 
 ### `~/.copilot/instructions/*.instructions.md`
 
 User-level path-specific instructions, applied across projects and ranked above repository instructions. Read-only context for `doctor`: Rulegate never writes outside the repository.
 
-Source: [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-02
+Source: [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-26
 
 ## Size limits
 
@@ -70,13 +77,13 @@ No byte cap is documented in the GitHub or VS Code instruction documentation cit
 - **info** — Precedence across scopes runs personal instructions → repository instructions → organization instructions, and every applicable set is supplied to the model. Repository instructions cannot override a personal instruction.
   Source: [GitHub Docs — Adding repository custom instructions for GitHub Copilot](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions) — retrieved 2026-09-02
 - **info** — `applyTo` is a single quoted string, and multiple patterns are comma-separated inside it — not a YAML sequence. A YAML list parses cleanly and then matches nothing, which is the failure this adapter’s renderer is hand-written to avoid.
-  Source: [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-02
+  Source: [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-26
 - **info** — Rulegate writes instructions only. Prompt files (`.github/prompts/*.prompt.md`) and chat modes are a different surface — user-invoked rather than always-on — and generating them is deliberately out of scope for v0.
-  Source: [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-02
+  Source: [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-26
 
 ## Sources
 
 - [Visual Studio Code — MCP configuration reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) — retrieved 2026-09-04
-- [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-02
+- [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-26
 - [Visual Studio Code — Variables reference](https://code.visualstudio.com/docs/reference/variables-reference) — retrieved 2026-09-04
 - [GitHub Docs — Adding repository custom instructions for GitHub Copilot](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions) — retrieved 2026-09-02

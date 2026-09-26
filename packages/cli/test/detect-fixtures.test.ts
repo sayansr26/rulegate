@@ -75,13 +75,20 @@ describe('detectTools over the shipped adapter set', () => {
     });
 
     expect(report.globalProbed).toBe(true);
-    const present = report.tools.flatMap((t) => t.global.filter((g) => g.present));
     // The fixture holds Claude Code's and Gemini's user files and not Cursor's or Codex's,
-    // so this covers both answers and cannot pass by returning a constant.
-    expect(present.map((g) => g.pattern).sort()).toEqual([
-      '~/.claude/CLAUDE.md',
-      '~/.gemini/GEMINI.md',
-    ]);
+    // so this covers both answers and cannot pass by returning a constant. Per tool, because
+    // OpenCode also reads ~/.claude/CLAUDE.md and Antigravity ~/.gemini/GEMINI.md.
+    const present = Object.fromEntries(
+      report.tools
+        .map((t) => [t.name, t.global.filter((g) => g.present).map((g) => g.pattern)] as const)
+        .filter(([, patterns]) => patterns.length > 0),
+    );
+    expect(present).toEqual({
+      antigravity: ['~/.gemini/GEMINI.md'],
+      'claude-code': ['~/.claude/CLAUDE.md'],
+      gemini: ['~/.gemini/GEMINI.md'],
+      opencode: ['~/.claude/CLAUDE.md'],
+    });
     const absent = report.tools.flatMap((t) => t.global.filter((g) => !g.present));
     expect(absent.length).toBeGreaterThan(0);
   });

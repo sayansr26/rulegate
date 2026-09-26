@@ -43,7 +43,11 @@ describe('a repository whose canonical source is AGENTS.md', () => {
     const paths = plan.artifacts.map((a) => a.path);
     expect(paths).toContain('CLAUDE.md');
     expect(paths).toContain('GEMINI.md');
-    for (const artifact of plan.artifacts) {
+    // Rule artifacts only: OpenCode's `.opencode/opencode.json` is a config that lists its
+    // rule files rather than carrying the rules itself.
+    const rules = plan.artifacts.filter((a) => a.kind === 'rules');
+    expect(rules.length).toBeGreaterThan(0);
+    for (const artifact of rules) {
       expect(artifact.contents).toContain('Be careful with migrations.');
     }
   });

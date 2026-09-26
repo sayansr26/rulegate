@@ -42,7 +42,7 @@ describe('runAudit (T106)', () => {
 
   it('hands drift to rulegate check rather than checking it here', async () => {
     await sb.put('.rulegate/rulegate.yaml', 'schemaVersion: 1\n');
-    expect(await audit()).toContain('drift: run `npx rulegate check`');
+    expect(await audit()).toContain('drift: run `npx --no rulegate check`');
   });
 
   it('says a generated CLAUDE.md is trimmed in .rulegate/rules/, not in the file', async () => {

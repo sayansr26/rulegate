@@ -21,7 +21,7 @@ const VSCODE_VARIABLES_REFERENCE: SourceLink = {
 const VSCODE_CUSTOM_INSTRUCTIONS: SourceLink = {
   url: 'https://code.visualstudio.com/docs/copilot/customization/custom-instructions',
   title: 'Visual Studio Code — Use custom instructions in VS Code',
-  retrieved: '2026-09-02',
+  retrieved: '2026-09-26',
 };
 
 /**
@@ -91,6 +91,15 @@ export const docs: AdapterDocs = {
       managed: false,
       description:
         'VS Code additionally reads CLAUDE.md (root, .claude/, or ~/.claude/) for Claude-tool compatibility. Owned by the claude-code adapter here, and listed so `doctor` can account for a file Copilot loads that nothing in Copilot’s own documentation mentions.',
+      source: VSCODE_CUSTOM_INSTRUCTIONS,
+    },
+    {
+      pattern: '.claude/rules/**/*.md',
+      scope: 'project',
+      role: 'instructions',
+      managed: false,
+      description:
+        'VS Code’s Local agent also reads Claude Code’s rule files when `chat.useClaudeMdFile` is on, scoping them by `paths` instead of `applyTo`. Owned by the claude-code adapter, which writes one per glob-scoped rule — so with both adapters enabled Copilot receives each scoped rule twice, and listing the file here is what lets `doctor` say so.',
       source: VSCODE_CUSTOM_INSTRUCTIONS,
     },
     {

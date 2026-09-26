@@ -1,0 +1,1 @@
+Never swallow an error.

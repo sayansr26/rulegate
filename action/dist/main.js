@@ -1023,7 +1023,7 @@ var require_command = __commonJS({
           writeErr: (str) => process2.stderr.write(str),
           getOutHelpWidth: () => process2.stdout.isTTY ? process2.stdout.columns : void 0,
           getErrHelpWidth: () => process2.stderr.isTTY ? process2.stderr.columns : void 0,
-          outputError: (str, write11) => write11(str)
+          outputError: (str, write14) => write14(str)
         };
         this._hidden = false;
         this._helpOption = void 0;
@@ -2823,13 +2823,13 @@ Expecting one of '${allowedValues.join("', '")}'`);
       _getHelpContext(contextOptions) {
         contextOptions = contextOptions || {};
         const context = { error: !!contextOptions.error };
-        let write11;
+        let write14;
         if (context.error) {
-          write11 = (arg) => this._outputConfiguration.writeErr(arg);
+          write14 = (arg) => this._outputConfiguration.writeErr(arg);
         } else {
-          write11 = (arg) => this._outputConfiguration.writeOut(arg);
+          write14 = (arg) => this._outputConfiguration.writeOut(arg);
         }
-        context.write = contextOptions.write || write11;
+        context.write = contextOptions.write || write14;
         context.command = this;
         return context;
       }
@@ -9033,9 +9033,9 @@ var require_lexer = __commonJS({
         }
       }
       *parseQuotedScalar() {
-        const quote2 = this.charAt(0);
-        let end = this.buffer.indexOf(quote2, this.pos + 1);
-        if (quote2 === "'") {
+        const quote3 = this.charAt(0);
+        let end = this.buffer.indexOf(quote3, this.pos + 1);
+        if (quote3 === "'") {
           while (end !== -1 && this.buffer[end + 1] === "'")
             end = this.buffer.indexOf("'", end + 2);
         } else {
@@ -10229,14 +10229,14 @@ var require_public_api = __commonJS({
       const { lineCounter: lineCounter2, prettyErrors } = parseOptions2(options2);
       const parser$1 = new parser.Parser(lineCounter2?.addNewLine);
       const composer$1 = new composer.Composer(options2);
-      const docs11 = Array.from(composer$1.compose(parser$1.parse(source)));
+      const docs14 = Array.from(composer$1.compose(parser$1.parse(source)));
       if (prettyErrors && lineCounter2)
-        for (const doc of docs11) {
+        for (const doc of docs14) {
           doc.errors.forEach(errors.prettifyError(source, lineCounter2));
           doc.warnings.forEach(errors.prettifyError(source, lineCounter2));
         }
-      if (docs11.length > 0)
-        return docs11;
+      if (docs14.length > 0)
+        return docs14;
       return Object.assign([], { empty: true }, composer$1.streamInfo());
     }
     function parseDocument2(source, options2 = {}) {
@@ -10735,10 +10735,50 @@ function escapesRoot(relPath) {
   }
   return false;
 }
+function dirnamePosix(p) {
+  const norm = normalizeRelative(p);
+  const i = norm.lastIndexOf("/");
+  return i === -1 ? "" : norm.slice(0, i);
+}
 function basenamePosix(p) {
   const norm = normalizeRelative(p);
   const i = norm.lastIndexOf("/");
   return i === -1 ? norm : norm.slice(i + 1);
+}
+
+// ../packages/core/dist/fs/case.js
+function foldPath(relPath) {
+  return relPath.toLowerCase();
+}
+function pathKeyFor(caseInsensitive) {
+  return caseInsensitive ? foldPath : (relPath) => relPath;
+}
+function flipCase(name) {
+  let flipped = "";
+  for (const char of name) {
+    const lower = char.toLowerCase();
+    const upper = char.toUpperCase();
+    flipped += char === lower ? upper : lower;
+  }
+  return flipped;
+}
+async function probeCaseInsensitive(fs2) {
+  let entries;
+  try {
+    entries = await fs2.listDir("");
+  } catch {
+    return false;
+  }
+  const listed = new Set(entries.map((e) => e.name));
+  for (const entry of entries) {
+    if (entry.kind !== "file")
+      continue;
+    const flipped = flipCase(entry.name);
+    if (listed.has(flipped))
+      continue;
+    return await fs2.exists(flipped);
+  }
+  return false;
 }
 
 // ../packages/core/dist/index.js
@@ -12213,41 +12253,6 @@ async function loadState(fs2) {
 }
 var EMPTY_STATE = { schemaVersion: STATE_SCHEMA_VERSION, artifacts: [] };
 
-// ../packages/core/dist/fs/case.js
-function foldPath(relPath) {
-  return relPath.toLowerCase();
-}
-function pathKeyFor(caseInsensitive) {
-  return caseInsensitive ? foldPath : (relPath) => relPath;
-}
-function flipCase(name) {
-  let flipped = "";
-  for (const char of name) {
-    const lower = char.toLowerCase();
-    const upper = char.toUpperCase();
-    flipped += char === lower ? upper : lower;
-  }
-  return flipped;
-}
-async function probeCaseInsensitive(fs2) {
-  let entries;
-  try {
-    entries = await fs2.listDir("");
-  } catch {
-    return false;
-  }
-  const listed = new Set(entries.map((e) => e.name));
-  for (const entry of entries) {
-    if (entry.kind !== "file")
-      continue;
-    const flipped = flipCase(entry.name);
-    if (listed.has(flipped))
-      continue;
-    return await fs2.exists(flipped);
-  }
-  return false;
-}
-
 // ../packages/core/dist/state/compare.js
 async function compareToDisk(state, artifacts, fs2) {
   const unchanged = [];
@@ -12288,6 +12293,7 @@ async function compareToDisk(state, artifacts, fs2) {
 }
 
 // ../packages/core/dist/pipeline/plan.js
+init_glob();
 async function computePlan(input) {
   const { fs: fs2, repoRoot, adapters } = input;
   const errors = [];
@@ -12298,6 +12304,7 @@ async function computePlan(input) {
   const claimedBy = /* @__PURE__ */ new Map();
   const planLevels = [];
   const enabledEverywhere = /* @__PURE__ */ new Set();
+  const producedAt = /* @__PURE__ */ new Map();
   for (const level of levels) {
     const canonical = level.canonical;
     const nested = level.dir !== "";
@@ -12306,8 +12313,6 @@ async function computePlan(input) {
     const skippedTools = nested ? toolsWithoutNesting(selected) : [];
     const skipped = new Set(skippedTools);
     const eligible = selected.filter((a) => !skipped.has(a.name));
-    if (nested)
-      warnings.push(...allMergedWarnings(level, eligible));
     planLevels.push({
       dir: level.dir,
       skippedTools,
@@ -12339,6 +12344,14 @@ async function computePlan(input) {
           cause
         }));
         continue;
+      }
+      producedAt.set(`${level.dir}\0${adapter.name}`, produced);
+      if (nested) {
+        const inherited = level.inheritedFrom.map((dir) => ({
+          dir,
+          produced: producedAt.get(`${dir}\0${adapter.name}`) ?? []
+        }));
+        warnings.push(...allMergedWarnings(level, adapter, produced, inherited));
       }
       for (const raw of produced) {
         const artifact = finalizeArtifact(raw);
@@ -12435,20 +12448,36 @@ async function resolveLevels(input, errors, warnings) {
   }
   return resolveNested(sources);
 }
-function allMergedWarnings(level, eligible) {
+function allMergedWarnings(level, adapter, produced, inherited) {
   if (level.overriddenRuleIds.length === 0)
     return [];
+  const merged = nestedTargets([adapter]).filter((target) => target.nesting === "all-merged").map((target) => target.pattern);
+  if (merged.length === 0)
+    return [];
   const out = [];
-  for (const target of nestedTargets(eligible)) {
-    if (target.nesting !== "all-merged")
-      continue;
-    for (const id of level.overriddenRuleIds) {
-      out.push(new RulegateError({
-        code: "W_NESTED_MERGE_CONFLICT",
-        message: `${level.dir} redefines rule \`${id}\`, but ${target.tool} merges nested files instead of overriding: it will load both texts`,
-        source: { file: nestedPath(level.dir, target.pattern) },
-        hint: `give the rule a different id in ${level.dir}, or disable ${target.tool} there`
-      }));
+  const warned = /* @__PURE__ */ new Set();
+  const sides = [{ dir: level.dir, produced }, ...[...inherited].reverse()];
+  for (const side of sides) {
+    for (const artifact of side.produced) {
+      if (artifact.kind !== "rules")
+        continue;
+      const local = normalizeRelative(artifact.path);
+      if (!merged.some((pattern) => matchesGlob(local, pattern)))
+        continue;
+      const carried = artifact.provenance?.ruleIds;
+      for (const id of level.overriddenRuleIds) {
+        if (carried !== void 0 && !carried.includes(id))
+          continue;
+        if (side.dir !== level.dir && warned.has(id))
+          continue;
+        warned.add(id);
+        out.push(new RulegateError({
+          code: "W_NESTED_MERGE_CONFLICT",
+          message: `${level.dir} redefines rule \`${id}\`, but ${adapter.name} merges nested files instead of overriding: it will load both texts`,
+          source: { file: nestedPath(side.dir, local) },
+          hint: `give the rule a different id in ${level.dir}, or disable ${adapter.name} there`
+        }));
+      }
     }
   }
   return out;
@@ -13176,6 +13205,357 @@ var aider = {
   docs
 };
 
+// ../packages/adapters/antigravity/dist/frontmatter.js
+var TRIGGERS = /* @__PURE__ */ new Set([
+  "always_on",
+  "glob",
+  "model_decision",
+  "manual"
+]);
+function renderGlobs(globs) {
+  for (const glob of globs) {
+    if (glob.includes(",")) {
+      throw new RulegateError({
+        code: "E_FRONTMATTER_INVALID",
+        message: `glob \`${glob}\` contains a comma, which antigravity cannot express`,
+        hint: "antigravity separates patterns with commas and has no escape for one inside a pattern; split the rule in two"
+      });
+    }
+  }
+  return JSON.stringify(globs.join(", "));
+}
+var YAML_KEYWORD = /^(?:true|false|yes|no|on|off|null|~)$/i;
+function renderDescription(description) {
+  const folded = description.replace(/\s+/g, " ").trim();
+  const plain = /^[A-Za-z][A-Za-z0-9 _.,()/'-]*$/.test(folded) && !YAML_KEYWORD.test(folded);
+  return plain ? folded : JSON.stringify(folded);
+}
+function renderFrontmatter(init) {
+  const lines = ["---"];
+  const scoped = init.globs.length > 0;
+  lines.push(`trigger: ${scoped ? "glob" : "always_on"}`);
+  if (scoped)
+    lines.push(`globs: ${renderGlobs(init.globs)}`);
+  if (init.description !== void 0 && init.description !== "") {
+    lines.push(`description: ${renderDescription(init.description)}`);
+  }
+  lines.push("---", "", "");
+  return lines.join("\n");
+}
+var YAML_INDICATOR = /^[*&!@`]/;
+function unquote(raw) {
+  const value = raw.trim();
+  if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value.slice(1, -1);
+    }
+  }
+  if (value.startsWith("'") && value.endsWith("'") && value.length >= 2) {
+    return value.slice(1, -1).replace(/''/g, "'");
+  }
+  return value;
+}
+function parseRule(contents) {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(contents);
+  if (match === null) {
+    return { globs: [], hasFrontmatter: false, body: stripMarker(contents).trim() };
+  }
+  const body = stripMarker(contents.slice(match[0].length).replace(/^\s*\n/, ""));
+  const globs = [];
+  let description;
+  let trigger;
+  let invalidKey;
+  const check = (key, raw) => {
+    if (invalidKey === void 0 && YAML_INDICATOR.test(raw.trim()))
+      invalidKey = key;
+  };
+  let listKey;
+  for (const line of match[1].split(/\r?\n/)) {
+    const item = /^\s+-\s*(.*)$/.exec(line);
+    if (item !== null && listKey !== void 0) {
+      check(listKey, item[1]);
+      const glob = unquote(item[1].trim());
+      if (glob !== "")
+        globs.push(glob);
+      continue;
+    }
+    listKey = void 0;
+    const pair = /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/.exec(line);
+    if (pair === null)
+      continue;
+    const [, key, raw] = pair;
+    check(key, raw);
+    const value = unquote(raw);
+    if ((key === "globs" || key === "glob") && value === "") {
+      listKey = key;
+    } else if (key === "globs" || key === "glob") {
+      const flow = /^\[(.*)\]$/.exec(value);
+      const items = (flow === null ? value : flow[1]).split(",");
+      if (flow !== null)
+        for (const g of items)
+          check(key, g);
+      globs.push(...items.map((g) => unquote(g)).filter((g) => g !== ""));
+    } else if (key === "description" && value !== "") {
+      description = value;
+    } else if (key === "trigger") {
+      trigger = value;
+    }
+  }
+  return {
+    globs,
+    ...description === void 0 ? {} : { description },
+    ...trigger === void 0 ? {} : { trigger },
+    hasFrontmatter: true,
+    ...invalidKey === void 0 ? {} : { invalidKey },
+    body: body.trim()
+  };
+}
+function isKnownTrigger(trigger) {
+  return trigger !== void 0 && TRIGGERS.has(trigger);
+}
+
+// ../packages/adapters/antigravity/dist/docs.js
+var RULES_DOCS = {
+  url: "https://antigravity.google/docs/rules",
+  title: "Google Antigravity \u2014 Rules configuration reference",
+  retrieved: "2026-09-26"
+};
+var docs2 = {
+  toolName: "Antigravity",
+  homepage: "https://antigravity.google",
+  // Not a release number: the page carries none, and the tool was not run for this.
+  verifiedAgainst: { version: "Rules docs as published 2026-09-26", date: "2026-09-26" },
+  resolution: "additive",
+  files: [
+    {
+      pattern: ".agents/rules/*.md",
+      scope: "project",
+      role: "instructions",
+      managed: true,
+      nesting: "all-merged",
+      description: "Workspace rules, one file per rule, each opening with YAML frontmatter that declares a trigger. Only the immediate .md children are scanned; a file with missing frontmatter or an unrecognized trigger is silently discarded. This is what Rulegate generates.",
+      source: RULES_DOCS
+    },
+    {
+      pattern: ".agent/rules/*.md",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      nesting: "all-merged",
+      description: "The legacy name of the rules directory, still read. Rulegate imports it and never writes it.",
+      source: RULES_DOCS
+    },
+    {
+      pattern: ".agents/AGENTS.md",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      nesting: "all-merged",
+      description: "Antigravity-specific instructions without frontmatter, beside the rules directory. Rulegate imports it and never writes it.",
+      source: RULES_DOCS
+    },
+    {
+      pattern: ".agents/GEMINI.md",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      nesting: "all-merged",
+      description: "The GEMINI.md spelling of the same Antigravity-specific file. Rulegate imports it and never writes it.",
+      source: RULES_DOCS
+    },
+    {
+      pattern: "AGENTS.md",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      nesting: "all-merged",
+      description: "Read in any directory, without frontmatter. Generated by the codex adapter, not by this one \u2014 so enabling antigravity and codex together sends Antigravity the same rules twice.",
+      source: RULES_DOCS
+    },
+    {
+      pattern: "GEMINI.md",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      nesting: "all-merged",
+      description: "Read in any directory, without frontmatter. Generated by the gemini adapter, not by this one \u2014 so enabling antigravity and gemini together sends Antigravity the same rules twice.",
+      source: RULES_DOCS
+    },
+    {
+      pattern: "~/.gemini/AGENTS.md",
+      scope: "global",
+      role: "instructions",
+      managed: false,
+      description: "User-level rules. Outside the repository, so Rulegate reports it and never writes it.",
+      source: RULES_DOCS
+    },
+    {
+      pattern: "~/.gemini/GEMINI.md",
+      scope: "global",
+      role: "instructions",
+      managed: false,
+      description: "User-level rules; the same file Gemini CLI reads, so it reaches both tools. Rulegate reports it and never writes it.",
+      source: RULES_DOCS
+    },
+    {
+      pattern: "~/.gemini/config/AGENTS.md",
+      scope: "global",
+      role: "instructions",
+      managed: false,
+      description: "User-level rules in the config directory. Rulegate reports it and never writes it.",
+      source: RULES_DOCS
+    },
+    {
+      pattern: "~/.gemini/config/rules/*.md",
+      scope: "global",
+      role: "instructions",
+      managed: false,
+      description: "User-level rule files with the same frontmatter as .agents/rules. Rulegate reports them and never writes them.",
+      source: RULES_DOCS
+    }
+  ],
+  limits: {
+    maxBytesPerFile: 24e3,
+    note: "Antigravity documents 24,000 bytes per rule file, and a 20,000-token budget shared by every global and always_on rule together. Rulegate checks the per-file cap; the shared budget spans files it does not write, so it is reported here rather than enforced."
+  },
+  notes: [
+    {
+      level: "info",
+      message: "trigger: is derived, not authored. A rule with globs becomes trigger: glob and a repo-wide rule becomes trigger: always_on; model_decision and manual are never generated, because both let the model skip a rule the author asked for. Imported rules in either mode come back as ordinary rules, with a warning.",
+      source: RULES_DOCS
+    },
+    {
+      level: "info",
+      message: 'globs: is always double-quoted and comma-separated, as the vendor example writes it ("*.proto, **/*.pb.go"). Bare, a pattern starting with * is a YAML alias, and a block that fails to parse gets the rule discarded without an error. Import imports such a file with a warning that it is not in effect today, and the render quotes it.',
+      source: RULES_DOCS
+    },
+    {
+      level: "warn",
+      message: "Antigravity also reads AGENTS.md and GEMINI.md in every directory. With codex or gemini enabled as well, the same rules reach Antigravity from two or three files and are billed each time.",
+      source: RULES_DOCS
+    }
+  ]
+};
+
+// ../packages/adapters/antigravity/dist/index.js
+var RULES_DIR2 = ".agents/rules";
+var LEGACY_RULES_DIR = ".agent/rules";
+var AGENTS_DIR_FILES = [".agents/AGENTS.md", ".agents/GEMINI.md"];
+var DETECTION_PATHS2 = [RULES_DIR2, LEGACY_RULES_DIR];
+async function detect2(ctx) {
+  const evidence = [];
+  for (const path4 of DETECTION_PATHS2) {
+    if (await ctx.fs.exists(path4))
+      evidence.push(path4);
+  }
+  return detected(evidence);
+}
+async function read2(ctx) {
+  const rules = [];
+  const warnings = [];
+  const taken = /* @__PURE__ */ new Set();
+  for (const dir of [RULES_DIR2, LEGACY_RULES_DIR]) {
+    for (const path4 of await ctx.fs.glob(`${dir}/**/*.md`)) {
+      if (isCanonicalSource(ctx.canonical.manifest, path4))
+        continue;
+      if (dirnamePosix(path4) !== dir) {
+        warnings.push(`${path4}: Antigravity scans only the immediate children of ${dir}/, so this file is not loaded and was not imported`);
+        continue;
+      }
+      const contents = await ctx.fs.tryReadFile(path4);
+      if (contents === void 0)
+        continue;
+      const parsed = parseRule(contents);
+      if (parsed.body === "" && parsed.description === void 0)
+        continue;
+      if (parsed.hasFrontmatter && parsed.trigger === "glob" && parsed.globs.length === 0) {
+        const overwritten = dir === RULES_DIR2 ? `; \`init --yes\` replaces it, with a backup under .rulegate/backup/, if a rule imported from another tool is named \`${basenamePosix(path4).replace(/\.md$/i, "")}\`` : "";
+        warnings.push(`${path4}: trigger \`glob\` with no globs matches no file, so Antigravity never applies this rule; it was not imported \u2014 add a \`globs:\` value and run \`init\` again to keep it${overwritten}`);
+        continue;
+      }
+      if (parsed.invalidKey !== void 0) {
+        warnings.push(`${path4}: the \`${parsed.invalidKey}:\` value starts with a YAML indicator (a bare \`*\` is an alias), so the frontmatter does not parse and Antigravity silently discards this rule today; it was imported so that nothing is lost, and Rulegate will render the value quoted`);
+      } else if (!parsed.hasFrontmatter || !isKnownTrigger(parsed.trigger)) {
+        warnings.push(`${path4}: Antigravity silently discards a rule file with missing frontmatter or an unrecognized trigger, so this rule is not in effect today; it was imported so that nothing is lost, and Rulegate will render it with a valid trigger`);
+      } else if (parsed.trigger === "model_decision" || parsed.trigger === "manual") {
+        warnings.push(`${path4}: trigger \`${parsed.trigger}\` has no canonical equivalent; imported as a rule Rulegate renders always_on (or glob, when it has globs)`);
+      }
+      const alwaysOn = parsed.hasFrontmatter && parsed.trigger === "always_on";
+      if (alwaysOn && parsed.globs.length > 0) {
+        warnings.push(`${path4}: trigger \`always_on\` ignores its \`globs:\` value, so Antigravity applies this rule to every request; it was imported unscoped, and the globs were dropped`);
+      }
+      const base = basenamePosix(path4).replace(/\.md$/i, "");
+      rules.push(importedRule({
+        id: claimRuleId(importRuleId(base, "antigravity"), taken),
+        ...parsed.description === void 0 ? {} : { description: parsed.description },
+        globs: alwaysOn ? [] : parsed.globs,
+        body: parsed.body,
+        source: { file: path4, line: 1 }
+      }));
+    }
+  }
+  for (const file of AGENTS_DIR_FILES) {
+    if (isCanonicalSource(ctx.canonical.manifest, file))
+      continue;
+    const contents = await ctx.fs.tryReadFile(file);
+    if (contents === void 0)
+      continue;
+    const fallback = `antigravity-${basenamePosix(file).replace(/\.md$/i, "").toLowerCase()}`;
+    for (const rule of importConcatenated({ file, contents, idFallback: fallback })) {
+      rules.push({ ...rule, id: claimRuleId(rule.id, taken) });
+    }
+  }
+  return {
+    ...rules.length === 0 ? {} : { rules },
+    ...warnings.length === 0 ? {} : { warnings }
+  };
+}
+function write2(ctx) {
+  const { canonical } = ctx;
+  const marker = canonical.manifest.options.marker;
+  const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, "antigravity")));
+  const artifacts = [];
+  const claimed = /* @__PURE__ */ new Map();
+  for (const rule of rules) {
+    const path4 = `${RULES_DIR2}/${slugForId(rule.id)}.md`;
+    const previous = claimed.get(path4);
+    if (previous !== void 0) {
+      throw new RulegateError({
+        code: "E_ARTIFACT_PATH_CONFLICT",
+        message: `rules \`${previous}\` and \`${rule.id}\` both render to ${path4}`,
+        source: rule.source,
+        hint: "rename one of them; antigravity rule filenames are flattened rule ids"
+      });
+    }
+    claimed.set(path4, rule.id);
+    const frontmatter = renderFrontmatter({
+      globs: rule.frontmatter.globs,
+      ...rule.frontmatter.description === void 0 ? {} : { description: rule.frontmatter.description }
+    });
+    artifacts.push(finalizeArtifact({
+      path: path4,
+      // The marker goes *after* the frontmatter. Antigravity discards a rule file whose
+      // first bytes are not a valid block, silently — a comment above it would make
+      // every generated rule vanish with nothing reported anywhere.
+      contents: `${frontmatter}${withHtmlMarker(rule.body, marker)}`,
+      adapter: "antigravity",
+      kind: "rules",
+      provenance: { ruleIds: [rule.id] }
+    }));
+  }
+  return Promise.resolve(artifacts);
+}
+var antigravity = {
+  name: "antigravity",
+  apiVersion: ADAPTER_API_VERSION,
+  detect: detect2,
+  read: read2,
+  write: write2,
+  docs: docs2
+};
+
 // ../packages/adapters/claude-code/dist/mcp.js
 var MCP_FILE = ".mcp.json";
 function reference(value) {
@@ -13221,6 +13601,375 @@ function importMcpConfig(contents, file = MCP_FILE) {
   return importMcpJson(contents, { serversKey: "mcpServers", parseReference, file });
 }
 
+// ../packages/adapters/claude-code/dist/rules.js
+var RULES_DIR3 = ".claude/rules";
+function rulePath(rule) {
+  return `${RULES_DIR3}/${slugForId(rule.id)}.md`;
+}
+function quote(glob) {
+  return `"${glob.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+function renderPathsFrontmatter(globs) {
+  return ["---", "paths:", ...globs.map((glob) => `  - ${quote(glob)}`), "---"].join("\n");
+}
+var CONTROL = /[\u0000-\u001f\u007f]/;
+function assertRenderable(rule) {
+  for (const glob of rule.frontmatter.globs) {
+    if (CONTROL.test(glob)) {
+      throw new RulegateError({
+        code: "E_FRONTMATTER_INVALID",
+        message: `glob ${JSON.stringify(glob)} in rule \`${rule.id}\` contains a control character, which Claude Code's \`paths:\` frontmatter cannot carry`,
+        source: rule.source,
+        hint: "remove the line break or tab from the glob"
+      });
+    }
+  }
+}
+function renderScopedRule(rule, section, marker) {
+  assertRenderable(rule);
+  const head = renderPathsFrontmatter(rule.frontmatter.globs);
+  return marker ? `${head}
+<!-- generated by rulegate; edit .rulegate/ instead -->
+
+${section}` : `${head}
+${section}`;
+}
+function importRuleFile(file, id, parsed) {
+  const stripped = stripMarker(parsed.remainder);
+  let body = stripped;
+  let description = parsed.description;
+  if (stripped !== parsed.remainder) {
+    const heading = /^## +(.*)(?:\n|$)/.exec(stripped);
+    const title = heading?.[1]?.trim() ?? "";
+    if (heading !== null && title !== "") {
+      description = title;
+      body = stripped.slice(heading[0].length).replace(/^\n+/, "");
+    }
+  }
+  body = body.replace(/\n+$/, "");
+  if (body.trim() === "" && description === void 0)
+    return void 0;
+  return importedRule({
+    id,
+    body: body === "" ? "" : `${body}
+`,
+    ...description === void 0 ? {} : { description },
+    globs: parsed.paths,
+    unknown: parsed.unknown,
+    source: { file, line: 1 }
+  });
+}
+var KEY_LINE = /^([^:\s#-][^:]*):(?:[ \t]+(.*))?$/;
+var ITEM_LINE = /^-(?:[ \t]+(.*))?$/;
+var BLOCK_SCALAR = /^([|>])([-+]?)\d?$/;
+var REPAIRED = /[{}[\]*&#!|>%@`]|: /;
+var RESERVED = /* @__PURE__ */ new Set(["globs", "tools", "order"]);
+function parseRuleFile2(contents) {
+  const text = contents.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+  const whole = { paths: [], unknown: {}, remainder: text };
+  const lines = text.split("\n");
+  if ((lines[0] ?? "").trim() !== "---")
+    return whole;
+  const close = lines.findIndex((line, i) => i > 0 && ["---", "..."].includes(line.trim()));
+  if (close === -1)
+    return whole;
+  const block = lines.slice(1, close).map((line) => line.replace(/^\t+/, (t) => "  ".repeat(t.length)));
+  if (block.some((line) => !isSkippable(line) && /^ *\t/.test(line)))
+    return whole;
+  const mapping = parseMapping(block, 0, 0);
+  if (mapping === void 0 || mapping.next !== block.length)
+    return whole;
+  let description;
+  let paths = [];
+  const unknown = {};
+  for (const [key, value] of mapping.entries) {
+    if (key === "paths") {
+      const globs = typeof value === "string" ? splitOutside(value).map((part) => part.trim()) : value;
+      if (!Array.isArray(globs) || !globs.every((glob) => typeof glob === "string")) {
+        return whole;
+      }
+      paths = globs.filter((glob) => glob !== "");
+    } else if (key === "description") {
+      if (typeof value !== "string")
+        return whole;
+      if (value.trim() !== "")
+        description = value.trim();
+    } else if (!RESERVED.has(key)) {
+      unknown[key] = value;
+    }
+  }
+  return {
+    ...description === void 0 ? {} : { description },
+    paths,
+    unknown,
+    remainder: lines.slice(close + 1).join("\n").replace(/^\n+/, "")
+  };
+}
+function indentOf(line) {
+  return line.length - line.trimStart().length;
+}
+function isSkippable(line) {
+  const trimmed = line.trim();
+  return trimmed === "" || trimmed.startsWith("#");
+}
+function nextContent(lines, from) {
+  let i = from;
+  while (i < lines.length && isSkippable(lines[i] ?? ""))
+    i += 1;
+  return i;
+}
+function parseMapping(lines, start, indent) {
+  const entries = [];
+  let i = nextContent(lines, start);
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+    const own = indentOf(line);
+    if (own < indent)
+      break;
+    if (own > indent)
+      return void 0;
+    const pair = splitKey(line.slice(own));
+    if (pair === void 0)
+      return void 0;
+    const repairable = own === 0 && pair.bare && /^[a-zA-Z_-]+$/.test(pair.key);
+    const value = parseValue(lines, i, own, pair.rest, repairable);
+    if (value === void 0)
+      return void 0;
+    entries.push([pair.key, value.value]);
+    i = nextContent(lines, value.next);
+  }
+  return { entries, next: i };
+}
+function splitKey(text) {
+  if (text.startsWith('"') || text.startsWith("'")) {
+    const end = closingQuote(text);
+    if (end === -1)
+      return void 0;
+    const after = text.slice(end + 1);
+    const match2 = /^[ \t]*:(?:[ \t]+(.*))?$/.exec(after);
+    const key = unquote2(text.slice(0, end + 1));
+    if (match2 === null || key === void 0)
+      return void 0;
+    return { key, rest: match2[1] ?? "", bare: false };
+  }
+  const match = KEY_LINE.exec(text);
+  if (match === null)
+    return void 0;
+  return { key: (match[1] ?? "").trim(), rest: match[2] ?? "", bare: true };
+}
+function parseValue(lines, at, indent, inline, repairable = false) {
+  const raw = stripComment(inline).trim();
+  const scalar = BLOCK_SCALAR.exec(raw);
+  if (scalar !== null)
+    return parseBlockScalar(lines, at + 1, indent, scalar);
+  if (raw !== "") {
+    const value = raw.startsWith("[") ? parseFlowList(raw) : unquote2(raw);
+    if (value !== void 0)
+      return { value, next: at + 1 };
+    const text = inline.trimEnd();
+    const flow = /^\{.*\}$|^\[.*\]$/.test(text);
+    if (repairable && !flow && !/^["']/.test(text) && REPAIRED.test(text)) {
+      return { value: text, next: at + 1 };
+    }
+    return void 0;
+  }
+  const j = nextContent(lines, at + 1);
+  const below = lines[j];
+  if (below === void 0)
+    return { value: "", next: at + 1 };
+  const own = indentOf(below);
+  if (ITEM_LINE.test(below.trimStart()) && own >= indent)
+    return parseList(lines, j, own);
+  if (own > indent) {
+    const mapping = parseMapping(lines, j, own);
+    if (mapping === void 0)
+      return void 0;
+    return { value: Object.fromEntries(mapping.entries), next: mapping.next };
+  }
+  return { value: "", next: at + 1 };
+}
+function parseList(lines, start, indent) {
+  const items = [];
+  let i = start;
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+    if (indentOf(line) !== indent)
+      break;
+    const item = ITEM_LINE.exec(line.trimStart());
+    if (item === null)
+      break;
+    const value = unquote2(stripComment(item[1] ?? "").trim());
+    if (value === void 0 || splitKey(item[1] ?? "") !== void 0)
+      return void 0;
+    items.push(value);
+    i = nextContent(lines, i + 1);
+  }
+  return { value: items, next: i };
+}
+function parseBlockScalar(lines, start, indent, header) {
+  const body = [];
+  let i = start;
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+    if (line.trim() !== "" && indentOf(line) <= indent)
+      break;
+    body.push(line);
+    i += 1;
+  }
+  while (body.length > 0 && (body[body.length - 1] ?? "").trim() === "")
+    body.pop();
+  if (body.length === 0)
+    return { value: "", next: i };
+  const content = Math.min(...body.filter((l) => l.trim() !== "").map(indentOf));
+  const stripped = body.map((line) => line.slice(content));
+  let text = "";
+  if (header[1] === "|")
+    text = stripped.join("\n");
+  else {
+    for (const line of stripped) {
+      if (line.trim() === "")
+        text += "\n";
+      else
+        text += (text === "" || text.endsWith("\n") ? "" : " ") + line;
+    }
+  }
+  return { value: header[2] === "-" ? text : `${text}
+`, next: i };
+}
+function parseFlowList(raw) {
+  if (!raw.endsWith("]"))
+    return void 0;
+  const items = [];
+  for (const part of splitOutside(raw.slice(1, -1))) {
+    const value = unquote2(part.trim());
+    if (value === void 0)
+      return void 0;
+    items.push(value);
+  }
+  return items;
+}
+function stripComment(value) {
+  let quoteChar;
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (quoteChar !== void 0) {
+      if (ch === "\\" && quoteChar === '"')
+        i += 1;
+      else if (ch === quoteChar)
+        quoteChar = void 0;
+      continue;
+    }
+    const before = value.slice(0, i).trimEnd();
+    if ((ch === '"' || ch === "'") && (before === "" || /[[,]$/.test(before)))
+      quoteChar = ch;
+    else if (ch === "#" && (i === 0 || /\s/.test(value[i - 1] ?? "")))
+      return value.slice(0, i);
+  }
+  return value;
+}
+function closingQuote(value) {
+  const open = value[0];
+  for (let i = 1; i < value.length; i += 1) {
+    const ch = value[i];
+    if (open === '"' && ch === "\\")
+      i += 1;
+    else if (ch === open) {
+      if (open === "'" && value[i + 1] === "'")
+        i += 1;
+      else
+        return i;
+    }
+  }
+  return -1;
+}
+function splitOutside(value) {
+  const parts = [];
+  let depth = 0;
+  let quoteChar;
+  let start = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (quoteChar !== void 0) {
+      if (ch === "\\" && quoteChar === '"')
+        i += 1;
+      else if (ch === quoteChar)
+        quoteChar = void 0;
+    } else if (ch === '"' || ch === "'")
+      quoteChar = ch;
+    else if (ch === "{")
+      depth += 1;
+    else if (ch === "}")
+      depth = Math.max(0, depth - 1);
+    else if (ch === "," && depth === 0) {
+      parts.push(value.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(value.slice(start));
+  return parts.filter((part) => part.trim() !== "");
+}
+function unquote2(value) {
+  if (value.startsWith('"')) {
+    let out = "";
+    for (let i = 1; i < value.length; i += 1) {
+      const ch = value[i] ?? "";
+      if (ch === '"')
+        return i === value.length - 1 ? out : void 0;
+      if (ch === "\\") {
+        const escape = decodeEscape(value, i + 1);
+        if (escape === void 0)
+          return void 0;
+        out += escape.text;
+        i = escape.end;
+      } else
+        out += ch;
+    }
+    return void 0;
+  }
+  if (value.startsWith("'")) {
+    if (value.length < 2 || !value.endsWith("'"))
+      return void 0;
+    return value.slice(1, -1).replace(/''/g, "'");
+  }
+  if (/^[*&!|>%@`[{]/.test(value) || /: |:$/.test(value))
+    return void 0;
+  return value;
+}
+var ESCAPES = {
+  "0": "\0",
+  a: "\x07",
+  b: "\b",
+  t: "	",
+  "	": "	",
+  n: "\n",
+  v: "\v",
+  f: "\f",
+  r: "\r",
+  e: "\x1B",
+  " ": " ",
+  '"': '"',
+  "/": "/",
+  "\\": "\\",
+  N: "\x85",
+  _: "\xA0",
+  L: "\u2028",
+  P: "\u2029"
+};
+function decodeEscape(value, at) {
+  const ch = value[at] ?? "";
+  const simple = ESCAPES[ch];
+  if (simple !== void 0)
+    return { text: simple, end: at };
+  const width = ch === "x" ? 2 : ch === "u" ? 4 : ch === "U" ? 8 : 0;
+  const hex = value.slice(at + 1, at + 1 + width);
+  if (width === 0 || !new RegExp(`^[0-9a-fA-F]{${String(width)}}$`).test(hex))
+    return void 0;
+  const code = Number.parseInt(hex, 16);
+  if (code > 1114111)
+    return void 0;
+  return { text: String.fromCodePoint(code), end: at + width };
+}
+
 // ../packages/adapters/claude-code/dist/docs.js
 var MCP_DOCS = {
   // `docs.claude.com/en/docs/claude-code/mcp` 301s here. The redirect target is recorded
@@ -13231,14 +13980,14 @@ var MCP_DOCS = {
   retrieved: "2026-09-04"
 };
 var CLAUDE_MEMORY_DOCS = {
-  url: "https://docs.claude.com/en/docs/claude-code/memory",
-  title: "Claude Code \u2014 Manage Claude\u2019s memory",
-  retrieved: "2026-09-01"
+  url: "https://code.claude.com/docs/en/memory",
+  title: "Claude Code \u2014 How Claude remembers your project",
+  retrieved: "2026-09-26"
 };
-var docs2 = {
+var docs3 = {
   toolName: "Claude Code",
   homepage: "https://docs.claude.com/en/docs/claude-code",
-  verifiedAgainst: { version: "2.x", date: "2026-09-01" },
+  verifiedAgainst: { version: "2.1.283", date: "2026-09-26" },
   // A nearer CLAUDE.md supersedes a further one for the same scope.
   resolution: "override",
   files: [
@@ -13260,11 +14009,34 @@ var docs2 = {
       source: CLAUDE_MEMORY_DOCS
     },
     {
+      pattern: ".claude/rules/**/*.md",
+      scope: "project",
+      role: "instructions",
+      managed: true,
+      // Nested `.claude/rules/` directories load on demand, like nested CLAUDE.md files, and
+      // alongside the root ones rather than instead of them. The vendor page does not say
+      // what a nested rule's `paths` are relative to; T117 is the first real check.
+      nesting: "all-merged",
+      description: "Project rules, discovered recursively. A file with `paths:` frontmatter loads only when Claude reads a file matching one of its globs; a file without it loads at launch with the same priority as `.claude/CLAUDE.md`. Rulegate generates one per glob-scoped canonical rule, and keeps repo-wide rules in CLAUDE.md.",
+      source: CLAUDE_MEMORY_DOCS
+    },
+    {
       pattern: "~/.claude/CLAUDE.md",
       scope: "global",
       role: "instructions",
       managed: false,
       description: "User-level memory applied across every project. Read-only context for `doctor`: Rulegate never writes outside the repository.",
+      source: CLAUDE_MEMORY_DOCS
+    },
+    {
+      // One level, not `**`: the global probe refuses a recursive pattern so that `doctor`
+      // never walks the home directory, and a declared entry nobody probes is worse than a
+      // narrower one that is measured.
+      pattern: "~/.claude/rules/*.md",
+      scope: "global",
+      role: "instructions",
+      managed: false,
+      description: "User-level rules applied to every project, loaded before project rules; neither set overrides the other. Read-only context for `doctor`, which counts the top level of the directory only \u2014 rule files in its subdirectories load too but are not measured.",
       source: CLAUDE_MEMORY_DOCS
     },
     {
@@ -13310,20 +14082,22 @@ var docs2 = {
     },
     {
       level: "info",
-      message: 'Claude Code has no native per-glob rule scoping, so a glob-scoped canonical rule is rendered with an "Applies to:" line stating its scope in prose. This mapping is lossy but visible; dropping the scope silently would turn a component-only rule into a repo-wide one.'
+      message: "A glob-scoped canonical rule renders to its own `.claude/rules/<id>.md` with a `paths:` list, and Claude Code loads it only when it reads a file matching one of the globs. `paths` is the only frontmatter key Claude Code reads, and the frontmatter is stripped before the rule loads, so the rule\u2019s description is written as a heading in the body. Frontmatter that does not parse is ignored without an error and the rule loads repo-wide \u2014 an unquoted glob starting with `*` is enough \u2014 which is why every glob is written double-quoted and one per list item: brace expansion puts commas inside a glob, so the comma-separated form cannot carry it.",
+      source: CLAUDE_MEMORY_DOCS
     },
     {
       level: "info",
-      message: "Rulegate writes CLAUDE.md only. `.claude/settings.json` carries permissions and hooks \u2014 a materially different trust surface from instructions \u2014 and generating it is deliberately out of scope for v0."
+      message: "`doctor` bills a path-scoped rule file as if it were always loaded, as it does Copilot\u2019s and Cursor\u2019s scoped files: it cannot know which files a session will read. The token figure for this tool is an upper bound.",
+      source: CLAUDE_MEMORY_DOCS
+    },
+    {
+      level: "info",
+      message: "Rulegate writes CLAUDE.md, `.claude/rules/` and `.mcp.json` only. `.claude/settings.json` carries permissions and hooks \u2014 a materially different trust surface from instructions \u2014 and generating it is deliberately out of scope for v0."
     },
     {
       level: "warn",
-      message: "Claude Code does not read AGENTS.md natively. That gap is the reason this project exists; the generated CLAUDE.md is what closes it.",
-      source: {
-        url: "https://github.com/anthropics/claude-code/issues/6235",
-        title: "claude-code#6235 \u2014 Support AGENTS.md",
-        retrieved: "2026-09-01"
-      }
+      message: "Since v2.1.277 Claude Code reads AGENTS.md \u2014 but only when there is no CLAUDE.md, .claude/CLAUDE.md or CLAUDE.local.md in the working directory or above it; `.claude/rules/` files do not count toward that check. Rulegate emits no CLAUDE.md when every rule selected for this adapter is glob-scoped, so enabling codex alongside it then has Claude Code read AGENTS.md too, and receive each scoped rule twice: once scoped, once as AGENTS.md prose. `doctor` does not model the fallback yet, so it cannot report that double load.",
+      source: CLAUDE_MEMORY_DOCS
     },
     {
       level: "warn",
@@ -13339,28 +14113,44 @@ var docs2 = {
 
 // ../packages/adapters/claude-code/dist/index.js
 var CLAUDE_MD = "CLAUDE.md";
-var DETECTION_PATHS2 = [CLAUDE_MD, "CLAUDE.local.md", ".claude", MCP_FILE];
-async function detect2(ctx) {
+var DETECTION_PATHS3 = [CLAUDE_MD, "CLAUDE.local.md", ".claude", MCP_FILE];
+async function detect3(ctx) {
   const evidence = [];
-  for (const path4 of DETECTION_PATHS2) {
+  for (const path4 of DETECTION_PATHS3) {
     if (await ctx.fs.exists(path4))
       evidence.push(path4);
   }
   return detected(evidence);
 }
-async function read2(ctx) {
-  if (isCanonicalSource(ctx.canonical.manifest, CLAUDE_MD))
-    return {};
-  const contents = await ctx.fs.tryReadFile(CLAUDE_MD);
-  return {
-    ...contents === void 0 ? {} : {
-      rules: importConcatenated({
+async function read3(ctx) {
+  const rules = [];
+  const taken = /* @__PURE__ */ new Set();
+  if (!isCanonicalSource(ctx.canonical.manifest, CLAUDE_MD)) {
+    const contents = await ctx.fs.tryReadFile(CLAUDE_MD);
+    if (contents !== void 0) {
+      for (const rule of importConcatenated({
         file: CLAUDE_MD,
         contents,
         headingLevel: 2,
         idFallback: "claude"
-      })
-    },
+      })) {
+        rules.push({ ...rule, id: claimRuleId(rule.id, taken) });
+      }
+    }
+  }
+  for (const path4 of await ctx.fs.glob(`${RULES_DIR3}/**/*.md`)) {
+    if (isCanonicalSource(ctx.canonical.manifest, path4))
+      continue;
+    const contents = await ctx.fs.tryReadFile(path4);
+    if (contents === void 0)
+      continue;
+    const base = basenamePosix(path4).replace(/\.md$/i, "");
+    const rule = importRuleFile(path4, claimRuleId(importRuleId(base, "claude-rules"), taken), parseRuleFile2(contents));
+    if (rule !== void 0)
+      rules.push(rule);
+  }
+  return {
+    ...rules.length === 0 ? {} : { rules },
     ...await readMcp(ctx)
   };
 }
@@ -13376,21 +14166,47 @@ async function readMcp(ctx) {
     ...warnings.length === 0 ? {} : { warnings }
   };
 }
-async function write2(ctx) {
+async function write3(ctx) {
   const { canonical } = ctx;
   const marker = canonical.manifest.options.marker;
   const artifacts = [];
-  if (!isCanonicalSource(canonical.manifest, CLAUDE_MD)) {
-    const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, "claude-code")));
-    if (rules.length > 0) {
-      artifacts.push(finalizeArtifact({
-        path: CLAUDE_MD,
-        contents: withHtmlMarker(renderConcatenated(rules, { headingLevel: 2, showGlobs: true }), marker),
-        adapter: "claude-code",
-        kind: "rules",
-        provenance: { ruleIds: rules.map((r) => r.id) }
-      }));
+  const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, "claude-code")));
+  const repoWide = rules.filter((r) => appliesRepoWide(r));
+  if (repoWide.length > 0 && !isCanonicalSource(canonical.manifest, CLAUDE_MD)) {
+    artifacts.push(finalizeArtifact({
+      path: CLAUDE_MD,
+      // showGlobs stays true although nothing here is scoped any more: it changes no
+      // bytes, and it keeps the renderer the exact inverse of `read`'s parsing.
+      contents: withHtmlMarker(renderConcatenated(repoWide, { headingLevel: 2, showGlobs: true }), marker),
+      adapter: "claude-code",
+      kind: "rules",
+      provenance: { ruleIds: repoWide.map((r) => r.id) }
+    }));
+  }
+  const claimed = /* @__PURE__ */ new Map();
+  for (const rule of rules.filter((r) => !appliesRepoWide(r))) {
+    const path4 = rulePath(rule);
+    const previous = claimed.get(path4);
+    if (previous !== void 0) {
+      throw new RulegateError({
+        code: "E_ARTIFACT_PATH_CONFLICT",
+        message: `rules \`${previous}\` and \`${rule.id}\` both generate ${path4}`,
+        source: rule.source,
+        hint: "rename one of the rules so their generated filenames differ"
+      });
     }
+    claimed.set(path4, rule.id);
+    if (isCanonicalSource(canonical.manifest, path4))
+      continue;
+    artifacts.push(finalizeArtifact({
+      path: path4,
+      // The description is a body heading, not a frontmatter key: Claude Code reads
+      // only `paths` and strips the rest before the model sees the rule.
+      contents: renderScopedRule(rule, renderRuleSection(rule, { headingLevel: 2, showGlobs: false }), marker),
+      adapter: "claude-code",
+      kind: "rules",
+      provenance: { ruleIds: [rule.id] }
+    }));
   }
   const mcp = renderMcpJson(canonical.mcpServers, marker);
   if (mcp !== "" && !isCanonicalSource(canonical.manifest, MCP_FILE)) {
@@ -13406,19 +14222,19 @@ async function write2(ctx) {
 var claudeCode = {
   name: "claude-code",
   apiVersion: ADAPTER_API_VERSION,
-  detect: detect2,
-  read: read2,
-  write: write2,
-  docs: docs2
+  detect: detect3,
+  read: read3,
+  write: write3,
+  docs: docs3
 };
 
 // ../packages/adapters/cline/dist/docs.js
-var RULES_DOCS = {
+var RULES_DOCS2 = {
   url: "https://docs.cline.bot/features/cline-rules",
   title: "Cline \u2014 Cline Rules",
   retrieved: "2026-09-04"
 };
-var docs3 = {
+var docs4 = {
   toolName: "Cline",
   homepage: "https://cline.bot",
   // The rules page carries no version number, so the documentation date is the honest
@@ -13433,7 +14249,7 @@ var docs3 = {
       role: "instructions",
       managed: true,
       description: "Workspace rules. Cline processes all .md and .txt files inside .clinerules/ and combines them. This is what Rulegate generates; it writes .md only, and imports both extensions.",
-      source: RULES_DOCS
+      source: RULES_DOCS2
     },
     {
       pattern: ".cursorrules",
@@ -13441,7 +14257,7 @@ var docs3 = {
       role: "instructions",
       managed: false,
       description: "Cline reads Cursor\u2019s legacy rules file as well as its own. Generated by the cursor adapter when options.legacy is set, not by this one. The vendor documents no rank among the workspace formats.",
-      source: RULES_DOCS
+      source: RULES_DOCS2
     },
     {
       pattern: ".windsurfrules",
@@ -13449,7 +14265,7 @@ var docs3 = {
       role: "instructions",
       managed: false,
       description: "Cline reads Windsurf\u2019s legacy rules file as well as its own. Rulegate never writes it. The vendor documents no rank among the workspace formats.",
-      source: RULES_DOCS
+      source: RULES_DOCS2
     },
     {
       pattern: "AGENTS.md",
@@ -13457,7 +14273,7 @@ var docs3 = {
       role: "instructions",
       managed: false,
       description: "Cline reads AGENTS.md as well as its own directory. Generated by the codex adapter, so enabling cline and codex together sends Cline the same rules twice. The vendor documents no rank among the workspace formats.",
-      source: RULES_DOCS
+      source: RULES_DOCS2
     },
     {
       pattern: "~/Documents/Cline/Rules",
@@ -13465,7 +14281,7 @@ var docs3 = {
       role: "instructions",
       managed: false,
       description: "User-level rules, combined with workspace rules. Workspace rules take precedence when the two conflict \u2014 the one ranking the vendor does document. Outside the repository, so Rulegate reports it and never writes it.",
-      source: RULES_DOCS
+      source: RULES_DOCS2
     }
   ],
   // No cap is published. Said explicitly, because "no limit" and "nobody checked" must not
@@ -13475,38 +14291,38 @@ var docs3 = {
     {
       level: "warn",
       message: "Cline reads .cursorrules, .windsurfrules and AGENTS.md in addition to .clinerules/. These are additive, not an override chain, so enabling cline alongside codex, cursor or windsurf sends Cline the same canonical rules more than once. `rulegate doctor` counts the cost per repository (W_DUPLICATE_LOAD); this note records why it happens.",
-      source: RULES_DOCS
+      source: RULES_DOCS2
     },
     {
       level: "info",
       message: "The vendor documents no precedence among the four workspace formats \u2014 only that workspace rules beat global ones. The order in this file leads with Cline\u2019s own directory and asserts nothing further.",
-      source: RULES_DOCS
+      source: RULES_DOCS2
     },
     {
       level: "info",
       message: "Cline has no project-level MCP configuration file: MCP servers live in user-level storage, outside any repository. This adapter therefore generates no MCP artifact.",
-      source: RULES_DOCS
+      source: RULES_DOCS2
     }
   ]
 };
 
 // ../packages/adapters/cline/dist/index.js
-var RULES_DIR2 = ".clinerules";
+var RULES_DIR4 = ".clinerules";
 var READ_EXTENSIONS = ["md", "txt"];
-var DETECTION_PATHS3 = [RULES_DIR2];
-async function detect3(ctx) {
+var DETECTION_PATHS4 = [RULES_DIR4];
+async function detect4(ctx) {
   const evidence = [];
-  for (const path4 of DETECTION_PATHS3) {
+  for (const path4 of DETECTION_PATHS4) {
     if (await ctx.fs.exists(path4))
       evidence.push(path4);
   }
   return detected(evidence);
 }
-async function read3(ctx) {
+async function read4(ctx) {
   const rules = [];
   const taken = /* @__PURE__ */ new Set();
   for (const extension of READ_EXTENSIONS) {
-    for (const path4 of await ctx.fs.glob(`${RULES_DIR2}/*.${extension}`)) {
+    for (const path4 of await ctx.fs.glob(`${RULES_DIR4}/*.${extension}`)) {
       if (isCanonicalSource(ctx.canonical.manifest, path4))
         continue;
       const contents = await ctx.fs.tryReadFile(path4);
@@ -13526,14 +14342,14 @@ async function read3(ctx) {
   }
   return rules.length === 0 ? {} : { rules };
 }
-function write3(ctx) {
+function write4(ctx) {
   const { canonical } = ctx;
   const marker = canonical.manifest.options.marker;
   const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, "cline")));
   const artifacts = [];
   const claimed = /* @__PURE__ */ new Map();
   for (const rule of rules) {
-    const path4 = `${RULES_DIR2}/${slugForId(rule.id)}.md`;
+    const path4 = `${RULES_DIR4}/${slugForId(rule.id)}.md`;
     const previous = claimed.get(path4);
     if (previous !== void 0) {
       throw new RulegateError({
@@ -13557,10 +14373,10 @@ function write3(ctx) {
 var cline = {
   name: "cline",
   apiVersion: ADAPTER_API_VERSION,
-  detect: detect3,
-  read: read3,
-  write: write3,
-  docs: docs3
+  detect: detect4,
+  read: read4,
+  write: write4,
+  docs: docs4
 };
 
 // ../packages/adapters/codex/dist/toml.js
@@ -13668,8 +14484,8 @@ function splitPath(raw) {
   return parts.length === 0 ? void 0 : parts;
 }
 function readString(text, start) {
-  const quote2 = text[start];
-  if (quote2 === "'") {
+  const quote3 = text[start];
+  if (quote3 === "'") {
     const end = text.indexOf("'", start + 1);
     return end === -1 ? void 0 : { value: text.slice(start + 1, end), next: end + 1 };
   }
@@ -13783,7 +14599,7 @@ function readValue(raw) {
   }
   return UNREADABLE;
 }
-function stripComment(line) {
+function stripComment2(line) {
   let inString;
   for (let i = 0; i < line.length; i += 1) {
     const ch = line[i];
@@ -13810,7 +14626,7 @@ function parseToml(contents) {
   let current = { path: [], entries: {}, unreadable: [] };
   tables.push(current);
   for (const rawLine of contents.split("\n")) {
-    const line = stripComment(rawLine).trim();
+    const line = stripComment2(rawLine).trim();
     if (line === "")
       continue;
     if (line.startsWith("[[")) {
@@ -14036,7 +14852,7 @@ var AGENTS_MD_SPEC = {
   title: "AGENTS.md \u2014 a simple, open format for guiding coding agents",
   retrieved: "2026-09-02"
 };
-var docs4 = {
+var docs5 = {
   toolName: "Codex CLI",
   homepage: "https://developers.openai.com/codex",
   verifiedAgainst: { version: "CLI docs as published 2026-09-02", date: "2026-09-02" },
@@ -14135,16 +14951,16 @@ var docs4 = {
 
 // ../packages/adapters/codex/dist/index.js
 var AGENTS_MD2 = "AGENTS.md";
-var DETECTION_PATHS4 = [AGENTS_MD2, ".codex"];
-async function detect4(ctx) {
+var DETECTION_PATHS5 = [AGENTS_MD2, ".codex"];
+async function detect5(ctx) {
   const evidence = [];
-  for (const path4 of DETECTION_PATHS4) {
+  for (const path4 of DETECTION_PATHS5) {
     if (await ctx.fs.exists(path4))
       evidence.push(path4);
   }
   return detected(evidence);
 }
-async function read4(ctx) {
+async function read5(ctx) {
   const rules = await readRules(ctx);
   return { ...rules, ...await readMcp2(ctx) };
 }
@@ -14175,7 +14991,7 @@ async function readMcp2(ctx) {
     ...warnings.length === 0 ? {} : { warnings }
   };
 }
-async function write4(ctx) {
+async function write5(ctx) {
   const { canonical } = ctx;
   const marker = canonical.manifest.options.marker;
   const artifacts = [];
@@ -14200,10 +15016,10 @@ async function write4(ctx) {
 var codex = {
   name: "codex",
   apiVersion: ADAPTER_API_VERSION,
-  detect: detect4,
-  read: read4,
-  write: write4,
-  docs: docs4
+  detect: detect5,
+  read: read5,
+  write: write5,
+  docs: docs5
 };
 
 // ../packages/adapters/copilot/dist/instructions.js
@@ -14214,18 +15030,18 @@ function frontmatterFor(rule) {
     applyTo: rule.frontmatter.globs
   };
 }
-function quote(value) {
+function quote2(value) {
   return `'${value.replace(/'/g, "''")}'`;
 }
 function renderInstructionsFrontmatter(fm) {
   const lines = ["---"];
   if (fm.description !== void 0)
-    lines.push(`description: ${quote(fm.description)}`);
-  lines.push(`applyTo: ${quote(fm.applyTo.join(","))}`);
+    lines.push(`description: ${quote2(fm.description)}`);
+  lines.push(`applyTo: ${quote2(fm.applyTo.join(","))}`);
   lines.push("---");
   return lines.join("\n");
 }
-function assertRenderable(rule) {
+function assertRenderable2(rule) {
   for (const glob of rule.frontmatter.globs) {
     if (glob.includes(",")) {
       throw new RulegateError({
@@ -14240,7 +15056,7 @@ function assertRenderable(rule) {
 function foldDescription(description) {
   return description.replace(/\s*[\r\n]+\s*/g, " ").trim();
 }
-var KEY_LINE = /^([^:\s][^:]*):[ \t]?(.*)$/;
+var KEY_LINE2 = /^([^:\s][^:]*):[ \t]?(.*)$/;
 function parseInstructions(contents) {
   const lines = contents.split("\n");
   if ((lines[0] ?? "").trim() !== "---") {
@@ -14253,11 +15069,11 @@ function parseInstructions(contents) {
   let applyTo = [];
   const unknown = {};
   for (const line of lines.slice(1, close)) {
-    const match = KEY_LINE.exec(line);
+    const match = KEY_LINE2.exec(line);
     if (match === null)
       continue;
     const key = (match[1] ?? "").trim();
-    const value = unquote((match[2] ?? "").trim());
+    const value = unquote3((match[2] ?? "").trim());
     if (key === "description") {
       if (value !== "")
         description = value;
@@ -14274,7 +15090,7 @@ function parseInstructions(contents) {
     body: joinBody2(lines.slice(close + 1))
   };
 }
-function unquote(value) {
+function unquote3(value) {
   if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {
     return value.slice(1, -1).replace(/''/g, "'");
   }
@@ -14354,9 +15170,9 @@ var VSCODE_VARIABLES_REFERENCE = {
 var VSCODE_CUSTOM_INSTRUCTIONS = {
   url: "https://code.visualstudio.com/docs/copilot/customization/custom-instructions",
   title: "Visual Studio Code \u2014 Use custom instructions in VS Code",
-  retrieved: "2026-09-02"
+  retrieved: "2026-09-26"
 };
-var docs5 = {
+var docs6 = {
   toolName: "GitHub Copilot",
   homepage: "https://docs.github.com/en/copilot",
   verifiedAgainst: {
@@ -14408,6 +15224,14 @@ var docs5 = {
       source: VSCODE_CUSTOM_INSTRUCTIONS
     },
     {
+      pattern: ".claude/rules/**/*.md",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      description: "VS Code\u2019s Local agent also reads Claude Code\u2019s rule files when `chat.useClaudeMdFile` is on, scoping them by `paths` instead of `applyTo`. Owned by the claude-code adapter, which writes one per glob-scoped rule \u2014 so with both adapters enabled Copilot receives each scoped rule twice, and listing the file here is what lets `doctor` say so.",
+      source: VSCODE_CUSTOM_INSTRUCTIONS
+    },
+    {
       pattern: "~/.copilot/instructions/*.instructions.md",
       scope: "global",
       role: "instructions",
@@ -14456,16 +15280,16 @@ var docs5 = {
 // ../packages/adapters/copilot/dist/index.js
 var REPO_INSTRUCTIONS = ".github/copilot-instructions.md";
 var INSTRUCTIONS_DIR = ".github/instructions";
-var DETECTION_PATHS5 = [REPO_INSTRUCTIONS, INSTRUCTIONS_DIR, MCP_FILE3];
-async function detect5(ctx) {
+var DETECTION_PATHS6 = [REPO_INSTRUCTIONS, INSTRUCTIONS_DIR, MCP_FILE3];
+async function detect6(ctx) {
   const evidence = [];
-  for (const path4 of DETECTION_PATHS5) {
+  for (const path4 of DETECTION_PATHS6) {
     if (await ctx.fs.exists(path4))
       evidence.push(path4);
   }
   return detected(evidence);
 }
-async function read5(ctx) {
+async function read6(ctx) {
   const rules = [];
   const taken = /* @__PURE__ */ new Set();
   if (!isCanonicalSource(ctx.canonical.manifest, REPO_INSTRUCTIONS)) {
@@ -14522,7 +15346,7 @@ function instructionsPath(rule) {
   return `${INSTRUCTIONS_DIR}/${slugForId(rule.id)}.instructions.md`;
 }
 function renderInstructions(rule, marker) {
-  assertRenderable(rule);
+  assertRenderable2(rule);
   const head = renderInstructionsFrontmatter(frontmatterFor(rule));
   const body = rule.body.replace(/\n+$/, "");
   return marker ? `${head}
@@ -14531,7 +15355,7 @@ function renderInstructions(rule, marker) {
 ${body}` : `${head}
 ${body}`;
 }
-async function write5(ctx) {
+async function write6(ctx) {
   const { canonical } = ctx;
   const marker = canonical.manifest.options.marker;
   const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, "copilot")));
@@ -14580,10 +15404,10 @@ async function write5(ctx) {
 var copilot = {
   name: "copilot",
   apiVersion: ADAPTER_API_VERSION,
-  detect: detect5,
-  read: read5,
-  write: write5,
-  docs: docs5
+  detect: detect6,
+  read: read6,
+  write: write6,
+  docs: docs6
 };
 
 // ../packages/adapters/cursor/dist/mdc.js
@@ -14604,7 +15428,7 @@ function renderMdcFrontmatter(fm) {
   lines.push("---");
   return lines.join("\n");
 }
-function assertRenderable2(rule) {
+function assertRenderable3(rule) {
   const description = rule.frontmatter.description;
   if (description !== void 0 && /[\r\n]/.test(description)) {
     throw new RulegateError({
@@ -14625,7 +15449,7 @@ function assertRenderable2(rule) {
     }
   }
 }
-var KEY_LINE2 = /^([^:\s][^:]*):[ \t]?(.*)$/;
+var KEY_LINE3 = /^([^:\s][^:]*):[ \t]?(.*)$/;
 function parseMdc(contents) {
   const lines = contents.split("\n");
   if ((lines[0] ?? "").trim() !== "---") {
@@ -14638,7 +15462,7 @@ function parseMdc(contents) {
   let globs = [];
   const unknown = {};
   for (const line of lines.slice(1, close)) {
-    const match = KEY_LINE2.exec(line);
+    const match = KEY_LINE3.exec(line);
     if (match === null)
       continue;
     const key = (match[1] ?? "").trim();
@@ -14665,9 +15489,9 @@ function splitGlobs(value) {
   const trimmed = value.trim();
   const flow = trimmed.startsWith("[") && trimmed.endsWith("]");
   const inner = flow ? trimmed.slice(1, -1) : trimmed;
-  return inner.split(",").map((part) => unquote2(part.trim())).filter((part) => part !== "");
+  return inner.split(",").map((part) => unquote4(part.trim())).filter((part) => part !== "");
 }
-function unquote2(part) {
+function unquote4(part) {
   const quoted = part.length >= 2 && (part.startsWith('"') || part.startsWith("'")) && part.endsWith(part[0]);
   return quoted ? part.slice(1, -1) : part;
 }
@@ -14727,12 +15551,12 @@ var MCP_DOCS2 = {
   title: "Cursor \u2014 Model Context Protocol",
   retrieved: "2026-09-04"
 };
-var RULES_DOCS2 = {
+var RULES_DOCS3 = {
   url: "https://docs.cursor.com/context/rules",
   title: "Cursor \u2014 Rules",
   retrieved: "2026-09-01"
 };
-var docs6 = {
+var docs7 = {
   toolName: "Cursor",
   homepage: "https://docs.cursor.com",
   verifiedAgainst: { version: "1.x", date: "2026-09-01" },
@@ -14746,7 +15570,7 @@ var docs6 = {
       managed: true,
       nesting: "nearest-wins",
       description: "Project rules. One file per rule, each with .mdc frontmatter carrying description, globs, and alwaysApply. Cursor also reads .cursor/rules directories nested in subdirectories.",
-      source: RULES_DOCS2
+      source: RULES_DOCS3
     },
     {
       pattern: ".cursorrules",
@@ -14754,7 +15578,7 @@ var docs6 = {
       role: "instructions",
       managed: true,
       description: "Legacy single-file rules, superseded by .cursor/rules. Rulegate writes it only when `options.legacy` is true.",
-      source: RULES_DOCS2
+      source: RULES_DOCS3
     },
     {
       pattern: "~/.cursor/rules",
@@ -14762,7 +15586,7 @@ var docs6 = {
       role: "instructions",
       managed: false,
       description: "User-level rules applied across projects. Read-only context for `doctor`; Rulegate never writes outside the repository.",
-      source: RULES_DOCS2
+      source: RULES_DOCS3
     },
     {
       pattern: ".cursor/mcp.json",
@@ -14798,7 +15622,7 @@ var docs6 = {
     {
       level: "warn",
       message: "Cursor\u2019s .mdc frontmatter is not strict YAML: `globs` is a bare comma-joined string, an empty `globs` is written as a bare key, and `alwaysApply` is derived rather than authored. Rendering it through a YAML emitter produces plausible-looking output that Cursor interprets differently.",
-      source: RULES_DOCS2
+      source: RULES_DOCS3
     },
     {
       level: "info",
@@ -14812,21 +15636,21 @@ var docs6 = {
 };
 
 // ../packages/adapters/cursor/dist/index.js
-var RULES_DIR3 = ".cursor/rules";
+var RULES_DIR5 = ".cursor/rules";
 var LEGACY_FILE = ".cursorrules";
-var DETECTION_PATHS6 = [".cursor", LEGACY_FILE];
-async function detect6(ctx) {
+var DETECTION_PATHS7 = [".cursor", LEGACY_FILE];
+async function detect7(ctx) {
   const evidence = [];
-  for (const path4 of DETECTION_PATHS6) {
+  for (const path4 of DETECTION_PATHS7) {
     if (await ctx.fs.exists(path4))
       evidence.push(path4);
   }
   return detected(evidence);
 }
-async function read6(ctx) {
+async function read7(ctx) {
   const rules = [];
   const taken = /* @__PURE__ */ new Set();
-  for (const path4 of await ctx.fs.glob(`${RULES_DIR3}/**/*.mdc`)) {
+  for (const path4 of await ctx.fs.glob(`${RULES_DIR5}/**/*.mdc`)) {
     if (isCanonicalSource(ctx.canonical.manifest, path4))
       continue;
     const contents = await ctx.fs.tryReadFile(path4);
@@ -14876,10 +15700,10 @@ async function readMcp4(ctx) {
   };
 }
 function mdcPath(rule) {
-  return `${RULES_DIR3}/${slugForId(rule.id)}.mdc`;
+  return `${RULES_DIR5}/${slugForId(rule.id)}.mdc`;
 }
 function renderMdc(rule, marker) {
-  assertRenderable2(rule);
+  assertRenderable3(rule);
   const head = renderMdcFrontmatter(frontmatterFor2(rule));
   const body = rule.body.replace(/\n+$/, "");
   return marker ? `${head}
@@ -14888,7 +15712,7 @@ function renderMdc(rule, marker) {
 ${body}` : `${head}
 ${body}`;
 }
-async function write6(ctx) {
+async function write7(ctx) {
   const { canonical } = ctx;
   const marker = canonical.manifest.options.marker;
   const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, "cursor")));
@@ -14939,10 +15763,10 @@ async function write6(ctx) {
 var cursor = {
   name: "cursor",
   apiVersion: ADAPTER_API_VERSION,
-  detect: detect6,
-  read: read6,
-  write: write6,
-  docs: docs6
+  detect: detect7,
+  read: read7,
+  write: write7,
+  docs: docs7
 };
 
 // ../packages/adapters/gemini/dist/docs.js
@@ -14951,7 +15775,7 @@ var GEMINI_CONTEXT_DOCS = {
   title: "Gemini CLI \u2014 Provide context with GEMINI.md files",
   retrieved: "2026-09-02"
 };
-var docs7 = {
+var docs8 = {
   toolName: "Gemini CLI",
   homepage: "https://google-gemini.github.io/gemini-cli/",
   verifiedAgainst: { version: "CLI docs as published 2026-09-02", date: "2026-09-02" },
@@ -15016,16 +15840,16 @@ var docs7 = {
 
 // ../packages/adapters/gemini/dist/index.js
 var GEMINI_MD = "GEMINI.md";
-var DETECTION_PATHS7 = [GEMINI_MD, ".gemini"];
-async function detect7(ctx) {
+var DETECTION_PATHS8 = [GEMINI_MD, ".gemini"];
+async function detect8(ctx) {
   const evidence = [];
-  for (const path4 of DETECTION_PATHS7) {
+  for (const path4 of DETECTION_PATHS8) {
     if (await ctx.fs.exists(path4))
       evidence.push(path4);
   }
   return detected(evidence);
 }
-async function read7(ctx) {
+async function read8(ctx) {
   if (isCanonicalSource(ctx.canonical.manifest, GEMINI_MD))
     return {};
   const contents = await ctx.fs.tryReadFile(GEMINI_MD);
@@ -15040,7 +15864,7 @@ async function read7(ctx) {
     })
   };
 }
-async function write7(ctx) {
+async function write8(ctx) {
   const { canonical } = ctx;
   if (isCanonicalSource(canonical.manifest, GEMINI_MD))
     return [];
@@ -15061,10 +15885,753 @@ async function write7(ctx) {
 var gemini = {
   name: "gemini",
   apiVersion: ADAPTER_API_VERSION,
-  detect: detect7,
-  read: read7,
-  write: write7,
-  docs: docs7
+  detect: detect8,
+  read: read8,
+  write: write8,
+  docs: docs8
+};
+
+// ../packages/adapters/kilo/dist/instructions.js
+var FOREIGN_SOURCE_DIRS = [".agent-os", ".ruler", ".rulesync", ".rulegate"];
+var FOREIGN_FILES = /* @__PURE__ */ new Set([
+  "agents.md",
+  "agents.override.md",
+  "claude.md",
+  "gemini.md"
+]);
+var KILO_MODES = "(?:code|architect|ask|debug|orchestrator)";
+var FOREIGN_ARTIFACTS = [
+  { owner: "aider", pattern: /^conventions\.md$/ },
+  { owner: "antigravity", pattern: /^\.agents?\/rules\/[^/]+\.md$/ },
+  { owner: "claude-code", pattern: /^\.claude\/rules\/.+\.md$/ },
+  { owner: "claude-code", pattern: /^\.mcp\.json$/ },
+  { owner: "cline", pattern: /^\.clinerules\/[^/]+\.(?:md|txt)$/ },
+  { owner: "codex", pattern: /^\.codex\/config\.toml$/ },
+  { owner: "copilot", pattern: /^\.github\/copilot-instructions\.md$/ },
+  { owner: "copilot", pattern: /^\.github\/instructions\/.+\.instructions\.md$/ },
+  { owner: "copilot", pattern: /^\.vscode\/mcp\.json$/ },
+  { owner: "cursor", pattern: /^\.cursor\/rules\/.+\.mdc$/ },
+  { owner: "cursor", pattern: /^\.cursor\/mcp\.json$/ },
+  { owner: "cursor", pattern: /^\.cursorrules$/ },
+  { owner: "kilo", pattern: new RegExp(`^\\.kilocode/rules(?:-${KILO_MODES})?/[^/]+\\.md$`) },
+  { owner: "kilo", pattern: new RegExp(`^\\.kilocoderules(?:-${KILO_MODES})?$`) },
+  { owner: "kilo", pattern: /^(?:\.kilo\/)?kilo\.jsonc?$/ },
+  { owner: "opencode", pattern: /^(?:\.opencode\/)?opencode\.jsonc?$/ },
+  { owner: "roo-code", pattern: /^\.roo\/rules\/.+\.(?:md|txt)$/ },
+  { owner: "roo-code", pattern: /^\.roo\/mcp\.json$/ },
+  { owner: "roo-code", pattern: /^\.roorules$/ },
+  { owner: "windsurf", pattern: /^\.(?:windsurf|devin)\/rules\/.+\.md$/ },
+  { owner: "windsurf", pattern: /^\.windsurfrules$/ },
+  { owner: "zed", pattern: /^\.rules$/ }
+];
+var GLOB_CHARS = /[*?[\]{}]/;
+function skipReason(entry, self) {
+  if (/^https?:\/\//i.test(entry)) {
+    return "a remote URL; the tool fetches it, and Rulegate makes no network calls";
+  }
+  if (entry.startsWith("~"))
+    return "in the home directory, outside the repository";
+  if (entry.startsWith("/") || /^[A-Za-z]:[\\/]/.test(entry)) {
+    return "an absolute path, outside the repository";
+  }
+  const segments = entry.split("/");
+  if (segments.includes(".."))
+    return "outside the repository";
+  const first = segments[0].toLowerCase();
+  if (FOREIGN_SOURCE_DIRS.includes(first)) {
+    return `inside ${first}/, which another importer owns`;
+  }
+  if (FOREIGN_FILES.has(segments[segments.length - 1].toLowerCase())) {
+    return "owned by another adapter";
+  }
+  const lower = entry.toLowerCase();
+  const owner = FOREIGN_ARTIFACTS.find((f) => f.owner !== self && f.pattern.test(lower))?.owner;
+  if (owner !== void 0)
+    return `a location the ${owner} adapter imports from and writes to`;
+  return void 0;
+}
+function normalize(entry) {
+  return entry.trim().replace(/\\/g, "/").replace(/^(\.\/)+/, "");
+}
+function entriesOf(file, contents) {
+  let parsed;
+  try {
+    parsed = JSON.parse(stripJsonc(contents));
+  } catch {
+    return {
+      entries: [],
+      warning: `${file}: not valid JSON or JSONC; its instructions were not imported`
+    };
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+    return { entries: [] };
+  const list = parsed["instructions"];
+  if (!Array.isArray(list))
+    return { entries: [] };
+  return { entries: list.filter((e) => typeof e === "string") };
+}
+async function resolveInstructions(fs2, configs, skip, self) {
+  const files = [];
+  const seen = /* @__PURE__ */ new Set();
+  const warnings = [];
+  for (const config of configs) {
+    const contents = await fs2.tryReadFile(config);
+    if (contents === void 0)
+      continue;
+    const { entries, warning } = entriesOf(config, contents);
+    if (warning !== void 0)
+      warnings.push(warning);
+    for (const raw of entries) {
+      const entry = normalize(raw);
+      if (entry === "")
+        continue;
+      const reason = skipReason(entry, self);
+      if (reason !== void 0) {
+        warnings.push(`${config}: instruction \`${raw}\` was not imported: it is ${reason}`);
+        continue;
+      }
+      const matches = await fs2.glob(entry);
+      if (matches.length === 0 && !GLOB_CHARS.test(entry) && await fs2.exists(entry)) {
+        warnings.push(`${config}: instruction \`${raw}\` was not imported: it is not a regular file inside the repository by that exact spelling (a directory, a link out of the repository, a different letter case, or under node_modules/ or .git/)`);
+        continue;
+      }
+      for (const path4 of matches) {
+        if (skipReason(path4, self) !== void 0 || skip(path4) || seen.has(path4))
+          continue;
+        seen.add(path4);
+        files.push({ path: path4, config, entry: raw });
+      }
+    }
+  }
+  return { files, warnings };
+}
+
+// ../packages/adapters/kilo/dist/docs.js
+var RULES_DOCS4 = {
+  url: "https://kilo.ai/docs/customize/custom-rules",
+  title: "Kilo Code \u2014 Custom rules",
+  retrieved: "2026-09-26"
+};
+var SETTINGS_DOCS = {
+  url: "https://kilo.ai/docs/getting-started/settings",
+  title: "Kilo Code \u2014 Settings and config files",
+  retrieved: "2026-09-26"
+};
+var AGENTS_DOCS = {
+  url: "https://kilo.ai/docs/customize/agents-md",
+  title: "Kilo Code \u2014 AGENTS.md",
+  retrieved: "2026-09-26"
+};
+var MIGRATION_SOURCE = {
+  url: "https://github.com/Kilo-Org/kilo/blob/main/packages/opencode/src/kilocode/docs/rules-migration.md",
+  title: "Kilo source \u2014 Kilocode rules migration",
+  retrieved: "2026-09-26"
+};
+var docs9 = {
+  toolName: "Kilo Code",
+  homepage: "https://kilo.ai",
+  verifiedAgainst: { version: "Kilo 1.0.25 (source, main branch)", date: "2026-09-26" },
+  resolution: "additive",
+  files: [
+    {
+      pattern: ".kilocode/rules/*.md",
+      scope: "project",
+      role: "instructions",
+      managed: true,
+      description: "The legacy rules directory, auto-loaded for backward compatibility: only the immediate .md children, in directory-listing order. This is what Rulegate generates, because it is the one Kilo path that loads without an entry in a config file.",
+      source: RULES_DOCS4
+    },
+    {
+      pattern: ".kilocoderules",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      description: "The legacy single-file rules at the project root, still auto-loaded. Rulegate imports it and never writes it.",
+      source: MIGRATION_SOURCE
+    },
+    {
+      pattern: ".kilocoderules-*",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      description: "Mode-specific legacy single files (.kilocoderules-code and the like). Like the mode directories, Kilo loads them in every mode. Rulegate imports them as ordinary rules and never writes them.",
+      source: MIGRATION_SOURCE
+    },
+    {
+      pattern: ".kilocode/rules-*/*.md",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      description: "Mode-specific rule directories (code, architect, ask, debug, orchestrator). Kilo loads them in every mode, not only their own. Rulegate imports them as ordinary rules and never writes them.",
+      source: MIGRATION_SOURCE
+    },
+    {
+      pattern: ".kilo/kilo.jsonc",
+      scope: "project",
+      role: "settings",
+      managed: false,
+      description: "The project config, preferred over a root kilo.jsonc. Its instructions entries are the current way to load rules, including anything in .kilo/rules/, which is not auto-loaded. Kilo's Settings UI writes this file, so Rulegate imports its local instructions and never writes it.",
+      source: SETTINGS_DOCS
+    },
+    {
+      pattern: ".kilo/kilo.json",
+      scope: "project",
+      role: "settings",
+      managed: false,
+      description: "The JSON spelling of the project config under .kilo/. Imported like .kilo/kilo.jsonc, never written.",
+      source: SETTINGS_DOCS
+    },
+    {
+      pattern: "kilo.json",
+      scope: "project",
+      role: "settings",
+      managed: false,
+      description: "The JSON spelling of the root project config, deep-merged with kilo.jsonc. Imported, never written.",
+      source: SETTINGS_DOCS
+    },
+    {
+      pattern: "kilo.jsonc",
+      scope: "project",
+      role: "settings",
+      managed: false,
+      description: "The project config at the root, deep-merged with kilo.json and the legacy opencode.json. Imported, never written.",
+      source: SETTINGS_DOCS
+    },
+    {
+      pattern: "opencode.json",
+      scope: "project",
+      role: "settings",
+      managed: false,
+      description: "OpenCode's project config, which Kilo still deep-merges. The opencode adapter imports it, so this one does not. Kilo does not read .opencode/, so the opencode adapter's output never reaches Kilo.",
+      source: SETTINGS_DOCS
+    },
+    {
+      pattern: "AGENTS.md",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      nesting: "all-merged",
+      description: "Loaded at the root when a task starts (AGENT.md is the fallback spelling); a per-directory copy is loaded when the agent reads a file in that directory. Generated by the codex adapter, not by this one \u2014 so enabling kilo and codex together sends Kilo the same rules twice.",
+      source: AGENTS_DOCS
+    },
+    {
+      pattern: "~/.config/kilo/kilo.jsonc",
+      scope: "global",
+      role: "settings",
+      managed: false,
+      description: "The global config. Its instructions load before the project ones, which take precedence. Reported, never written.",
+      source: SETTINGS_DOCS
+    },
+    {
+      pattern: "~/.kilocode/rules/*.md",
+      scope: "global",
+      role: "instructions",
+      managed: false,
+      description: "The legacy global rules directory, still auto-loaded. Outside the repository, so Rulegate reports it and never writes it.",
+      source: MIGRATION_SOURCE
+    }
+  ],
+  limits: {
+    note: "Kilo documents no size cap on rule files or AGENTS.md."
+  },
+  notes: [
+    {
+      level: "warn",
+      message: "Rulegate writes .kilocode/rules/, which Kilo documents as legacy and loads only for backward compatibility; its docs recommend moving rules into kilo.jsonc instructions. Rulegate cannot follow that advice without owning kilo.jsonc, which Kilo's own Settings UI edits. If Kilo drops the legacy loader, the generated rules stop loading and nothing reports it.",
+      source: RULES_DOCS4
+    },
+    {
+      level: "info",
+      message: "Kilo loads .kilocode/rules/ in directory-listing order, which it does not sort. Generated files carry a zero-padded position prefix so that a sorted listing matches canonical order; on a filesystem that lists in another order, the rules still all load, possibly in a different sequence.",
+      source: MIGRATION_SOURCE
+    },
+    {
+      level: "info",
+      message: "Kilo's pages disagree about CLAUDE.md: the AGENTS.md page names only AGENTS.md and AGENT.md, while the rules-migration notes say CLAUDE.md is loaded natively, as OpenCode does. It is left out of this list until one of them is confirmed.",
+      source: AGENTS_DOCS
+    },
+    {
+      level: "info",
+      message: "Import skips remote URLs, home-directory and absolute paths in instructions, and anything under .agent-os/, .ruler/, .rulesync/ or .rulegate/ or at a file another adapter imports (AGENTS.md, .cursor/rules/*.mdc, .github/copilot-instructions.md and the like \u2014 matched by the patterns that adapter reads, so .claude/docs/ is still imported), each with a warning. Remote instructions are fetched by Kilo itself; Rulegate never fetches them.",
+      source: SETTINGS_DOCS
+    }
+  ]
+};
+
+// ../packages/adapters/kilo/dist/index.js
+var RULES_DIR6 = ".kilocode/rules";
+var LEGACY_FILE2 = ".kilocoderules";
+var KNOWN_MODES = ["code", "architect", "ask", "debug", "orchestrator"];
+var READ_CONFIGS = ["kilo.json", "kilo.jsonc", ".kilo/kilo.json", ".kilo/kilo.jsonc"];
+var DETECTION_PATHS9 = [".kilo", ".kilocode", LEGACY_FILE2, "kilo.json", "kilo.jsonc"];
+async function detect9(ctx) {
+  const evidence = [];
+  for (const path4 of DETECTION_PATHS9) {
+    if (await ctx.fs.exists(path4))
+      evidence.push(path4);
+  }
+  return detected(evidence);
+}
+async function read9(ctx) {
+  const manifest = ctx.canonical.manifest;
+  const legacy = [];
+  const warnings = [];
+  for (const path4 of await ctx.fs.glob(`${RULES_DIR6}/**/*.md`)) {
+    if (dirnamePosix(path4) !== RULES_DIR6) {
+      warnings.push(`${path4}: Kilo loads only the immediate .md children of ${RULES_DIR6}/, so this file is not loaded and was not imported`);
+      continue;
+    }
+    legacy.push(path4);
+  }
+  if (await ctx.fs.exists(LEGACY_FILE2))
+    legacy.push(LEGACY_FILE2);
+  for (const mode of KNOWN_MODES) {
+    const modeFiles = [
+      ...await ctx.fs.glob(`.kilocode/rules-${mode}/*.md`),
+      ...await ctx.fs.exists(`${LEGACY_FILE2}-${mode}`) ? [`${LEGACY_FILE2}-${mode}`] : []
+    ];
+    for (const path4 of modeFiles) {
+      warnings.push(`${path4}: a rule for the ${mode} mode; Kilo loads mode-specific rules in every mode, so it was imported as an ordinary rule`);
+      legacy.push(path4);
+    }
+  }
+  const loaded = new Set(legacy);
+  const configs = READ_CONFIGS.filter((c) => !isCanonicalSource(manifest, c));
+  const listed = await resolveInstructions(ctx.fs, configs, (p) => loaded.has(p) || isCanonicalSource(manifest, p), "kilo");
+  warnings.push(...listed.warnings);
+  const stillLoaded = /* @__PURE__ */ new Map();
+  for (const path4 of legacy) {
+    if (dirnamePosix(path4) === RULES_DIR6 && /^\d{3}-/.test(basenamePosix(path4)))
+      continue;
+    stillLoaded.set(path4, `${path4}: Kilo keeps auto-loading this file beside the generated copy in ${RULES_DIR6}/ \u2014 once \`init --yes\` has run, delete it or Kilo sends this rule twice`);
+  }
+  for (const { path: path4, config, entry } of listed.files) {
+    stillLoaded.set(path4, `${path4}: ${config} lists it (\`${entry}\`), and Rulegate never writes ${config}, so Kilo keeps loading it beside the generated copy in ${RULES_DIR6}/ \u2014 once \`init --yes\` has run, remove that entry or Kilo sends this rule twice`);
+  }
+  const rules = [];
+  const taken = /* @__PURE__ */ new Set();
+  for (const path4 of [...legacy, ...listed.files.map((f) => f.path)]) {
+    if (isCanonicalSource(manifest, path4))
+      continue;
+    const contents = await ctx.fs.tryReadFile(path4);
+    if (contents === void 0)
+      continue;
+    const base = basenamePosix(path4).replace(/\.md$/i, "").replace(/^\d{3}-/, "");
+    const id = importRuleId(base, "kilo");
+    for (const rule of importConcatenated({ file: path4, contents, idFallback: id })) {
+      rules.push({ ...rule, id: claimRuleId(id, taken) });
+    }
+    const warning = stillLoaded.get(path4);
+    if (warning !== void 0)
+      warnings.push(warning);
+  }
+  return {
+    ...rules.length === 0 ? {} : { rules },
+    ...warnings.length === 0 ? {} : { warnings }
+  };
+}
+function ruleFilename(rule, position) {
+  return `${RULES_DIR6}/${String(position + 1).padStart(3, "0")}-${slugForId(rule.id)}.md`;
+}
+function write9(ctx) {
+  const { canonical } = ctx;
+  const marker = canonical.manifest.options.marker;
+  const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, "kilo")));
+  return Promise.resolve(rules.map((rule, i) => finalizeArtifact({
+    path: ruleFilename(rule, i),
+    contents: withHtmlMarker(renderRuleSection(rule, { headingLevel: 2, showGlobs: true }), marker),
+    adapter: "kilo",
+    kind: "rules",
+    provenance: { ruleIds: [rule.id] }
+  })));
+}
+var kilo = {
+  name: "kilo",
+  apiVersion: ADAPTER_API_VERSION,
+  detect: detect9,
+  read: read9,
+  write: write9,
+  docs: docs9
+};
+
+// ../packages/adapters/opencode/dist/instructions.js
+var FOREIGN_SOURCE_DIRS2 = [".agent-os", ".ruler", ".rulesync", ".rulegate"];
+var FOREIGN_FILES2 = /* @__PURE__ */ new Set([
+  "agents.md",
+  "agents.override.md",
+  "claude.md",
+  "gemini.md"
+]);
+var KILO_MODES2 = "(?:code|architect|ask|debug|orchestrator)";
+var FOREIGN_ARTIFACTS2 = [
+  { owner: "aider", pattern: /^conventions\.md$/ },
+  { owner: "antigravity", pattern: /^\.agents?\/rules\/[^/]+\.md$/ },
+  { owner: "claude-code", pattern: /^\.claude\/rules\/.+\.md$/ },
+  { owner: "claude-code", pattern: /^\.mcp\.json$/ },
+  { owner: "cline", pattern: /^\.clinerules\/[^/]+\.(?:md|txt)$/ },
+  { owner: "codex", pattern: /^\.codex\/config\.toml$/ },
+  { owner: "copilot", pattern: /^\.github\/copilot-instructions\.md$/ },
+  { owner: "copilot", pattern: /^\.github\/instructions\/.+\.instructions\.md$/ },
+  { owner: "copilot", pattern: /^\.vscode\/mcp\.json$/ },
+  { owner: "cursor", pattern: /^\.cursor\/rules\/.+\.mdc$/ },
+  { owner: "cursor", pattern: /^\.cursor\/mcp\.json$/ },
+  { owner: "cursor", pattern: /^\.cursorrules$/ },
+  { owner: "kilo", pattern: new RegExp(`^\\.kilocode/rules(?:-${KILO_MODES2})?/[^/]+\\.md$`) },
+  { owner: "kilo", pattern: new RegExp(`^\\.kilocoderules(?:-${KILO_MODES2})?$`) },
+  { owner: "kilo", pattern: /^(?:\.kilo\/)?kilo\.jsonc?$/ },
+  { owner: "opencode", pattern: /^(?:\.opencode\/)?opencode\.jsonc?$/ },
+  { owner: "roo-code", pattern: /^\.roo\/rules\/.+\.(?:md|txt)$/ },
+  { owner: "roo-code", pattern: /^\.roo\/mcp\.json$/ },
+  { owner: "roo-code", pattern: /^\.roorules$/ },
+  { owner: "windsurf", pattern: /^\.(?:windsurf|devin)\/rules\/.+\.md$/ },
+  { owner: "windsurf", pattern: /^\.windsurfrules$/ },
+  { owner: "zed", pattern: /^\.rules$/ }
+];
+var GLOB_CHARS2 = /[*?[\]{}]/;
+function skipReason2(entry, self) {
+  if (/^https?:\/\//i.test(entry)) {
+    return "a remote URL; the tool fetches it, and Rulegate makes no network calls";
+  }
+  if (entry.startsWith("~"))
+    return "in the home directory, outside the repository";
+  if (entry.startsWith("/") || /^[A-Za-z]:[\\/]/.test(entry)) {
+    return "an absolute path, outside the repository";
+  }
+  const segments = entry.split("/");
+  if (segments.includes(".."))
+    return "outside the repository";
+  const first = segments[0].toLowerCase();
+  if (FOREIGN_SOURCE_DIRS2.includes(first)) {
+    return `inside ${first}/, which another importer owns`;
+  }
+  if (FOREIGN_FILES2.has(segments[segments.length - 1].toLowerCase())) {
+    return "owned by another adapter";
+  }
+  const lower = entry.toLowerCase();
+  const owner = FOREIGN_ARTIFACTS2.find((f) => f.owner !== self && f.pattern.test(lower))?.owner;
+  if (owner !== void 0)
+    return `a location the ${owner} adapter imports from and writes to`;
+  return void 0;
+}
+function normalize2(entry) {
+  return entry.trim().replace(/\\/g, "/").replace(/^(\.\/)+/, "");
+}
+function entriesOf2(file, contents) {
+  let parsed;
+  try {
+    parsed = JSON.parse(stripJsonc(contents));
+  } catch {
+    return {
+      entries: [],
+      warning: `${file}: not valid JSON or JSONC; its instructions were not imported`
+    };
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+    return { entries: [] };
+  const list = parsed["instructions"];
+  if (!Array.isArray(list))
+    return { entries: [] };
+  return { entries: list.filter((e) => typeof e === "string") };
+}
+async function resolveInstructions2(fs2, configs, skip, self) {
+  const files = [];
+  const seen = /* @__PURE__ */ new Set();
+  const warnings = [];
+  for (const config of configs) {
+    const contents = await fs2.tryReadFile(config);
+    if (contents === void 0)
+      continue;
+    const { entries, warning } = entriesOf2(config, contents);
+    if (warning !== void 0)
+      warnings.push(warning);
+    for (const raw of entries) {
+      const entry = normalize2(raw);
+      if (entry === "")
+        continue;
+      const reason = skipReason2(entry, self);
+      if (reason !== void 0) {
+        warnings.push(`${config}: instruction \`${raw}\` was not imported: it is ${reason}`);
+        continue;
+      }
+      const matches = await fs2.glob(entry);
+      if (matches.length === 0 && !GLOB_CHARS2.test(entry) && await fs2.exists(entry)) {
+        warnings.push(`${config}: instruction \`${raw}\` was not imported: it is not a regular file inside the repository by that exact spelling (a directory, a link out of the repository, a different letter case, or under node_modules/ or .git/)`);
+        continue;
+      }
+      for (const path4 of matches) {
+        if (skipReason2(path4, self) !== void 0 || skip(path4) || seen.has(path4))
+          continue;
+        seen.add(path4);
+        files.push({ path: path4, config, entry: raw });
+      }
+    }
+  }
+  return { files, warnings };
+}
+
+// ../packages/adapters/opencode/dist/docs.js
+var RULES_DOCS5 = {
+  url: "https://opencode.ai/docs/rules/",
+  title: "OpenCode \u2014 Rules",
+  retrieved: "2026-09-26"
+};
+var CONFIG_DOCS = {
+  url: "https://opencode.ai/docs/config/",
+  title: "OpenCode \u2014 Config",
+  retrieved: "2026-09-26"
+};
+var CONFIG_SOURCE = {
+  url: "https://github.com/sst/opencode/blob/dev/packages/opencode/src/config/config.ts",
+  title: "OpenCode source \u2014 config.ts (mergeConfigConcatArrays)",
+  retrieved: "2026-09-26"
+};
+var INSTRUCTION_SOURCE = {
+  url: "https://github.com/sst/opencode/blob/dev/packages/opencode/src/session/instruction.ts",
+  title: "OpenCode source \u2014 instruction.ts (systemPaths)",
+  retrieved: "2026-09-26"
+};
+var docs10 = {
+  toolName: "OpenCode",
+  homepage: "https://opencode.ai",
+  verifiedAgainst: { version: "opencode 1.18.32 (source, dev branch)", date: "2026-09-26" },
+  resolution: "additive",
+  files: [
+    {
+      pattern: ".opencode/opencode.json",
+      scope: "project",
+      role: "settings",
+      managed: true,
+      description: "A config layer of its own, merged over the root opencode.json, holding only $schema and an instructions list naming the generated rule files. Rulegate owns this file whole and never touches the root config; one it did not write is refused rather than overwritten.",
+      source: CONFIG_SOURCE
+    },
+    {
+      pattern: ".opencode/opencode.jsonc",
+      scope: "project",
+      role: "settings",
+      managed: false,
+      description: "The JSONC spelling of the .opencode/ config layer. Rulegate writes the .json spelling only; a .jsonc here is imported like the root config and never written.",
+      source: CONFIG_DOCS
+    },
+    {
+      pattern: ".opencode/rules/*.md",
+      scope: "project",
+      role: "instructions",
+      managed: true,
+      description: "One Markdown file per rule, loaded because .opencode/opencode.json lists it. A file here that is not listed is not loaded. This is what Rulegate generates.",
+      source: RULES_DOCS5
+    },
+    {
+      pattern: "opencode.json",
+      scope: "project",
+      role: "settings",
+      managed: false,
+      description: "The user's project config. Its instructions entries are imported (local files only) and it is never written.",
+      source: CONFIG_DOCS
+    },
+    {
+      pattern: "opencode.jsonc",
+      scope: "project",
+      role: "settings",
+      managed: false,
+      description: "The JSONC spelling of the project config. Imported like opencode.json, never written.",
+      source: CONFIG_DOCS
+    },
+    {
+      pattern: "AGENTS.md",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      nesting: "all-merged",
+      description: "Every AGENTS.md from the working directory up to the worktree root; when any is found, CLAUDE.md is not read at all. Generated by the codex adapter, not by this one \u2014 so enabling opencode and codex together sends OpenCode the same rules twice.",
+      source: RULES_DOCS5
+    },
+    {
+      pattern: "CLAUDE.md",
+      scope: "project",
+      role: "instructions",
+      managed: false,
+      nesting: "all-merged",
+      description: "The Claude Code fallback, read (at every level up to the worktree root) only when no AGENTS.md is found. Generated by the claude-code adapter, not by this one.",
+      source: RULES_DOCS5
+    },
+    {
+      pattern: "~/.config/opencode/AGENTS.md",
+      scope: "global",
+      role: "instructions",
+      managed: false,
+      description: "User-level rules. Outside the repository, so Rulegate reports it and never writes it.",
+      source: RULES_DOCS5
+    },
+    {
+      pattern: "~/.claude/CLAUDE.md",
+      scope: "global",
+      role: "instructions",
+      managed: false,
+      description: "The Claude Code user file, read only when ~/.config/opencode/AGENTS.md is absent, and unless OPENCODE_DISABLE_CLAUDE_CODE is set.",
+      source: RULES_DOCS5
+    },
+    {
+      pattern: "~/.config/opencode/opencode.json",
+      scope: "global",
+      role: "settings",
+      managed: false,
+      description: "The global config layer. Its instructions are concatenated with the project layers. Reported, never written.",
+      source: CONFIG_DOCS
+    }
+  ],
+  limits: {
+    note: "OpenCode documents no size cap on instruction files. The only documented limit is a 5-second timeout on fetching a remote instruction URL."
+  },
+  notes: [
+    {
+      level: "warn",
+      message: "Rulegate owns .opencode/opencode.json entirely and writes only $schema and instructions into it. Put every other setting in the root opencode.json: OpenCode merges the two, and a setting added to the generated file is reported by check as a hand-edit and overwritten only with --force.",
+      source: CONFIG_SOURCE
+    },
+    {
+      level: "info",
+      message: "instructions arrays are concatenated (and de-duplicated) across config layers rather than replaced, so the list Rulegate writes adds to the root config's list instead of hiding it. The config page says only that layers merge; the concatenation is in the source (mergeConfigConcatArrays).",
+      source: CONFIG_SOURCE
+    },
+    {
+      level: "info",
+      message: `The generated config carries no "//" marker key: OpenCode's schema rejects unknown keys, so the marker every other generated JSON file carries would make this one invalid. Ownership is recorded in .rulegate/state.json as it is for every artifact.`,
+      source: CONFIG_SOURCE
+    },
+    {
+      level: "warn",
+      message: "Resolution is declared additive, but AGENTS.md and CLAUDE.md are first-match: when both exist OpenCode reads only AGENTS.md. In a repository with both, doctor bills CLAUDE.md to OpenCode although OpenCode never opens it, so its token estimate for OpenCode runs high.",
+      source: RULES_DOCS5
+    },
+    {
+      level: "info",
+      message: "Relative instructions entries are resolved by searching upward from the working directory to the worktree root, not relative to the config file. Import treats them as repository-relative, and skips remote URLs, home-directory and absolute paths, anything under .agent-os/, .ruler/, .rulesync/ or .rulegate/, and any file another adapter imports (AGENTS.md, .cursor/rules/*.mdc, .github/copilot-instructions.md and the like \u2014 matched by the patterns that adapter reads, so .claude/docs/ is still imported), each with a warning. An unlisted file in .opencode/rules/ is not imported, with a warning, because OpenCode does not load it and `init --yes` would replace it if an imported rule takes its name.",
+      source: INSTRUCTION_SOURCE
+    }
+  ]
+};
+
+// ../packages/adapters/opencode/dist/index.js
+var CONFIG_FILE = ".opencode/opencode.json";
+var RULES_DIR7 = ".opencode/rules";
+var CONFIG_SCHEMA = "https://opencode.ai/config.json";
+var READ_CONFIGS2 = [
+  "opencode.json",
+  "opencode.jsonc",
+  CONFIG_FILE,
+  ".opencode/opencode.jsonc"
+];
+var DETECTION_PATHS10 = [".opencode", "opencode.json", "opencode.jsonc"];
+async function detect10(ctx) {
+  const evidence = [];
+  for (const path4 of DETECTION_PATHS10) {
+    if (await ctx.fs.exists(path4))
+      evidence.push(path4);
+  }
+  return detected(evidence);
+}
+async function foreignConfigKeys(ctx) {
+  const contents = await ctx.fs.tryReadFile(CONFIG_FILE);
+  if (contents === void 0)
+    return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(stripJsonc(contents));
+  } catch {
+    return [];
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+    return [];
+  return Object.keys(parsed).filter((k) => k !== "$schema" && k !== "instructions").sort();
+}
+async function read10(ctx) {
+  const manifest = ctx.canonical.manifest;
+  const configs = READ_CONFIGS2.filter((c) => !isCanonicalSource(manifest, c));
+  const resolved = await resolveInstructions2(ctx.fs, configs, (p) => isCanonicalSource(manifest, p), "opencode");
+  const warnings = [...resolved.warnings];
+  const foreign = configs.includes(CONFIG_FILE) ? await foreignConfigKeys(ctx) : [];
+  if (foreign.length > 0) {
+    warnings.push(`${CONFIG_FILE}: ${String(foreign.length)} setting(s) (${foreign.join(", ")}) are not imported. Rulegate owns this whole file once it writes it, so they will stop applying after \`init --yes\` or the first \`sync --force\` \u2014 move them to the root opencode.json first.`);
+  }
+  const rules = [];
+  const taken = /* @__PURE__ */ new Set();
+  for (const { path: path4, config, entry } of resolved.files) {
+    const contents = await ctx.fs.tryReadFile(path4);
+    if (contents === void 0)
+      continue;
+    const base = basenamePosix(path4).replace(/\.[^.]+$/, "");
+    const id = importRuleId(base, "opencode");
+    const fromFile = importConcatenated({ file: path4, contents, idFallback: id }).map((rule) => ({
+      ...rule,
+      id: claimRuleId(id, taken)
+    }));
+    rules.push(...fromFile);
+    const inPlace = fromFile.length === 1 && `${RULES_DIR7}/${slugForId(fromFile[0].id)}.md` === path4;
+    if (config !== CONFIG_FILE && !inPlace) {
+      warnings.push(`${path4}: ${config} lists it (\`${entry}\`), and Rulegate never writes ${config}, so OpenCode keeps loading it beside the generated copy under ${RULES_DIR7}/ \u2014 once \`init --yes\` has run, remove that entry from ${config} or OpenCode sends this rule twice`);
+    }
+  }
+  const imported = new Set(resolved.files.map((f) => f.path));
+  for (const path4 of await ctx.fs.glob(`${RULES_DIR7}/*.md`)) {
+    if (imported.has(path4) || isCanonicalSource(manifest, path4))
+      continue;
+    warnings.push(`${path4}: no OpenCode config lists it, so OpenCode does not load it and it was not imported; it sits where Rulegate renders rules, and \`init --yes\` replaces it, with a backup under .rulegate/backup/, if an imported rule is named \`${basenamePosix(path4).replace(/\.md$/, "")}\` \u2014 move it out of ${RULES_DIR7}/ first to keep it in place`);
+  }
+  return {
+    ...rules.length === 0 ? {} : { rules },
+    ...warnings.length === 0 ? {} : { warnings }
+  };
+}
+function write10(ctx) {
+  const { canonical } = ctx;
+  const marker = canonical.manifest.options.marker;
+  const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, "opencode")));
+  if (rules.length === 0 || isCanonicalSource(canonical.manifest, CONFIG_FILE)) {
+    return Promise.resolve([]);
+  }
+  const artifacts = [];
+  const claimed = /* @__PURE__ */ new Map();
+  for (const rule of rules) {
+    const path4 = `${RULES_DIR7}/${slugForId(rule.id)}.md`;
+    const previous = claimed.get(path4);
+    if (previous !== void 0) {
+      throw new RulegateError({
+        code: "E_ARTIFACT_PATH_CONFLICT",
+        message: `rules \`${previous}\` and \`${rule.id}\` both render to ${path4}`,
+        source: rule.source,
+        hint: "rename one of them; opencode rule filenames are flattened rule ids"
+      });
+    }
+    claimed.set(path4, rule.id);
+    artifacts.push(finalizeArtifact({
+      path: path4,
+      contents: withHtmlMarker(renderRuleSection(rule, { headingLevel: 2, showGlobs: true }), marker),
+      adapter: "opencode",
+      kind: "rules",
+      provenance: { ruleIds: [rule.id] }
+    }));
+  }
+  artifacts.push(finalizeArtifact({
+    path: CONFIG_FILE,
+    // The marker is off here whatever `options.marker` says. OpenCode's config schema
+    // sets `additionalProperties: false`, so the `"//"` key would make OpenCode reject
+    // the file as invalid on startup. Ownership still lives in `state.json`, where it
+    // always has; nothing in core infers it from a JSON marker.
+    contents: stableJsonStringify(withJsonMarker({ $schema: CONFIG_SCHEMA, instructions: [...claimed.keys()] }, false)),
+    adapter: "opencode",
+    // No provenance: the file lists paths, not rules, so `sync --import` has no section
+    // to map an edit back to and should say so rather than try.
+    kind: "other"
+  }));
+  return Promise.resolve(artifacts);
+}
+var opencode = {
+  name: "opencode",
+  apiVersion: ADAPTER_API_VERSION,
+  detect: detect10,
+  read: read10,
+  write: write10,
+  docs: docs10
 };
 
 // ../packages/adapters/roo-code/dist/mcp.js
@@ -15117,7 +16684,7 @@ function importMcpConfig4(contents, file = MCP_FILE5) {
 }
 
 // ../packages/adapters/roo-code/dist/docs.js
-var RULES_DOCS3 = {
+var RULES_DOCS6 = {
   url: "https://roocodeinc.github.io/Roo-Code/features/custom-instructions",
   title: "Roo Code \u2014 Custom Instructions",
   retrieved: "2026-09-04"
@@ -15127,7 +16694,7 @@ var MCP_DOCS3 = {
   title: "Roo Code \u2014 Using MCP in Roo",
   retrieved: "2026-09-04"
 };
-var docs8 = {
+var docs11 = {
   toolName: "Roo Code",
   homepage: "https://roocode.com",
   verifiedAgainst: { version: "Roo Code docs as published 2026-09-04", date: "2026-09-04" },
@@ -15140,7 +16707,7 @@ var docs8 = {
       managed: true,
       nesting: "all-merged",
       description: "Workspace rules. Read recursively, including subdirectories, and concatenated sorted by basename only, case-insensitive. Rulegate prefixes each generated filename with a zero-padded index so that sort reproduces the canonical order.",
-      source: RULES_DOCS3
+      source: RULES_DOCS6
     },
     {
       pattern: ".roo/rules-*/",
@@ -15148,7 +16715,7 @@ var docs8 = {
       role: "instructions",
       managed: false,
       description: "Mode-specific workspace rules, inserted before the generic ones. Rulegate has no canonical model for modes, so it never writes these; a repository that uses them keeps them untouched.",
-      source: RULES_DOCS3
+      source: RULES_DOCS6
     },
     {
       pattern: ".roorules",
@@ -15156,7 +16723,7 @@ var docs8 = {
       role: "instructions",
       managed: false,
       description: "Legacy single-file fallback, read only when .roo/rules/ is absent or empty. Rulegate imports it and never writes it.",
-      source: RULES_DOCS3
+      source: RULES_DOCS6
     },
     {
       pattern: ".clinerules",
@@ -15164,7 +16731,7 @@ var docs8 = {
       role: "instructions",
       managed: false,
       description: "Read for Cline compatibility, and only when the Roo directories are absent or empty. Managed by the cline adapter, not this one.",
-      source: RULES_DOCS3
+      source: RULES_DOCS6
     },
     {
       pattern: "AGENTS.md",
@@ -15172,7 +16739,7 @@ var docs8 = {
       role: "instructions",
       managed: false,
       description: "Read from the workspace root by default, disabled by the roo-cline.useAgentRules setting. Generated by the codex adapter, so enabling roo-code and codex together sends Roo the same rules twice \u2014 `rulegate doctor` reports the duplicate and its token cost.",
-      source: RULES_DOCS3
+      source: RULES_DOCS6
     },
     {
       pattern: ".roo/mcp.json",
@@ -15188,7 +16755,7 @@ var docs8 = {
       role: "instructions",
       managed: false,
       description: "User-level rules, aggregated with the workspace ones rather than replaced by them. Outside the repository, so Rulegate reports it and never writes it.",
-      source: RULES_DOCS3
+      source: RULES_DOCS6
     }
   ],
   limits: { note: "Roo Code publishes no size cap for rule files." },
@@ -15196,7 +16763,7 @@ var docs8 = {
     {
       level: "warn",
       message: "Roo Code sorts rule files by basename only, case-insensitively, and that ordering knows nothing about Rulegate\u2019s `order` field. Generated filenames therefore carry a zero-padded index; renaming or reordering rules renames files, which is the cost of making Roo\u2019s sort agree with the canonical one.",
-      source: RULES_DOCS3
+      source: RULES_DOCS6
     },
     {
       level: "warn",
@@ -15206,32 +16773,32 @@ var docs8 = {
     {
       level: "info",
       message: "Roo reads every file in .roo/rules/ regardless of extension. Rulegate imports .md and .txt only; a rule kept under another extension is not lost from disk, but it will not be imported into .rulegate/.",
-      source: RULES_DOCS3
+      source: RULES_DOCS6
     }
   ]
 };
 
 // ../packages/adapters/roo-code/dist/index.js
-var RULES_DIR4 = ".roo/rules";
-var LEGACY_FILE2 = ".roorules";
-var DETECTION_PATHS8 = [".roo", LEGACY_FILE2];
-async function detect8(ctx) {
+var RULES_DIR8 = ".roo/rules";
+var LEGACY_FILE3 = ".roorules";
+var DETECTION_PATHS11 = [".roo", LEGACY_FILE3];
+async function detect11(ctx) {
   const evidence = [];
-  for (const path4 of DETECTION_PATHS8) {
+  for (const path4 of DETECTION_PATHS11) {
     if (await ctx.fs.exists(path4))
       evidence.push(path4);
   }
   return detected(evidence);
 }
-function ruleFilename(rule, position) {
+function ruleFilename2(rule, position) {
   const index = String(position + 1).padStart(3, "0");
-  return `${RULES_DIR4}/${index}-${slugForId(rule.id)}.md`;
+  return `${RULES_DIR8}/${index}-${slugForId(rule.id)}.md`;
 }
-async function read8(ctx) {
+async function read11(ctx) {
   const rules = [];
   const taken = /* @__PURE__ */ new Set();
   for (const extension of ["md", "txt"]) {
-    for (const path4 of await ctx.fs.glob(`${RULES_DIR4}/**/*.${extension}`)) {
+    for (const path4 of await ctx.fs.glob(`${RULES_DIR8}/**/*.${extension}`)) {
       if (isCanonicalSource(ctx.canonical.manifest, path4))
         continue;
       const contents = await ctx.fs.tryReadFile(path4);
@@ -15248,11 +16815,11 @@ async function read8(ctx) {
       }
     }
   }
-  if (!isCanonicalSource(ctx.canonical.manifest, LEGACY_FILE2)) {
-    const legacy = await ctx.fs.tryReadFile(LEGACY_FILE2);
+  if (!isCanonicalSource(ctx.canonical.manifest, LEGACY_FILE3)) {
+    const legacy = await ctx.fs.tryReadFile(LEGACY_FILE3);
     if (legacy !== void 0) {
       for (const rule of importConcatenated({
-        file: LEGACY_FILE2,
+        file: LEGACY_FILE3,
         contents: legacy,
         headingLevel: 2,
         idFallback: "roorules"
@@ -15276,12 +16843,12 @@ async function readMcp5(ctx) {
     ...warnings.length === 0 ? {} : { warnings }
   };
 }
-function write8(ctx) {
+function write11(ctx) {
   const { canonical } = ctx;
   const marker = canonical.manifest.options.marker;
   const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, "roo-code")));
   const artifacts = rules.map((rule, i) => finalizeArtifact({
-    path: ruleFilename(rule, i),
+    path: ruleFilename2(rule, i),
     contents: withHtmlMarker(renderRuleSection(rule, { headingLevel: 2, showGlobs: true }), marker),
     adapter: "roo-code",
     kind: "rules",
@@ -15296,17 +16863,17 @@ function write8(ctx) {
 var rooCode = {
   name: "roo-code",
   apiVersion: ADAPTER_API_VERSION,
-  detect: detect8,
-  read: read8,
-  write: write8,
-  docs: docs8
+  detect: detect11,
+  read: read11,
+  write: write11,
+  docs: docs11
 };
 
 // ../packages/adapters/windsurf/dist/frontmatter.js
 function invalid(what, hint) {
   return new RulegateError({ code: "E_FRONTMATTER_INVALID", message: what, hint });
 }
-function renderGlobs(globs) {
+function renderGlobs2(globs) {
   for (const glob of globs) {
     if (glob.includes(",")) {
       throw invalid(`glob \`${glob}\` contains a comma, which windsurf cannot express`, "windsurf separates patterns with commas and has no escape for one inside a pattern; split the rule in two");
@@ -15314,22 +16881,22 @@ function renderGlobs(globs) {
   }
   return globs.join(",");
 }
-function renderDescription(description) {
+function renderDescription2(description) {
   return description.replace(/\s+/g, " ").trim();
 }
-function renderFrontmatter(init) {
+function renderFrontmatter2(init) {
   const lines = ["---"];
   const scoped = init.globs.length > 0;
   lines.push(`trigger: ${scoped ? "glob" : "always_on"}`);
   if (scoped)
-    lines.push(`globs: ${renderGlobs(init.globs)}`);
+    lines.push(`globs: ${renderGlobs2(init.globs)}`);
   if (init.description !== void 0 && init.description !== "") {
-    lines.push(`description: ${renderDescription(init.description)}`);
+    lines.push(`description: ${renderDescription2(init.description)}`);
   }
   lines.push("---", "", "");
   return lines.join("\n");
 }
-function parseRule(contents) {
+function parseRule2(contents) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(contents);
   if (match === null)
     return { globs: [], body: stripMarker(contents).trim() };
@@ -15356,12 +16923,12 @@ function parseRule(contents) {
 }
 
 // ../packages/adapters/windsurf/dist/docs.js
-var RULES_DOCS4 = {
+var RULES_DOCS7 = {
   url: "https://docs.devin.ai/desktop/cascade/memories",
   title: "Windsurf \u2014 Rules and memories (Cascade)",
   retrieved: "2026-09-04"
 };
-var docs9 = {
+var docs12 = {
   toolName: "Windsurf",
   homepage: "https://windsurf.com",
   // Not a release number: the vendor page carries none, and inventing one would be the
@@ -15377,7 +16944,7 @@ var docs9 = {
       managed: false,
       nesting: "all-merged",
       description: "Devin Desktop workspace rules. Documented as taking precedence over .windsurf/rules. Rulegate reads these on import so a Devin user does not lose them, and never writes them: the directory belongs to a different product.",
-      source: RULES_DOCS4
+      source: RULES_DOCS7
     },
     {
       pattern: ".windsurf/rules/*.md",
@@ -15386,7 +16953,7 @@ var docs9 = {
       managed: true,
       nesting: "all-merged",
       description: "Workspace rules, one file per rule, each with a trigger: frontmatter key. Discovered in subdirectories and in parent directories up to the git root. This is what Rulegate generates.",
-      source: RULES_DOCS4
+      source: RULES_DOCS7
     },
     {
       pattern: ".windsurfrules",
@@ -15394,7 +16961,7 @@ var docs9 = {
       role: "instructions",
       managed: false,
       description: "Legacy single-file rules at the workspace root, superseded by .windsurf/rules. Rulegate imports it and never writes it.",
-      source: RULES_DOCS4
+      source: RULES_DOCS7
     },
     {
       pattern: "AGENTS.md",
@@ -15402,7 +16969,7 @@ var docs9 = {
       role: "instructions",
       managed: false,
       description: "Read at the workspace root, without frontmatter. Generated by the codex adapter, not by this one \u2014 so enabling windsurf and codex together sends Windsurf the same rules twice.",
-      source: RULES_DOCS4
+      source: RULES_DOCS7
     },
     {
       pattern: "~/.codeium/windsurf/memories/global_rules.md",
@@ -15410,7 +16977,7 @@ var docs9 = {
       role: "instructions",
       managed: false,
       description: "User-level rules, always applied, no frontmatter. Outside the repository, so Rulegate reports it and never writes it.",
-      source: RULES_DOCS4
+      source: RULES_DOCS7
     }
   ],
   limits: {
@@ -15426,45 +16993,45 @@ var docs9 = {
     {
       level: "warn",
       message: "Multiple glob patterns are undocumented. The vendor shows a single bare pattern (globs: **/*.test.ts) and does not say how several are separated; Rulegate joins them with commas, matching Cursor .mdc and community practice. A rule whose scoping matters and that carries more than one pattern is worth checking in Windsurf before relying on it.",
-      source: RULES_DOCS4
+      source: RULES_DOCS7
     },
     {
       level: "warn",
       message: ".devin/rules takes precedence over .windsurf/rules. In a repository that has both, the files Rulegate generates are shadowed by a directory it deliberately does not write.",
-      source: RULES_DOCS4
+      source: RULES_DOCS7
     },
     {
       level: "info",
       message: "trigger: is derived, not authored. A rule with globs becomes trigger: glob and a repo-wide rule becomes trigger: always_on; model_decision and manual are never generated, because both let the model skip a rule the author asked for.",
-      source: RULES_DOCS4
+      source: RULES_DOCS7
     }
   ]
 };
 
 // ../packages/adapters/windsurf/dist/index.js
-var RULES_DIR5 = ".windsurf/rules";
+var RULES_DIR9 = ".windsurf/rules";
 var DEVIN_RULES_DIR = ".devin/rules";
-var LEGACY_FILE3 = ".windsurfrules";
-var DETECTION_PATHS9 = [".windsurf", LEGACY_FILE3];
-async function detect9(ctx) {
+var LEGACY_FILE4 = ".windsurfrules";
+var DETECTION_PATHS12 = [".windsurf", LEGACY_FILE4];
+async function detect12(ctx) {
   const evidence = [];
-  for (const path4 of DETECTION_PATHS9) {
+  for (const path4 of DETECTION_PATHS12) {
     if (await ctx.fs.exists(path4))
       evidence.push(path4);
   }
   return detected(evidence);
 }
-async function read9(ctx) {
+async function read12(ctx) {
   const rules = [];
   const taken = /* @__PURE__ */ new Set();
-  for (const dir of [DEVIN_RULES_DIR, RULES_DIR5]) {
+  for (const dir of [DEVIN_RULES_DIR, RULES_DIR9]) {
     for (const path4 of await ctx.fs.glob(`${dir}/**/*.md`)) {
       if (isCanonicalSource(ctx.canonical.manifest, path4))
         continue;
       const contents = await ctx.fs.tryReadFile(path4);
       if (contents === void 0)
         continue;
-      const parsed = parseRule(contents);
+      const parsed = parseRule2(contents);
       if (parsed.body === "" && parsed.description === void 0)
         continue;
       const base = basenamePosix(path4).replace(/\.md$/i, "");
@@ -15477,11 +17044,11 @@ async function read9(ctx) {
       }));
     }
   }
-  if (!isCanonicalSource(ctx.canonical.manifest, LEGACY_FILE3)) {
-    const legacy = await ctx.fs.tryReadFile(LEGACY_FILE3);
+  if (!isCanonicalSource(ctx.canonical.manifest, LEGACY_FILE4)) {
+    const legacy = await ctx.fs.tryReadFile(LEGACY_FILE4);
     if (legacy !== void 0) {
       for (const rule of importConcatenated({
-        file: LEGACY_FILE3,
+        file: LEGACY_FILE4,
         contents: legacy,
         headingLevel: 2,
         idFallback: "windsurfrules"
@@ -15492,14 +17059,14 @@ async function read9(ctx) {
   }
   return rules.length === 0 ? {} : { rules };
 }
-function write9(ctx) {
+function write12(ctx) {
   const { canonical } = ctx;
   const marker = canonical.manifest.options.marker;
   const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, "windsurf")));
   const artifacts = [];
   const claimed = /* @__PURE__ */ new Map();
   for (const rule of rules) {
-    const path4 = `${RULES_DIR5}/${slugForId(rule.id)}.md`;
+    const path4 = `${RULES_DIR9}/${slugForId(rule.id)}.md`;
     const previous = claimed.get(path4);
     if (previous !== void 0) {
       throw new RulegateError({
@@ -15510,7 +17077,7 @@ function write9(ctx) {
       });
     }
     claimed.set(path4, rule.id);
-    const frontmatter = renderFrontmatter({
+    const frontmatter = renderFrontmatter2({
       globs: rule.frontmatter.globs,
       ...rule.frontmatter.description === void 0 ? {} : { description: rule.frontmatter.description }
     });
@@ -15530,10 +17097,10 @@ function write9(ctx) {
 var windsurf = {
   name: "windsurf",
   apiVersion: ADAPTER_API_VERSION,
-  detect: detect9,
-  read: read9,
-  write: write9,
-  docs: docs9
+  detect: detect12,
+  read: read12,
+  write: write12,
+  docs: docs12
 };
 
 // ../packages/adapters/zed/dist/docs.js
@@ -15552,7 +17119,7 @@ function link(pattern, description) {
     source: INSTRUCTIONS_DOCS
   };
 }
-var docs10 = {
+var docs13 = {
   toolName: "Zed",
   homepage: "https://zed.dev",
   // The instructions page carries no version number; the documentation date is the honest
@@ -15602,16 +17169,16 @@ var docs10 = {
 
 // ../packages/adapters/zed/dist/index.js
 var RULES_FILE = ".rules";
-var DETECTION_PATHS10 = [RULES_FILE, ".zed"];
-async function detect10(ctx) {
+var DETECTION_PATHS13 = [RULES_FILE, ".zed"];
+async function detect13(ctx) {
   const evidence = [];
-  for (const path4 of DETECTION_PATHS10) {
+  for (const path4 of DETECTION_PATHS13) {
     if (await ctx.fs.exists(path4))
       evidence.push(path4);
   }
   return detected(evidence);
 }
-async function read10(ctx) {
+async function read13(ctx) {
   if (isCanonicalSource(ctx.canonical.manifest, RULES_FILE))
     return {};
   const contents = await ctx.fs.tryReadFile(RULES_FILE);
@@ -15626,7 +17193,7 @@ async function read10(ctx) {
     })
   };
 }
-async function write10(ctx) {
+async function write13(ctx) {
   const { canonical } = ctx;
   if (isCanonicalSource(canonical.manifest, RULES_FILE))
     return [];
@@ -15647,21 +17214,24 @@ async function write10(ctx) {
 var zed = {
   name: "zed",
   apiVersion: ADAPTER_API_VERSION,
-  detect: detect10,
-  read: read10,
-  write: write10,
-  docs: docs10
+  detect: detect13,
+  read: read13,
+  write: write13,
+  docs: docs13
 };
 
 // ../packages/cli/dist/registry.js
 var ADAPTERS = [
   aider,
+  antigravity,
   claudeCode,
   cline,
   codex,
   copilot,
   cursor,
   gemini,
+  kilo,
+  opencode,
   rooCode,
   windsurf,
   zed

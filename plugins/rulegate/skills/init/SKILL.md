@@ -24,11 +24,11 @@ a memory-bank read at every startup, a rules file with no `paths:` — is the bu
 
 ## `$ARGUMENTS`
 
-| Argument   | Do                                                                                                                      |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
-| _(none)_   | The full pass: audit, then route by MODE                                                                                |
-| `audit`    | Run the audit and report. Change nothing.                                                                               |
-| `settings` | The settings pass only — a preview of git write protection and the task tools for project and user settings. See below. |
+| Argument   | Do                                                                                                                           |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| _(none)_   | The full pass: audit, then route by MODE                                                                                     |
+| `audit`    | Run the audit and report. Change nothing.                                                                                    |
+| `settings` | The settings pass only — git write protection, the task tools and the task-tracking rule, previewed then applied. See below. |
 
 Related skills: `/rulegate:map` builds the architecture map, `/rulegate:memory`
 inspects and repairs what the project remembers.
@@ -101,11 +101,14 @@ point the user at it once the layer exists.
 
 ### Drift is `rulegate check`'s
 
-In a project with `.rulegate/`, run `npx rulegate check` once after the audit. Exit 0
+In a project with `.rulegate/`, run `npx --no rulegate check` once after the audit. Exit 0
 means every generated file matches its rules; exit 1 prints what is stale or
 hand-edited and the recovery for each — `rulegate sync` for stale, `rulegate sync
 --import` to keep a hand-edit. Do not diff generated files yourself: `check`
-renders exactly what `sync` would write, and nothing else can.
+renders exactly what `sync` would write, and nothing else can. `--no` is load-bearing:
+without a TTY, plain `npx` downloads the latest `rulegate` from the registry and runs it,
+which may not be the version CI checks with. If it fails because the project has no local
+`rulegate`, hand the user the command instead of dropping `--no`.
 
 ## Step 4 — Act on the findings
 
@@ -118,7 +121,7 @@ Each finding routes to one place. Load only what the audit actually surfaced:
 | user asks how to change an existing feature                        | `references/changing-a-feature.md`                                                                                                |
 | legacy store found; CLAUDE.md over budget                          | `references/migrating.md`                                                                                                         |
 | rule without `paths:`; no rules layer yet; CLAUDE.md to trim       | `references/writing-rules.md` — in a Rulegate project, edit `.rulegate/rules/` and run `rulegate sync`, never the generated files |
-| git write protection or task tools missing                         | the settings pass below — preview only in this version                                                                            |
+| git write protection or task tools missing                         | the settings pass below — apply, don't hand over                                                                                  |
 | LSP plugin recommended; checked-in generated dirs                  | `references/establishing.md`, "Stop Claude reading what it should not"                                                            |
 | hook target missing                                                | delete the hook entry, or restore the script — say which                                                                          |
 | shadowing agent or skill in `~/.claude` or `.claude/agents/`       | the user removes the standalone copy; a plugin cannot                                                                             |
@@ -126,7 +129,7 @@ Each finding routes to one place. Load only what the audit actually surfaced:
 | project CLAUDE.md refers to a `~/.claude/CLAUDE.md` that is absent | the user creates it or drops the reference                                                                                        |
 
 Shadowing agents and skills on the machine layer are the user's to remove.
-Settings are the user's too, for now: the settings pass below previews them and writes nothing.
+Settings are not: the settings pass below writes them, including `~/.claude`.
 
 ## Step 5 — Verify by re-running
 
@@ -137,7 +140,8 @@ numbers, so quote them.
 ## The settings pass
 
 Runs when `SETUP` is `FRESH`, or `REPAIR` with a settings item missing (after Step 4), and
-alone for `settings`. **In this version of the plugin it previews and does not apply.**
+alone for `settings`. It **writes** the setup rather than describing it — handing the user a
+JSON block to paste is how a project ends up with no git protection and no task tools.
 
 1. **Preview.** One call:
 
@@ -145,23 +149,35 @@ alone for `settings`. **In this version of the plugin it previews and does not a
    node "${CLAUDE_PLUGIN_ROOT}/dist/settings.js" --scope both
    ```
 
-   It prints, per file, what the pass would add to project `.claude/settings.json` and
+   It prints, per file, what it would add to project `.claude/settings.json` and
    `~/.claude/settings.json` — the git write-protection deny rules, and
    `env.CLAUDE_CODE_ENABLE_TODO_TOOLS` — plus the task-tracking rule. If it reports
    everything already present, say so and stop.
 
-2. **Show the preview and stop there for the settings files.** Do **not** edit
-   `.claude/settings.json`, `~/.claude/settings.json` or `~/.claude/CLAUDE.md` yourself,
-   and do not retry with `--apply` — it refuses and writes nothing. `permissions.deny` is
-   the guardrail on your own behaviour: a hand edit to it, made without the merge rules and
-   the backup the writer will carry, is exactly the change this skill exists to prevent.
-   Tell the user the deny rules and the env flag are theirs to add for now, and point at
-   `references/git-permissions.md` for the list and the reasoning.
+2. **Ask once.** One AskUserQuestion: apply to _project and user_ (recommended —
+   `~/.claude` protects every other repo on this machine), _project only_, or _skip_. This
+   is the one confirmation: `permissions.deny` is the guardrail on your own behaviour, so it
+   is changed with the user's yes, never silently.
 
-3. **The task-tracking rule is the exception, in a Rulegate project only.** It belongs in
-   the repository, not in a settings file: with the user's yes, create
-   `.rulegate/rules/working-agreement.md` exactly as the preview describes, then run
-   `rulegate sync`. Never add it to the generated `CLAUDE.md`.
+3. **Apply** with the same command plus `--apply` and `--scope both` or `--scope project`.
+   The script merges — existing keys, allow rules, deny rules and a user-set env value
+   survive — and backs up each file it changes to `<file>.rulegate.bak`, keeping
+   the first backup if one is already there. Show its output. It exits 1 when it refused an
+   item (invalid JSON, a symlink, a generated file, an existing rule file, a file that is
+   not UTF-8); report each refusal as printed and do not work around it by hand. The
+   preview already marks the items it will refuse.
+
+   In a Rulegate project the task-tracking rule goes into
+   `.rulegate/rules/working-agreement.md`, never into the generated `CLAUDE.md`, and the
+   output says to run `rulegate sync`: run `npx --no rulegate sync` so `CLAUDE.md`
+   carries it — `--no`, as for `check`, so nothing is fetched from the registry. The script cannot run it for you. If `working-agreement.md` already exists without
+   the rule, the script leaves it alone — add the rule to it by hand, then sync.
+
+4. **If the Bash call is denied** (writing under `~/.claude` can need approval), do not
+   fall back to pasting JSON or editing the settings files yourself. Give the user the
+   exact command to run with the `!` prefix so it runs in this session, with the scope the
+   user chose in step 2 — never widened to `both` after they said _project only_:
+   `! node "<plugin root>/dist/settings.js" --scope <both|project> --apply`.
 
 The rule set and every judgment call in it (why `git -C` is denied, why
 `fetch` is allowed) are in `references/git-permissions.md`.

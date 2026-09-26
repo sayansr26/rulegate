@@ -1,0 +1,8 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    ".opencode/rules/10-style.md",
+    ".opencode/rules/20-testing.md",
+    ".opencode/rules/40-sources.md"
+  ]
+}

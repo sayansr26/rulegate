@@ -153,7 +153,8 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
 
       await run(process.execPath, [binPath, 'sync'], { cwd: repo });
       const { stdout } = await run(process.execPath, [binPath, 'check'], { cwd: repo });
-      expect(stdout).toContain('in sync (5 artifacts)');
+      // Four `.mdc` files, CLAUDE.md, and the scoped rule's `.claude/rules/30-frontend.md`.
+      expect(stdout).toContain('in sync (6 artifacts)');
 
       await writeFile(path.join(repo, 'CLAUDE.md'), 'edited by hand\n');
       const drifted = await runFailing(process.execPath, [binPath, 'check'], { cwd: repo });
@@ -279,7 +280,9 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
 
     expect(stderr).not.toContain('EPIPE');
     expect(stderr).not.toMatch(/^\s+at /m);
-  });
+    // A whole-repository `doctor` over thirteen adapters takes over a second on its own, and
+    // the dist lane runs it beside every other suite; the default 5 s is not about this test.
+  }, 20_000);
 
   it('resolves both adapter-kit entry points from the built output', async () => {
     // Spawned rather than imported: vitest aliases `@rulegate/*` to source, so an

@@ -135,9 +135,9 @@ export async function runAudit({
       `RULEGATE  .rulegate/  — ${String(rules.length)} rule(s), ${String(recorded.size)} generated file(s) recorded`,
     );
     say(
-      '  drift: run `npx rulegate check` — exit 1 means a generated file is stale or hand-edited',
+      '  drift: run `npx --no rulegate check` — exit 1 means a generated file is stale or hand-edited',
     );
-    say('  cost:  `npx rulegate doctor` reports what each tool loads and its token estimate');
+    say('  cost:  `npx --no rulegate doctor` reports what each tool loads and its token estimate');
   } else {
     say('RULEGATE  no .rulegate/ — rules are not generated here');
     flag(
@@ -643,7 +643,7 @@ export async function runAudit({
   // ---------------------------------------------------------- setup state
   // Install and settings, as opposed to MODE, which is about the context layer.
   say();
-  for (const l of describeState(setupState(root, claudeDir, { expect }))) say(l);
+  for (const l of describeState(await setupState(root, claudeDir, { expect }))) say(l);
 
   say();
   say(`MODE  ${mode}`);
@@ -663,7 +663,7 @@ export async function runAudit({
   // ---------------------------------------------------------- verdict
   say();
   say(
-    `STARTUP COST  ~${String(residentBytes)} B always loaded${rulegate ? '  (per-tool token estimate: npx rulegate doctor)' : ''}`,
+    `STARTUP COST  ~${String(residentBytes)} B always loaded${rulegate ? '  (per-tool token estimate: npx --no rulegate doctor)' : ''}`,
   );
   say();
   if (findings.length === 0) say('VERDICT  no findings — setup is clean.');

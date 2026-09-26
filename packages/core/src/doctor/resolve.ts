@@ -251,6 +251,11 @@ function decideShadowed(
   return entries.map((entry, i) => {
     if ((measurements[i] ?? []).length === 0) return false;
     if (resolution === 'additive') return false;
+    // An entry whose own copies merge rather than replace one another is additive by
+    // nature, and joins a chain instead of contesting it: Claude Code loads
+    // `.claude/rules/` beside `CLAUDE.md`, never instead of it, and a scoped rule Rulegate
+    // moved there has no counterpart in `CLAUDE.md` to lose a conflict to (T110).
+    if (entry.nesting === 'all-merged') return false;
     // `override` and `first-match` share this shape — the first present entry in a chain
     // wins — and differ only in whether the losers are still read. That is decided by
     // `loaded` at the call site, not here.

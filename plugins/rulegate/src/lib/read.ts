@@ -1,3 +1,4 @@
+import { isUtf8 } from 'node:buffer';
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
@@ -24,6 +25,21 @@ export function read(path: string): string | undefined {
     return readFileSync(path, 'utf8');
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Whether `read()` returned the file's bytes exactly. It decodes as UTF-8, and a Latin-1
+ * `CLAUDE.md` comes back with U+FFFD in place of every byte it could not decode — harmless to
+ * a reader, but a writer that writes that text back has destroyed the original. `false`
+ * when the file cannot be read at all.
+ */
+export function isUtf8File(path: string): boolean {
+  try {
+    const st = statSync(path);
+    return st.isFile() && st.size <= MAX_READ_BYTES && isUtf8(readFileSync(path));
+  } catch {
+    return false;
   }
 }
 
@@ -80,6 +96,19 @@ export function isDir(path: string): boolean {
 export function isRealDir(path: string): boolean {
   try {
     return lstatSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Anything at all at `path`, a dangling symlink included — the question a writer asks
+ * before claiming a name, where `read()`'s "absent" would be the wrong answer.
+ */
+export function exists(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
   } catch {
     return false;
   }

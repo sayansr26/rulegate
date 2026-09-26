@@ -9,6 +9,7 @@ import { buildState, type StateFile } from '../state/state.js';
 import { parse } from '../parse/index.js';
 import { discoverSources, resolveNested, type ResolvedLevel } from '../parse/nested.js';
 import { nestedPath, nestedTargets, toolsWithoutNesting } from '../adapter/nesting.js';
+import { matchesGlob } from '../fs/glob.js';
 import { ADAPTER_API_VERSION } from '../adapter/context.js';
 import { compareCodepoint } from '../render/order.js';
 import type { Adapter } from '../adapter/adapter.js';
@@ -119,6 +120,9 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
   const claimedBy = new Map<string, ToolId>();
   const planLevels: PlanLevel[] = [];
   const enabledEverywhere = new Set<ToolId>();
+  // What each level's adapters produced, so a nested override can ask where its ancestor
+  // put the rule it redefines. Levels arrive ancestors first, so the lookup is complete.
+  const producedAt = new Map<string, readonly Artifact[]>();
 
   for (const level of levels) {
     const canonical = level.canonical;
@@ -135,8 +139,6 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
     const skippedTools = nested ? toolsWithoutNesting(selected) : [];
     const skipped = new Set<ToolId>(skippedTools);
     const eligible = selected.filter((a) => !skipped.has(a.name));
-
-    if (nested) warnings.push(...allMergedWarnings(level, eligible));
 
     planLevels.push({
       dir: level.dir,
@@ -186,6 +188,15 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
               }),
         );
         continue;
+      }
+
+      producedAt.set(`${level.dir}\u0000${adapter.name}`, produced);
+      if (nested) {
+        const inherited = level.inheritedFrom.map((dir) => ({
+          dir,
+          produced: producedAt.get(`${dir}\u0000${adapter.name}`) ?? [],
+        }));
+        warnings.push(...allMergedWarnings(level, adapter, produced, inherited));
       }
 
       for (const raw of produced) {
@@ -366,25 +377,53 @@ async function resolveLevels(
  * bytes. A warning rather than an error: this is a correct permanent property of the
  * tool, `check` owns exit 1 for drift alone, and refusing to render would leave the
  * package with no rules at all rather than with reported ones.
+ *
+ * Decided per produced artifact, not per tool. Claude Code has one target of each kind —
+ * `CLAUDE.md` nearest-wins, `.claude/rules/` all-merged — and a repo-wide override lands
+ * only in the first, so a per-tool answer tells its most common user that an override
+ * which works is a conflict. An artifact with no provenance cannot say which rules it
+ * carries and is assumed to carry them all: over-reporting is the safe direction here.
+ *
+ * Both ends of the override count. A scoped root rule lands in the root's
+ * `.claude/rules/`, whose `paths:` reach into the package, so a repo-wide redefinition in
+ * the package's nearest-wins `CLAUDE.md` still reaches Claude beside the root's text.
  */
 function allMergedWarnings(
   level: ResolvedLevel,
-  eligible: readonly Adapter[],
+  adapter: Adapter,
+  produced: readonly Artifact[],
+  inherited: readonly { readonly dir: string; readonly produced: readonly Artifact[] }[],
 ): readonly RulegateError[] {
   if (level.overriddenRuleIds.length === 0) return [];
+  const merged = nestedTargets([adapter])
+    .filter((target) => target.nesting === 'all-merged')
+    .map((target) => target.pattern);
+  if (merged.length === 0) return [];
 
   const out: RulegateError[] = [];
-  for (const target of nestedTargets(eligible)) {
-    if (target.nesting !== 'all-merged') continue;
-    for (const id of level.overriddenRuleIds) {
-      out.push(
-        new RulegateError({
-          code: 'W_NESTED_MERGE_CONFLICT',
-          message: `${level.dir} redefines rule \`${id}\`, but ${target.tool} merges nested files instead of overriding: it will load both texts`,
-          source: { file: nestedPath(level.dir, target.pattern) },
-          hint: `give the rule a different id in ${level.dir}, or disable ${target.tool} there`,
-        }),
-      );
+  const warned = new Set<string>();
+  const sides = [{ dir: level.dir, produced }, ...[...inherited].reverse()];
+  for (const side of sides) {
+    for (const artifact of side.produced) {
+      if (artifact.kind !== 'rules') continue;
+      const local = normalizeRelative(artifact.path);
+      if (!merged.some((pattern) => matchesGlob(local, pattern))) continue;
+      const carried = artifact.provenance?.ruleIds;
+      for (const id of level.overriddenRuleIds) {
+        if (carried !== undefined && !carried.includes(id)) continue;
+        // The nested side is named first when both ends qualify: that is the file the
+        // package owner can change.
+        if (side.dir !== level.dir && warned.has(id)) continue;
+        warned.add(id);
+        out.push(
+          new RulegateError({
+            code: 'W_NESTED_MERGE_CONFLICT',
+            message: `${level.dir} redefines rule \`${id}\`, but ${adapter.name} merges nested files instead of overriding: it will load both texts`,
+            source: { file: nestedPath(side.dir, local) },
+            hint: `give the rule a different id in ${level.dir}, or disable ${adapter.name} there`,
+          }),
+        );
+      }
     }
   }
   return out;

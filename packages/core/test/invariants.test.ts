@@ -303,8 +303,19 @@ describe('the shared rendering path', () => {
    * `cp` and `link` count only as `cpSync`/`linkSync`: bare, they are ordinary helper names
    * (Zed's `docs.ts` has a `link()`).
    */
-  /** The plugin's only writer (P3): once-per-session markers under `os.tmpdir()`. */
+  /**
+   * The plugin's writers (P3, amended for T109–T117). Each is its own directory, imported by
+   * one entry, and each is shape-pinned below:
+   *   - `session/` — once-per-session markers under `os.tmpdir()` (T108);
+   *   - `settings-writer/` — the settings pass's `--apply` (T109, D2): the two
+   *     `settings.json` files, the user's `CLAUDE.md` with a `.rulegate.bak` first, and a
+   *     new canonical task rule.
+   * T114's `migrate/` is the planned third; it extends this list, its length pin, and the
+   * per-bundle map below.
+   */
   const PLUGIN_MARKER = 'plugins/rulegate/src/session/marker.ts';
+  const PLUGIN_SETTINGS_WRITER = 'plugins/rulegate/src/settings-writer/apply.ts';
+  const PLUGIN_WRITERS: readonly string[] = Object.freeze([PLUGIN_MARKER, PLUGIN_SETTINGS_WRITER]);
 
   const WRITE_PRIMITIVE =
     /\b(?:writeFile|appendFile|copyFile|unlink|rm|rmdir|mkdir|rename|symlink|truncate|chmod|utimes)(?:Sync)?\(|\b(?:cp|link)Sync\(|\bcreateWriteStream\(|\bdeleteFile\(/;
@@ -320,23 +331,49 @@ describe('the shared rendering path', () => {
         rel.startsWith('packages/core/src/io/') ||
         rel === 'packages/core/src/pipeline/apply.ts' ||
         rel === 'packages/core/src/fs/types.ts' ||
-        rel === PLUGIN_MARKER;
+        PLUGIN_WRITERS.includes(rel);
       if (!allowed) offenders.push(rel);
     }
     expect(offenders).toEqual([]);
+    expect(PLUGIN_WRITERS).toHaveLength(2);
   });
 
-  it("keeps every write in the plugin's bundles to the marker's two calls", async () => {
+  /**
+   * Every write call each bundle may carry, by bundle. A bundle absent here may carry none.
+   * The audit and state scripts run on every `/rulegate:init` and the hooks on every
+   * session, so a writer reaching one of them through a shared import is the failure this
+   * map exists to catch — the source scan above cannot, since the call still sits in an
+   * allowlisted file. T114 adds `migrate-memory.js`.
+   */
+  const BUNDLE_WRITES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+    'pre-edit.js': ['mkdirSync(', 'writeFileSync('],
+    'settings.js': [
+      'copyFileSync(',
+      'mkdirSync(',
+      'mkdirSync(',
+      'renameSync(',
+      'rmSync(',
+      'writeFileSync(',
+      'writeFileSync(',
+    ],
+  });
+
+  it("keeps every write in the plugin's bundles to the writer each one ships", async () => {
     // The source scan above cannot see this: core is bundled from source (P2), so what
     // keeps `NodeFileSystem` and `applyPlan` out of `dist/` is esbuild dropping unused code.
     // A hook that one day imports a core symbol dragging a writer along stays green in every
     // source scan — `core/src/io/` is allowlisted — and ships the writer. The bundle says.
-    const calls: string[] = [];
-    for (const file of await bundleFiles()) {
+    const bundles = await bundleFiles();
+    expect(bundles.length).toBeGreaterThan(0);
+    for (const file of bundles) {
       const text = await readFile(file, 'utf8');
-      for (const m of text.matchAll(new RegExp(WRITE_PRIMITIVE.source, 'g'))) calls.push(m[0]);
+      const calls = [...text.matchAll(new RegExp(WRITE_PRIMITIVE.source, 'g'))].map((m) => m[0]);
+      const name = path.basename(file);
+      expect({ bundle: name, calls: calls.sort() }).toEqual({
+        bundle: name,
+        calls: [...(BUNDLE_WRITES[name] ?? [])],
+      });
     }
-    expect(calls.sort()).toEqual(['mkdirSync(', 'writeFileSync(']);
   });
 
   it("confines the plugin's one writer to empty marker files in the OS temp directory", async () => {
@@ -347,6 +384,54 @@ describe('the shared rendering path', () => {
     expect(text).toMatch(/join\(tmpdir\(\), MARKER_DIR\)/);
     expect(text).toMatch(/writeFileSync\(join\(base, [^\n]*\), '', \{ flag: 'wx' \}\)/);
     expect(text.match(/writeFileSync\(/g)).toHaveLength(1);
+  });
+
+  it('confines the settings writer to its planned targets, backups first, never overwriting a rule', async () => {
+    // T109 (D2). It is allowed above only because of what this pins. Every target comes
+    // from the planner's paths or a fixed join under the root or the Claude dir it is given
+    // — never `homedir()` or the environment, which is the entry's job and what the tests
+    // point into a sandbox. The user-scope backup is the literal `.rulegate.bak`, copied
+    // exclusively so the first original is the one kept. Both creations are `wx`: the
+    // canonical rule, so a rule file the user wrote is never replaced, and the temp
+    // sibling, so a planted link is never followed.
+    const text = await readFile(path.join(repoRoot, PLUGIN_SETTINGS_WRITER), 'utf8');
+    expect(text).toMatch(/export const BACKUP_SUFFIX = '\.rulegate\.bak';/);
+    expect(text).toMatch(
+      /copyFileSync\(file, `\$\{file\}\$\{BACKUP_SUFFIX\}`, constants\.COPYFILE_EXCL\)/,
+    );
+    expect(text.match(/copyFileSync\(/g)).toHaveLength(1);
+    expect(text.match(/writeFileSync\(/g)).toHaveLength(2);
+    expect(text).toMatch(/writeFileSync\(tmp, next, \{ flag: 'wx', mode \}\)/);
+    // The replaced file keeps its mode: a rename carries the sibling's, and a 0600
+    // `settings.json` holding a token must not come out world-readable.
+    expect(text).toMatch(/const mode = exists\(file\) \? lstatSync\(file\)\.mode & 0o777 : 0o666;/);
+    expect(text).toMatch(/writeFileSync\(ruleFile, r\.next, \{ flag: 'wx' \}\)/);
+    expect(text.match(/renameSync\(/g)).toHaveLength(1);
+    expect(text).toMatch(/renameSync\(tmp, file\)/);
+    // The temp sibling is removed only when this call created it: a `wx` that failed on
+    // something already at the name must not delete what it found.
+    expect(text).toMatch(/if \(created\) rmSync\(tmp, \{ force: true \}\);/);
+    expect(text.match(/rmSync\(/g)).toHaveLength(1);
+    expect(text).toMatch(/const settingsFile = settingsPath\(scope, root, claudeDir\);/);
+    expect(text).toMatch(/const ruleFile = ruleTarget\(scope, root, claudeDir\);/);
+    // No path of its own: every target is the planner's.
+    expect(text).not.toMatch(/\bjoin\(/);
+    // The rule's three possible homes, and nothing else.
+    const planner = await readFile(
+      path.join(repoRoot, 'plugins/rulegate/src/lib/settings.ts'),
+      'utf8',
+    );
+    const target = /export function ruleTarget\([^]*?\n\}/.exec(planner)?.[0] ?? '';
+    expect(
+      [...target.matchAll(/join\((root|claudeDir), ([^)]*)\)/g)].map((m) => m[0]).sort(),
+    ).toEqual(
+      [
+        "join(claudeDir, 'CLAUDE.md')",
+        'join(root, TASK_RULE_FILE)',
+        "join(root, 'CLAUDE.md')",
+      ].sort(),
+    );
+    expect(text).not.toMatch(/homedir|process\.env|tmpdir/);
   });
 
   /**

@@ -126,7 +126,9 @@ describe('computePlan across nested levels (T062)', () => {
     ]);
 
     const result = await plan(fs);
-    const warning = result.warnings.find((w) => w.code === 'W_NESTED_MERGE_CONFLICT');
+    const warning = result.warnings.find(
+      (w) => w.code === 'W_NESTED_MERGE_CONFLICT' && w.message.includes('gemini'),
+    );
 
     // Gemini is `all-merged`: it loads the root file *and* the nested one, so the package
     // gets both texts rather than an override, and no byte comparison can see it.
@@ -134,12 +136,53 @@ describe('computePlan across nested levels (T062)', () => {
     expect(warning?.message).toContain('10-style');
     expect(warning?.message).toContain('gemini');
 
-    // Claude Code is `nearest-wins`, so the same override is an override there and silent.
+    // The warning follows the artifact that carries the overridden id. `10-style` is
+    // repo-wide, so for Claude Code it lands in the `nearest-wins` CLAUDE.md, where the
+    // override works — even though `.claude/rules/` beside it is `all-merged` (T110).
+    expect(warning?.source?.file).toBe('packages/a/GEMINI.md');
     expect(result.warnings.filter((w) => w.message.includes('claude-code'))).toEqual([]);
 
     // Warned, still emitted: refusing would leave the package with no rules at all.
     expect(result.artifacts.map((a) => a.path)).toContain('packages/a/GEMINI.md');
     expect(result.errors).toEqual([]);
+  });
+
+  it('warns for Claude Code when the overridden rule is scoped into `.claude/rules/`', async () => {
+    const scoped = (body: string): string =>
+      `---\norder: 30\nglobs:\n  - src/**/*.tsx\n---\n\n${body}\n`;
+    const fs = new MemoryFileSystem([
+      ['.rulegate/rulegate.yaml', manifest('claude-code')],
+      ['.rulegate/rules/30-frontend.md', scoped('Root: use hooks.')],
+      ['packages/a/.rulegate/rulegate.yaml', manifest('claude-code')],
+      ['packages/a/.rulegate/rules/30-frontend.md', scoped('Package a: use classes.')],
+    ]);
+
+    const result = await plan(fs);
+    const warnings = result.warnings.filter((w) => w.code === 'W_NESTED_MERGE_CONFLICT');
+    // A real path, not the declared glob: this is the file that loads beside the root's.
+    expect(warnings.map((w) => w.source?.file)).toEqual([
+      'packages/a/.claude/rules/30-frontend.md',
+    ]);
+  });
+
+  it('warns for Claude Code when a scoped root rule is redefined repo-wide in a package', async () => {
+    const fs = new MemoryFileSystem([
+      ['.rulegate/rulegate.yaml', manifest('claude-code')],
+      [
+        '.rulegate/rules/30-frontend.md',
+        '---\norder: 30\nglobs:\n  - "**/*.tsx"\n---\n\nRoot: use hooks.\n',
+      ],
+      ['packages/a/.rulegate/rulegate.yaml', manifest('claude-code')],
+      ['packages/a/.rulegate/rules/30-frontend.md', rule('Package a: use classes.', 30)],
+    ]);
+
+    const result = await plan(fs);
+    const warnings = result.warnings.filter((w) => w.code === 'W_NESTED_MERGE_CONFLICT');
+    // The override lands in the package's nearest-wins CLAUDE.md, but the root's copy is
+    // an all-merged `.claude/rules/` file whose `paths:` still match the package's .tsx
+    // files — Claude gets both texts, so the root file is the one named.
+    expect(warnings.map((w) => w.source?.file)).toEqual(['.claude/rules/30-frontend.md']);
+    expect(warnings[0]?.message).toContain('packages/a');
   });
 
   it('does not fail a repository whose rules live only in its packages', async () => {

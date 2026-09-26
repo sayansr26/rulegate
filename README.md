@@ -34,20 +34,23 @@ network primitive appears anywhere in shipped source, including every dependency
 
 Every tool reads a different file, in a different format, with different precedence rules.
 
-| Tool           | Reads                                                                                                                                                            | Format                                        |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Claude Code    | `CLAUDE.md`, `CLAUDE.local.md`, nested `CLAUDE.md`, `~/.claude/CLAUDE.md`                                                                                        | Markdown; nearest file wins                   |
-| Codex          | `AGENTS.md`, nested `AGENTS.md`, `~/.codex/AGENTS.md`                                                                                                            | Markdown; merged, 32 KiB cap                  |
-| GitHub Copilot | `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, `AGENTS.md`, `CLAUDE.md`                                                            | Markdown + YAML frontmatter; additive         |
-| Cursor         | `.cursor/rules/*.mdc`, legacy `.cursorrules`                                                                                                                     | MDC — looks like YAML, is not                 |
-| Gemini CLI     | `GEMINI.md`, nested `GEMINI.md`, `~/.gemini/GEMINI.md`                                                                                                           | Markdown; everything concatenated             |
-| Aider          | `CONVENTIONS.md` — but only if `.aider.conf.yml` names it                                                                                                        | Markdown; loaded by config, not by convention |
-| Cline          | `.clinerules/*.md`, plus `.cursorrules`, `.windsurfrules`, `AGENTS.md`                                                                                           | Markdown; additive, not an override chain     |
-| Roo Code       | `.roo/rules/*.md`, `.roorules`, `.clinerules`, `AGENTS.md`                                                                                                       | Markdown; all merged                          |
-| Windsurf       | `.windsurf/rules/*.md`, `.windsurfrules`, `AGENTS.md`, `.devin/rules/*.md`                                                                                       | Markdown; Devin's rules win                   |
-| Zed            | the **first** of `.rules`, `.cursorrules`, `.windsurfrules`, `.clinerules`, `.github/copilot-instructions.md`, `AGENT.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` | Markdown; first match wins, rest never opened |
+| Tool           | Reads                                                                                                                                                            | Format                                                  |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Claude Code    | `CLAUDE.md`, `.claude/rules/*.md` (`paths:`-scoped), `CLAUDE.local.md`, nested `CLAUDE.md`, `~/.claude/CLAUDE.md`, `~/.claude/rules/*.md`                        | Markdown; `.claude/rules` YAML `paths:`                 |
+| Codex          | `AGENTS.md`, nested `AGENTS.md`, `~/.codex/AGENTS.md`                                                                                                            | Markdown; merged, 32 KiB cap                            |
+| GitHub Copilot | `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, `AGENTS.md`, `CLAUDE.md`, `.claude/rules/*.md` (VS Code Local agent)                | Markdown + YAML frontmatter; additive                   |
+| Cursor         | `.cursor/rules/*.mdc`, legacy `.cursorrules`                                                                                                                     | MDC — looks like YAML, is not                           |
+| Gemini CLI     | `GEMINI.md`, nested `GEMINI.md`, `~/.gemini/GEMINI.md`                                                                                                           | Markdown; everything concatenated                       |
+| Aider          | `CONVENTIONS.md` — but only if `.aider.conf.yml` names it                                                                                                        | Markdown; loaded by config, not by convention           |
+| Cline          | `.clinerules/*.md`, plus `.cursorrules`, `.windsurfrules`, `AGENTS.md`                                                                                           | Markdown; additive, not an override chain               |
+| Roo Code       | `.roo/rules/*.md`, `.roorules`, `.clinerules`, `AGENTS.md`                                                                                                       | Markdown; all merged                                    |
+| Windsurf       | `.windsurf/rules/*.md`, `.windsurfrules`, `AGENTS.md`, `.devin/rules/*.md`                                                                                       | Markdown; Devin's rules win                             |
+| Zed            | the **first** of `.rules`, `.cursorrules`, `.windsurfrules`, `.clinerules`, `.github/copilot-instructions.md`, `AGENT.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` | Markdown; first match wins, rest never opened           |
+| Antigravity    | `.agents/rules/*.md`, legacy `.agent/rules/*.md`, `AGENTS.md`, `GEMINI.md`                                                                                       | Markdown + YAML frontmatter (`trigger`); additive       |
+| OpenCode       | `AGENTS.md` (else `CLAUDE.md`), plus every file its `opencode.json` `instructions` lists                                                                         | Markdown; instructions concatenate across config layers |
+| Kilo Code      | `.kilocode/rules/*.md` (legacy, auto-loaded), `kilo.jsonc` `instructions`, `AGENTS.md`                                                                           | Markdown; additive                                      |
 
-Ten copies in step by hand is a chore. Not noticing they have diverged is the actual
+Thirteen copies in step by hand is a chore. Not noticing they have diverged is the actual
 failure: your agents keep answering from a rule you deleted three weeks ago, and nothing
 tells you.
 

@@ -131,6 +131,228 @@ describe('rulegate sync --import (T051)', () => {
     expect(await read(rulePath)).toBe(before);
   });
 
+  // A `.claude/rules` file carries its scope in `paths:`, and that is exactly what a user
+  // edits. Merging the body alone reported success and left `check` failing on the one
+  // line the user changed, for the next `sync` to revert (T110).
+  it('recovers an edited `paths:` scope along with the body', async () => {
+    await writeFile(
+      path.join(repo, '.rulegate/rules/30-frontend.md'),
+      "---\ndescription: Frontend\nglobs:\n  - 'src/**/*.tsx'\n---\n\nUse hooks.\n",
+    );
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+
+    const artifact = '.claude/rules/30-frontend.md';
+    const text = await read(artifact);
+    await writeFile(
+      path.join(repo, artifact),
+      text.replace('"src/**/*.tsx"', '"app/**/*.tsx"').replace('Use hooks.', 'Use hooks always.'),
+    );
+
+    expect(await runSync({ cwd: repo, import: true, yes: true, quiet: true })).toBe(ExitCode.Ok);
+    const canonical = await read('.rulegate/rules/30-frontend.md');
+    expect(canonical).toContain('app/**/*.tsx');
+    expect(canonical).not.toContain('src/**/*.tsx');
+    expect(canonical).toContain('Use hooks always.');
+
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+  });
+
+  it('leaves the scope alone for formats that do not carry it', async () => {
+    await writeFile(
+      path.join(repo, '.rulegate/rules/30-frontend.md'),
+      "---\ndescription: Frontend\nglobs:\n  - 'src/**/*.tsx'\n---\n\nUse hooks.\n",
+    );
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    await handEdit('CLAUDE.md', 'A line the user added by hand.');
+
+    expect(await runSync({ cwd: repo, import: true, yes: true, quiet: true })).toBe(ExitCode.Ok);
+    expect(await read('.rulegate/rules/30-frontend.md')).toContain('src/**/*.tsx');
+    expect(await read(rulePath)).toContain('A line the user added by hand.');
+  });
+
+  // A render need not read back to the body it came from, so an edit is measured against
+  // the ancestor read back through the adapter, not against canonical (T110).
+  it('keeps a heading of the rule body when the scoped rule has no description', async () => {
+    await writeFile(
+      path.join(repo, '.rulegate/rules/30-server.md'),
+      "---\nglobs:\n  - 'src/**'\n---\n\n## Server components\n\nUse them.\n",
+    );
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+
+    const artifact = '.claude/rules/30-server.md';
+    await writeFile(
+      path.join(repo, artifact),
+      (await read(artifact)).replace('"src/**"', '"app/**"'),
+    );
+
+    expect(await runSync({ cwd: repo, import: true, yes: true, quiet: true })).toBe(ExitCode.Ok);
+    const canonical = await read('.rulegate/rules/30-server.md');
+    expect(canonical).toContain('app/**');
+    expect(canonical).toContain('## Server components\n\nUse them.');
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+  });
+
+  it('does not copy the description heading into the body when the marker is off', async () => {
+    const manifest = path.join(repo, '.rulegate/rulegate.yaml');
+    await writeFile(
+      manifest,
+      `${await read('.rulegate/rulegate.yaml')}options:\n  marker: false\n`,
+    );
+    await writeFile(
+      path.join(repo, '.rulegate/rules/30-frontend.md'),
+      "---\ndescription: Frontend\nglobs:\n  - 'src/**/*.tsx'\n---\n\nPrefer server components.\n",
+    );
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+
+    const artifact = '.claude/rules/30-frontend.md';
+    await writeFile(
+      path.join(repo, artifact),
+      (await read(artifact)).replace('Prefer server components.', 'Prefer RSC.'),
+    );
+
+    expect(await runSync({ cwd: repo, import: true, yes: true, quiet: true })).toBe(ExitCode.Ok);
+    const canonical = await read('.rulegate/rules/30-frontend.md');
+    expect(canonical).toContain('Prefer RSC.');
+    expect(canonical).not.toContain('## Frontend');
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    expect(await read('AGENTS.md')).not.toMatch(/## Frontend[\s\S]*## Frontend/);
+    expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+  });
+
+  it('refuses a scoped rule file whose frontmatter no longer parses', async () => {
+    const rule = '.rulegate/rules/30-frontend.md';
+    await writeFile(
+      path.join(repo, rule),
+      "---\ndescription: Frontend\nglobs:\n  - 'src/**/*.tsx'\n---\n\nUse hooks.\n",
+    );
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    const before = await read(rule);
+
+    // An unquoted `*` opens a YAML alias: the whole file, marker and all, reads back as
+    // one unscoped body, and merging it would write raw YAML into canonical.
+    const artifact = '.claude/rules/30-frontend.md';
+    await writeFile(
+      path.join(repo, artifact),
+      (await read(artifact))
+        .replace('"src/components/**/*.tsx"', '**/*.tsx')
+        .replace('"src/**/*.tsx"', '**/*.tsx'),
+    );
+
+    await runSync({ cwd: repo, import: true, yes: true });
+    expect(await read(rule)).toBe(before);
+    expect(stdout.join('') + stderr.join('')).toContain(artifact);
+  });
+
+  it('refuses broken frontmatter with the marker off, where no marker gives it away', async () => {
+    await writeFile(
+      path.join(repo, '.rulegate/rulegate.yaml'),
+      `${await read('.rulegate/rulegate.yaml')}options:\n  marker: false\n`,
+    );
+    const rule = '.rulegate/rules/30-frontend.md';
+    await writeFile(
+      path.join(repo, rule),
+      "---\ndescription: Frontend\nglobs:\n  - 'src/**/*.tsx'\n---\n\nUse hooks.\n",
+    );
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    const before = await read(rule);
+
+    const artifact = '.claude/rules/30-frontend.md';
+    await writeFile(
+      path.join(repo, artifact),
+      (await read(artifact)).replace('"src/**/*.tsx"', '**/*.tsx'),
+    );
+
+    await runSync({ cwd: repo, import: true, yes: true });
+    expect(await read(rule)).toBe(before);
+    expect(stderr.join('')).toContain('unrecoverable');
+  });
+
+  // The edited heading is text the user typed. Handed to `String.replace` as a replacement
+  // string, `$'` pasted the rest of the body into it and `$$` lost a dollar.
+  it('carries an edited heading holding `$` patterns into canonical verbatim', async () => {
+    const rule = '.rulegate/rules/30-price.md';
+    await writeFile(
+      path.join(repo, rule),
+      "---\nglobs:\n  - 'src/**'\n---\n\n## Price\n\nCharge it.\n",
+    );
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+
+    const artifact = '.claude/rules/30-price.md';
+    await writeFile(
+      path.join(repo, artifact),
+      (await read(artifact)).replace('## Price', () => "## Cost in US$' and $$5 and $&"),
+    );
+
+    expect(await runSync({ cwd: repo, import: true, yes: true, quiet: true })).toBe(ExitCode.Ok);
+    expect(await read(rule)).toContain("\n## Cost in US$' and $$5 and $&\n\nCharge it.\n");
+    expect(await read(rule)).not.toMatch(/Charge it\.[\s\S]*Charge it\./);
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+  });
+
+  // A repository that uses Rulegate has a natural rule about the marker, and quoting it
+  // is not the marker having leaked out of broken frontmatter.
+  it('merges an edit to a rule whose own text quotes the marker', async () => {
+    await writeFile(
+      path.join(repo, rulePath),
+      `${await read(rulePath)}\nNever edit a file headed \`<!-- generated by rulegate; edit .rulegate/ instead -->\`.\n`,
+    );
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    await handEdit('CLAUDE.md', 'A line the user added by hand.');
+
+    expect(await runSync({ cwd: repo, import: true, yes: true, quiet: true })).toBe(ExitCode.Ok);
+    expect(await read(rulePath)).toContain('A line the user added by hand.');
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+  });
+
+  // In a CLAUDE.md section, which has no frontmatter, a leading `---` is a horizontal rule.
+  it('merges a horizontal rule at the start of a plain section body', async () => {
+    await handEdit('CLAUDE.md', '---\n\nText after the rule.');
+
+    expect(await runSync({ cwd: repo, import: true, yes: true, quiet: true })).toBe(ExitCode.Ok);
+    expect(await read(rulePath)).toContain('---\n\nText after the rule.');
+  });
+
+  // An emptied `paths:` makes the rule repo-wide, and Claude Code renders a repo-wide rule
+  // into CLAUDE.md. Merged, the edited file became a hand-edited orphan `sync` must refuse
+  // to delete — even with --force — and the rule loaded from both files.
+  it('refuses a scope edit that moves the rule out of the file the user edited', async () => {
+    const rule = '.rulegate/rules/30-frontend.md';
+    await writeFile(
+      path.join(repo, rule),
+      "---\ndescription: Frontend\nglobs:\n  - 'src/**/*.tsx'\n---\n\nUse hooks.\n",
+    );
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    const before = await read(rule);
+
+    const artifact = '.claude/rules/30-frontend.md';
+    await writeFile(
+      path.join(repo, artifact),
+      (await read(artifact)).replace(/^---\n[\s\S]*?\n---\n/, ''),
+    );
+
+    expect(await runSync({ cwd: repo, import: true, yes: true })).toBe(ExitCode.Failure);
+    expect(await read(rule)).toBe(before);
+    expect(stderr.join('')).toContain(artifact);
+    expect(stderr.join('')).toContain('sync --force');
+
+    // The recovery the refusal names does close the loop.
+    expect(await runSync({ cwd: repo, force: true, quiet: true })).toBe(ExitCode.Ok);
+    expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+  });
+
+  it('refuses the same move the other way, a scope typed into CLAUDE.md', async () => {
+    const before = await read(rulePath);
+    await handEdit('CLAUDE.md', '**Applies to:** `src/**`');
+
+    expect(await runSync({ cwd: repo, import: true, yes: true })).toBe(ExitCode.Failure);
+    expect(await read(rulePath)).toBe(before);
+    expect(stderr.join('')).toContain('moves rule `10-style` out of this file');
+  });
+
   it('says so plainly when there is nothing to import', async () => {
     expect(await runSync({ cwd: repo, import: true })).toBe(ExitCode.Ok);
     expect(stdout.join('')).toContain('nothing to import');

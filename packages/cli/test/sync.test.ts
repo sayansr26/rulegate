@@ -56,6 +56,7 @@ describe('rulegate sync', () => {
     };
 
     expect(state.artifacts.map((a) => a.path)).toEqual([
+      '.claude/rules/30-frontend.md',
       '.cursor/rules/10-style.mdc',
       '.cursor/rules/20-testing.mdc',
       '.cursor/rules/30-frontend.mdc',
@@ -76,7 +77,7 @@ describe('rulegate sync', () => {
     // file watchers stay quiet.
     expect(spy).not.toHaveBeenCalled();
     expect(report.written).toEqual([]);
-    expect(report.unchanged).toHaveLength(5);
+    expect(report.unchanged).toHaveLength(6);
     expect(report.stateWritten).toBe(false);
   });
 

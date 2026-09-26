@@ -62,7 +62,7 @@ function isRecord(value) {
 }
 
 // src/lib/settings.ts
-import { join as join2 } from "node:path";
+import { join as join2, resolve } from "node:path";
 var GIT_DENY = Object.freeze([
   "Bash(git -C*)",
   "Bash(git -c*)",
@@ -108,7 +108,7 @@ var GIT_DENY = Object.freeze([
   "Bash(git worktree *)"
 ]);
 function claudeHome(env, home) {
-  return env.CLAUDE_CONFIG_DIR ?? join2(home, ".claude");
+  return resolve(env.CLAUDE_CONFIG_DIR || join2(home, ".claude"));
 }
 
 // src/lib/entry.ts
@@ -161,7 +161,7 @@ function allowed(args) {
 }
 function runGit(args, cwd) {
   if (!allowed(args)) return Promise.resolve(void 0);
-  return new Promise((resolve) => {
+  return new Promise((resolve2) => {
     execFile(
       "git",
       [...GIT_SAFETY_ARGS, ...args],
@@ -174,7 +174,7 @@ function runGit(args, cwd) {
         timeout: 5e3,
         shell: false
       },
-      (error, stdout) => resolve(error ? void 0 : stdout)
+      (error, stdout) => resolve2(error ? void 0 : stdout)
     );
   });
 }

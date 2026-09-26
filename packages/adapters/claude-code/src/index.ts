@@ -1,10 +1,16 @@
 import {
   ADAPTER_API_VERSION,
+  RulegateError,
+  appliesRepoWide,
+  basenamePosix,
+  claimRuleId,
   detected,
   importConcatenated,
+  importRuleId,
   finalizeArtifact,
   isCanonicalSource,
   renderConcatenated,
+  renderRuleSection,
   selects,
   sortRules,
   withHtmlMarker,
@@ -14,8 +20,10 @@ import {
   type Canonical,
   type DetectResult,
   type ImportResult,
+  type RuleDocument,
 } from '@rulegate/adapter-kit';
 import { MCP_FILE, importMcpConfig, renderMcpJson } from './mcp.js';
+import { RULES_DIR, importRuleFile, parseRuleFile, renderScopedRule, rulePath } from './rules.js';
 import { docs } from './docs.js';
 
 export const CLAUDE_MD = 'CLAUDE.md';
@@ -33,25 +41,53 @@ async function detect(ctx: AdapterContext): Promise<DetectResult> {
   return detected(evidence);
 }
 
+/**
+ * Read the way `write` writes: repo-wide rules from `CLAUDE.md`, glob-scoped rules one per
+ * `.claude/rules/*.md`. The `**Applies to:**` parsing on `CLAUDE.md` stays even though
+ * `write` no longer emits it for this file, because a `CLAUDE.md` written before T110
+ * carries its scoped rules that way and still has to import.
+ */
 async function read(ctx: AdapterContext): Promise<Partial<Canonical>> {
+  const rules: RuleDocument[] = [];
+  const taken = new Set<string>();
+
   // The same guard `write` makes, for the mirror-image reason: when this file is already
   // the canonical source, the parser has read it and importing it again would duplicate
   // every rule in it. It matters for AGENTS.md above all (T014).
-  if (isCanonicalSource(ctx.canonical.manifest, CLAUDE_MD)) return {};
+  if (!isCanonicalSource(ctx.canonical.manifest, CLAUDE_MD)) {
+    const contents = await ctx.fs.tryReadFile(CLAUDE_MD);
+    if (contents !== undefined) {
+      for (const rule of importConcatenated({
+        file: CLAUDE_MD,
+        contents,
+        headingLevel: 2,
+        idFallback: 'claude',
+      })) {
+        rules.push({ ...rule, id: claimRuleId(rule.id, taken) });
+      }
+    }
+  }
 
-  const contents = await ctx.fs.tryReadFile(CLAUDE_MD);
+  // Recursive, because Claude Code discovers `.claude/rules/**` recursively: a rule in
+  // `backend/db.md` is loaded, so it is content an import must not leave behind.
+  for (const path of await ctx.fs.glob(`${RULES_DIR}/**/*.md`)) {
+    if (isCanonicalSource(ctx.canonical.manifest, path)) continue;
+    const contents = await ctx.fs.tryReadFile(path);
+    if (contents === undefined) continue;
+
+    const base = basenamePosix(path).replace(/\.md$/i, '');
+    // The id comes from the filename, not the heading: the filename is what `write`
+    // produced and what the next `sync` has to match (T017).
+    const rule = importRuleFile(
+      path,
+      claimRuleId(importRuleId(base, 'claude-rules'), taken),
+      parseRuleFile(contents),
+    );
+    if (rule !== undefined) rules.push(rule);
+  }
 
   return {
-    ...(contents === undefined
-      ? {}
-      : {
-          rules: importConcatenated({
-            file: CLAUDE_MD,
-            contents,
-            headingLevel: 2,
-            idFallback: 'claude',
-          }),
-        }),
+    ...(rules.length === 0 ? {} : { rules }),
     ...(await readMcp(ctx)),
   };
 }
@@ -87,26 +123,66 @@ async function write(ctx: AdapterContext): Promise<readonly Artifact[]> {
   // The canonical-source check is generic rather than Claude-specific: no adapter may write
   // over a file that is canonical input. It matters most for AGENTS.md (T014), but it costs
   // nothing to honour here and means every adapter inherits the protection.
-  if (!isCanonicalSource(canonical.manifest, CLAUDE_MD)) {
-    const rules = sortRules(
-      canonical.rules.filter((r) => selects(r.frontmatter.tools, 'claude-code')),
+  const rules = sortRules(
+    canonical.rules.filter((r) => selects(r.frontmatter.tools, 'claude-code')),
+  );
+
+  // Each rule lands in exactly one file. Claude Code loads `CLAUDE.md` and every matching
+  // `.claude/rules` file together, so a scoped rule also left in `CLAUDE.md` would be sent
+  // twice — and unconditionally, which is the scoping it exists to avoid.
+  const repoWide = rules.filter((r) => appliesRepoWide(r));
+  // No rules means no file. Emitting an empty CLAUDE.md would create an artifact that
+  // `check` then has to reason about, and that a user has to wonder about.
+  if (repoWide.length > 0 && !isCanonicalSource(canonical.manifest, CLAUDE_MD)) {
+    artifacts.push(
+      finalizeArtifact({
+        path: CLAUDE_MD,
+        // showGlobs stays true although nothing here is scoped any more: it changes no
+        // bytes, and it keeps the renderer the exact inverse of `read`'s parsing.
+        contents: withHtmlMarker(
+          renderConcatenated(repoWide, { headingLevel: 2, showGlobs: true }),
+          marker,
+        ),
+        adapter: 'claude-code',
+        kind: 'rules',
+        provenance: { ruleIds: repoWide.map((r) => r.id) },
+      }),
     );
-    // No rules means no file. Emitting an empty CLAUDE.md would create an artifact that
-    // `check` then has to reason about, and that a user has to wonder about.
-    if (rules.length > 0) {
-      artifacts.push(
-        finalizeArtifact({
-          path: CLAUDE_MD,
-          contents: withHtmlMarker(
-            renderConcatenated(rules, { headingLevel: 2, showGlobs: true }),
-            marker,
-          ),
-          adapter: 'claude-code',
-          kind: 'rules',
-          provenance: { ruleIds: rules.map((r) => r.id) },
-        }),
-      );
+  }
+
+  const claimed = new Map<string, string>();
+  for (const rule of rules.filter((r) => !appliesRepoWide(r))) {
+    const path = rulePath(rule);
+
+    const previous = claimed.get(path);
+    if (previous !== undefined) {
+      // Two rule ids slugging to one filename would silently drop one rule's content.
+      throw new RulegateError({
+        code: 'E_ARTIFACT_PATH_CONFLICT',
+        message: `rules \`${previous}\` and \`${rule.id}\` both generate ${path}`,
+        source: rule.source,
+        hint: 'rename one of the rules so their generated filenames differ',
+      });
     }
+    claimed.set(path, rule.id);
+
+    if (isCanonicalSource(canonical.manifest, path)) continue;
+
+    artifacts.push(
+      finalizeArtifact({
+        path,
+        // The description is a body heading, not a frontmatter key: Claude Code reads
+        // only `paths` and strips the rest before the model sees the rule.
+        contents: renderScopedRule(
+          rule,
+          renderRuleSection(rule, { headingLevel: 2, showGlobs: false }),
+          marker,
+        ),
+        adapter: 'claude-code',
+        kind: 'rules',
+        provenance: { ruleIds: [rule.id] },
+      }),
+    );
   }
 
   // No `provenance`: no canonical rule contributed to this file, and claiming one would
@@ -136,4 +212,4 @@ export const claudeCode: Adapter = {
 };
 
 export default claudeCode;
-export { docs, MCP_FILE, renderMcpJson };
+export { docs, MCP_FILE, RULES_DIR, renderMcpJson };

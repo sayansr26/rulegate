@@ -141,6 +141,47 @@ describe('rulegate doctor — T078 duplicate loading', () => {
     expect(dup?.paths).toContain('CLAUDE.md');
   });
 
+  // T110 moved a scoped rule's second copy from CLAUDE.md prose into `.claude/rules/`. Copilot
+  // still receives it twice; the warning keeps saying so only because copilot's docs declare
+  // that directory. Claude Code itself must stay silent: its two files are disjoint.
+  it('follows a scoped rule into .claude/rules (T110)', async () => {
+    await mkdir(path.join(repo, '.rulegate/rules'), { recursive: true });
+    await writeFile(
+      path.join(repo, '.rulegate/rulegate.yaml'),
+      'schemaVersion: 1\ntools:\n  - claude-code\n  - copilot\n',
+    );
+    await writeFile(
+      path.join(repo, '.rulegate/rules/10-style.md'),
+      '---\ndescription: Style\n---\n\nUse tabs.\n',
+    );
+    await writeFile(
+      path.join(repo, '.rulegate/rules/30-frontend.md'),
+      "---\ndescription: Frontend\nglobs:\n  - 'src/components/**/*.tsx'\n---\n\nPrefer server components.\n",
+    );
+    expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+
+    const r = await inspect();
+    const claude = r.warnings.find(
+      (w) => w.code === 'W_DUPLICATE_LOAD' && w.tool === 'claude-code',
+    );
+    expect(claude).toBeUndefined();
+
+    // Loaded beside CLAUDE.md, not outranked by it: `override` chains must not swallow an
+    // `all-merged` entry and report the scoped rule as losing to a file that lacks it.
+    const files = r.tools.find((t) => t.name === 'claude-code')?.files ?? [];
+    const rulesDir = files.find((f) => f.pattern === '.claude/rules/**/*.md');
+    expect(rulesDir?.paths).toEqual(['.claude/rules/30-frontend.md']);
+    expect(rulesDir?.shadowed).toBe(false);
+    expect(files.find((f) => f.pattern === 'CLAUDE.md')?.shadowed).toBe(false);
+
+    const copilot = r.warnings.find((w) => w.code === 'W_DUPLICATE_LOAD' && w.tool === 'copilot');
+    expect(copilot?.paths).toContain('.github/instructions/30-frontend.instructions.md');
+    expect(copilot?.paths).toContain('.claude/rules/30-frontend.md');
+
+    const resolved = new Set(r.tools.flatMap((t) => t.files.flatMap((f) => f.paths)));
+    for (const w of r.warnings) for (const p of w.paths) expect(resolved.has(p), p).toBe(true);
+  });
+
   it('is silent for the tools whose loaded files genuinely differ', async () => {
     await cp(path.join(fixtures, 'doctor/adopted'), repo, { recursive: true });
     const r = await inspect();
@@ -229,6 +270,23 @@ describe('rulegate doctor — contract', () => {
       // one path that must never appear in it. `repoRoot` is the only absolute path
       // allowed anywhere in the output.
       expect(stdout.join('')).not.toContain(home);
+    });
+
+    // User-level rules load for every project before the project's own, so leaving them
+    // out under-states what Claude Code loads. One level only: the probe never recurses
+    // into the home directory, and the subdirectory file is the control for that.
+    it('measures user-level ~/.claude/rules files, top level only (T110)', async () => {
+      await mkdir(path.join(home, '.claude/rules/sub'), { recursive: true });
+      await writeFile(path.join(home, '.claude/rules/style.md'), 'Use tabs.\n');
+      await writeFile(path.join(home, '.claude/rules/sub/deep.md'), 'Deep.\n');
+
+      await runDoctor({ cwd: repo, json: true, color: false, homeRoot: home });
+      const report = JSON.parse(stdout.join('')) as DoctorReport;
+      const rules = report.tools
+        .flatMap((t) => t.files)
+        .find((f) => f.pattern === '~/.claude/rules/*.md');
+      expect(rules?.scope).toBe('global');
+      expect(rules?.paths).toEqual(['~/.claude/rules/style.md']);
     });
 
     it('the paired control: with --no-global the row is not-probed and carries no label', async () => {

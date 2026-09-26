@@ -46,6 +46,9 @@ const PACKAGES = [
   '@rulegate/interop',
   '@rulegate/adapter-windsurf',
   '@rulegate/adapter-gemini',
+  '@rulegate/adapter-antigravity',
+  '@rulegate/adapter-opencode',
+  '@rulegate/adapter-kilo',
 ];
 
 /**

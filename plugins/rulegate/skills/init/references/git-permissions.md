@@ -4,9 +4,9 @@ A `permissions.deny` set that blocks every git command which changes the
 repository, while leaving read-only inspection (`status`, `log`, `diff`, `show`,
 `blame`, `rev-parse`, `ls-files`, `describe`, `grep`, `shortlog`, …) available.
 
-The settings pass (`dist/settings.js`) previews it for the project's
-`.claude/settings.json`, `~/.claude/settings.json`, or both, merged into what is
-already there, as part of `/rulegate:init`. In this version it does not apply it.
+You do not paste this. `dist/settings.js` applies it — to the project's
+`.claude/settings.json`, `~/.claude/settings.json`, or both — merged into what
+is already there, as part of `/rulegate:init`.
 The list lives in that script (`GIT_DENY`); it is reproduced here so the
 judgment calls below have something to point at.
 

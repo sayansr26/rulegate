@@ -40,7 +40,10 @@
       "@rulegate/adapter-zed": ["packages/adapters/zed/src/index.ts"],
       "@rulegate/interop": ["packages/interop/src/index.ts"],
       "@rulegate/adapter-windsurf": ["packages/adapters/windsurf/src/index.ts"],
-      "@rulegate/adapter-gemini": ["packages/adapters/gemini/src/index.ts"]
+      "@rulegate/adapter-gemini": ["packages/adapters/gemini/src/index.ts"],
+      "@rulegate/adapter-antigravity": ["packages/adapters/antigravity/src/index.ts"],
+      "@rulegate/adapter-opencode": ["packages/adapters/opencode/src/index.ts"],
+      "@rulegate/adapter-kilo": ["packages/adapters/kilo/src/index.ts"]
     }
   },
   "include": [

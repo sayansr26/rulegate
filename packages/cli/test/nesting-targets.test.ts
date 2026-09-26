@@ -16,6 +16,7 @@ describe('nestedTargets — over the shipped adapters', () => {
 
   it('names exactly the tools whose own managed artifact is read from a subdirectory', () => {
     expect([...new Set(targets.map((t) => t.tool))].sort()).toEqual([
+      'antigravity',
       'claude-code',
       'codex',
       'cursor',
@@ -26,23 +27,28 @@ describe('nestedTargets — over the shipped adapters', () => {
   });
 
   it('maps each to the artifact that is actually nestable', () => {
-    const byTool = Object.fromEntries(targets.map((t) => [t.tool, t.pattern]));
-    expect(byTool).toEqual({
-      'claude-code': 'CLAUDE.md',
-      codex: 'AGENTS.md',
-      cursor: '.cursor/rules/*.mdc',
-      gemini: 'GEMINI.md',
-      'roo-code': '.roo/rules/*.md',
-      windsurf: '.windsurf/rules/*.md',
-    });
+    // Pairs rather than a map keyed by tool: Claude Code has two nestable artifacts since
+    // T110, and a map would keep whichever came last and hide the other.
+    expect(targets.map((t) => [t.tool, t.pattern])).toEqual([
+      ['antigravity', '.agents/rules/*.md'],
+      ['claude-code', 'CLAUDE.md'],
+      ['claude-code', '.claude/rules/**/*.md'],
+      ['codex', 'AGENTS.md'],
+      ['cursor', '.cursor/rules/*.mdc'],
+      ['gemini', 'GEMINI.md'],
+      ['roo-code', '.roo/rules/*.md'],
+      ['windsurf', '.windsurf/rules/*.md'],
+    ]);
   });
 
   it('carries the resolution the tool documents, not a default', () => {
-    const byTool = Object.fromEntries(targets.map((t) => [t.tool, t.nesting]));
-    expect(byTool['claude-code']).toBe('nearest-wins');
-    expect(byTool['cursor']).toBe('nearest-wins');
-    expect(byTool['gemini']).toBe('all-merged');
-    expect(byTool['windsurf']).toBe('all-merged');
+    const byTool = Object.fromEntries(targets.map((t) => [`${t.tool} ${t.pattern}`, t.nesting]));
+    expect(byTool['claude-code CLAUDE.md']).toBe('nearest-wins');
+    // Nested rule directories load alongside the root's, not instead of them.
+    expect(byTool['claude-code .claude/rules/**/*.md']).toBe('all-merged');
+    expect(byTool['cursor .cursor/rules/*.mdc']).toBe('nearest-wins');
+    expect(byTool['gemini GEMINI.md']).toBe('all-merged');
+    expect(byTool['windsurf .windsurf/rules/*.md']).toBe('all-merged');
   });
 
   it('never offers to write a file the tool does not generate', () => {
@@ -60,11 +66,18 @@ describe('nestedTargets — over the shipped adapters', () => {
 });
 
 describe('toolsWithoutNesting — over the shipped adapters', () => {
-  it('names the four a nested level cannot reach', () => {
-    // Aider and Cline declare no nested mechanism; Copilot's is somebody else's file;
-    // Zed resolves `first-match`, so a nested copy would shadow the root rather than add
-    // to it. `sync` skips these at a nested level and says so.
-    expect([...toolsWithoutNesting(ADAPTERS)].sort()).toEqual(['aider', 'cline', 'copilot', 'zed']);
+  it('names the six a nested level cannot reach', () => {
+    // Aider, Cline, Kilo and OpenCode declare no nested mechanism for what they write;
+    // Copilot's is somebody else's file; Zed resolves `first-match`, so a nested copy would
+    // shadow the root rather than add to it. `sync` skips these at a nested level and says so.
+    expect([...toolsWithoutNesting(ADAPTERS)].sort()).toEqual([
+      'aider',
+      'cline',
+      'copilot',
+      'kilo',
+      'opencode',
+      'zed',
+    ]);
   });
 
   it('partitions the roster, leaving nobody unaccounted for', () => {

@@ -122,10 +122,40 @@ describe('rulegate init', () => {
 
     // The other half, and the more interesting one: a file whose re-render is
     // byte-identical is adopted rather than rewritten, so it is not backed up and not
-    // touched. `CLAUDE.md` here carries our marker, so import and render round-trip it.
-    expect(await read('CLAUDE.md')).toBe(
-      await readFile(path.join(fixtures, 'claude-code-import/input/CLAUDE.md'), 'utf8'),
+    // touched. This scoped rule file carries our marker, so import and render round-trip
+    // it. (`CLAUDE.md` used to be the example; since T110 its scoped `Frontend` section
+    // moves to `.claude/rules/`, so it is rewritten and backed up like AGENTS.md.)
+    const scoped = '.claude/rules/30-components.md';
+    expect(await read(scoped)).toBe(
+      await readFile(path.join(fixtures, 'claude-code-import/input', scoped), 'utf8'),
     );
+    await expect(read(`.rulegate/backup/${scoped}`)).rejects.toThrow();
+  });
+
+  // Taking ownership is what retires an original. A file imported and then left alone is
+  // still loaded beside the generated copy of its rules, and nothing after `init` can see
+  // it: `check` compares only what Rulegate owns (T110).
+  it('warns about every imported file that no generated file replaces', async () => {
+    await cp(path.join(fixtures, 'claude-code-import/input'), repo, { recursive: true });
+    await cp(path.join(fixtures, 'cursor-import/input'), repo, { recursive: true });
+    await mkdir(path.join(repo, '.claude/rules'), { recursive: true });
+    await writeFile(path.join(repo, '.claude/rules/Auth.md'), '---\npaths: auth/**\n---\nx\n');
+
+    const warnings = (await plan()).warnings.filter((w) => w.code === 'W_IMPORT_LEFT_BEHIND');
+    expect(warnings.map((w) => w.source?.file)).toEqual([
+      '.claude/rules/Auth.md',
+      '.claude/rules/backend/db.md',
+      '.claude/rules/security.md',
+      '.cursorrules',
+    ]);
+    // Case-only: on APFS and NTFS the "left-behind" file *is* the output, so deleting it
+    // would delete the rule. Never "rename" either: after `--yes` on a case-sensitive
+    // filesystem that moves the original over the generated file Rulegate now owns.
+    expect(warnings[0]?.hint).toBe(
+      'once init has run, list the directory: if it shows both .claude/rules/Auth.md and .claude/rules/auth.md, delete .claude/rules/Auth.md; if it shows one, the filesystem ignores case, they are one file and nothing is left behind',
+    );
+    expect(warnings[0]?.hint).not.toMatch(/\brename\b/);
+    expect(warnings[1]?.hint).toContain('delete .claude/rules/backend/db.md');
   });
 
   it('loses nothing from the file it takes over', async () => {

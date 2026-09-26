@@ -7,9 +7,3 @@ Use tabs. Never `any`.
 ## Testing
 
 Vitest. Colocate tests beside the code they cover.
-
-## Frontend
-
-**Applies to:** `src/components/**/*.tsx`
-
-Prefer server components.

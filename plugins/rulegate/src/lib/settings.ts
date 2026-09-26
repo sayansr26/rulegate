@@ -1,10 +1,11 @@
-import { join } from 'node:path';
-import { isDir, isRecord, ls, read } from './read.js';
+import { join, resolve } from 'node:path';
+import { exists, isDir, isRecord, ls, read } from './read.js';
 
 /**
  * The settings pass, pure half (decision P4). Everything here computes what the pass would
- * change and never writes: the audit and the setup state need these answers before T109's
- * writer exists, and a writer built on a pure planner can be tested without a filesystem.
+ * change and never writes: the audit and the setup state need the same answers, and the
+ * writer (`src/settings-writer/`, T109) writes exactly the `next` planned here, so there is
+ * one merge and a preview cannot promise something the apply does differently.
  *
  * Three things, at project scope, user scope, or both:
  *
@@ -86,9 +87,14 @@ export type Scope = 'project' | 'user';
 /** `Bash(git commit *)` and `Bash(git commit:*)` are the same rule to Claude Code. */
 export const normRule = (r: string): string => r.replace(/:\*\)$/, ' *)').replace(/\s+/g, ' ');
 
-/** `~/.claude`, or `CLAUDE_CONFIG_DIR` when set — resolved by the caller, never here. */
+/**
+ * `~/.claude`, or `CLAUDE_CONFIG_DIR` when set — the environment is the caller's to pass.
+ * An empty value counts as unset (`||`, not `??`) and the result is always absolute: with
+ * `CLAUDE_CONFIG_DIR=''` the user's settings resolved to a relative `settings.json`, which
+ * an `--apply` would have written into whatever directory it ran from.
+ */
 export function claudeHome(env: NodeJS.ProcessEnv, home: string): string {
-  return env.CLAUDE_CONFIG_DIR ?? join(home, '.claude');
+  return resolve(env.CLAUDE_CONFIG_DIR || join(home, '.claude'));
 }
 
 export function settingsPath(scope: Scope, root: string, claudeDir: string): string {
@@ -97,6 +103,16 @@ export function settingsPath(scope: Scope, root: string, claudeDir: string): str
 
 export const isRulegateProject = (root: string): boolean => isDir(join(root, '.rulegate'));
 
+/**
+ * Where the task rule goes: the user's `CLAUDE.md`, a new canonical rule in a Rulegate
+ * project (its `CLAUDE.md` is generated), or the project's own `CLAUDE.md`. The writer writes
+ * here and nowhere else, which `invariants.test.ts` pins.
+ */
+export function ruleTarget(scope: Scope, root: string, claudeDir: string): string {
+  if (scope === 'user') return join(claudeDir, 'CLAUDE.md');
+  return isRulegateProject(root) ? join(root, TASK_RULE_FILE) : join(root, 'CLAUDE.md');
+}
+
 export type EnvState = 'added' | 'present' | 'conflict';
 
 export interface SettingsPlan {
@@ -104,7 +120,7 @@ export interface SettingsPlan {
   readonly denyAdded: readonly string[];
   readonly env: EnvState | undefined;
   readonly current: unknown;
-  /** The merged file, when `status` is `changed`. T109 writes exactly this. */
+  /** The merged file, when `status` is `changed`. The writer writes exactly this. */
   readonly next?: string;
 }
 
@@ -153,7 +169,12 @@ export function planSettings(text: string | undefined, { todo = true } = {}): Se
 }
 
 export interface TaskRulePlan {
-  readonly status: 'present' | 'add' | 'no-file';
+  /**
+   * `exists`: a Rulegate project already has a `working-agreement.md` without the rule. It
+   * is a canonical rule the user wrote, so nothing is planned over it — the rule is theirs
+   * to add by hand.
+   */
+  readonly status: 'present' | 'add' | 'no-file' | 'exists';
   /** Repo-relative for project scope, absolute for user scope. */
   readonly file: string;
   readonly how?: string;
@@ -165,22 +186,32 @@ export interface TaskRulePlan {
  * there is one, so it lands with the other instructions about how to work, else in a new
  * "Working agreement" section at the end.
  */
-export function insertTaskRule(text: string): { next: string; section: string } {
+export function insertTaskRule(input: string): { next: string; section: string } {
+  // A CRLF file gets CRLF: the insert is built in LF and converted back, so the result has
+  // one line ending throughout. Only a file that is CRLF everywhere is converted — for a
+  // mixed one, rewriting its existing lines would be a change nobody planned.
+  const crlf = input.includes('\r\n') && !/(^|[^\r])\n/.test(input);
+  const text = crlf ? input.replace(/\r\n/g, '\n') : input;
   const heading = /^##\s+Operator preferences\s*$/m.exec(text);
   let next: string;
+  // The user's bytes are spliced around, never trimmed or collapsed: a trailing "  " is a
+  // Markdown hard break and a blank run may sit inside a fence, and the preview promised an
+  // insert. Only the inserted text adapts, padding up to one blank line before it.
+  const pad = (before: string): string =>
+    before === '' || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
   if (heading) {
     const start = heading.index + heading[0].length;
     const rest = text.slice(start);
     const nextHeading = rest.search(/^##\s+/m);
     const end = nextHeading === -1 ? text.length : start + nextHeading;
-    next = `${text.slice(0, end).trimEnd()}\n\n${TASK_RULE}\n\n${text.slice(end)}`;
+    const before = text.slice(0, end);
+    const after = text.slice(end);
+    next = `${before}${pad(before)}${TASK_RULE}\n${after === '' ? '' : '\n'}${after}`;
   } else {
-    // `trimEnd`, not `replace(/\s*$/)`: the regex retries from every whitespace run and is
-    // quadratic, so a CLAUDE.md of padding hung the setup state.
-    next = `${text.trimEnd()}\n\n## Working agreement\n\n${TASK_RULE}\n`;
+    next = `${text}${pad(text)}## Working agreement\n\n${TASK_RULE}\n`;
   }
   return {
-    next: next.replace(/\n{4,}/g, '\n\n\n'),
+    next: crlf ? next.replace(/\n/g, '\r\n') : next,
     section: heading ? 'Operator preferences' : 'Working agreement',
   };
 }
@@ -211,6 +242,7 @@ export function planTaskRule(scope: Scope, root: string, claudeDir: string): Tas
     if (inRules || /TaskCreate/.test(read(join(root, 'CLAUDE.md')) ?? '')) {
       return { status: 'present', file: TASK_RULE_FILE };
     }
+    if (exists(join(root, TASK_RULE_FILE))) return { status: 'exists', file: TASK_RULE_FILE };
     return {
       status: 'add',
       file: TASK_RULE_FILE,
@@ -245,11 +277,35 @@ export function planScope(scope: Scope, root: string, claudeDir: string): ScopeP
   };
 }
 
-export function describeScope(p: ScopePlan, { dry }: { dry: boolean }): string[] {
+/** What the writer did not do, per item, and why — `describeScope` reports it in place. */
+export interface Refusal {
+  readonly item: 'settings' | 'rule';
+  readonly file: string;
+  readonly reason: string;
+}
+
+export interface Outcome {
+  readonly dry: boolean;
+  readonly refused?: readonly Refusal[];
+  readonly backups?: readonly string[];
+}
+
+export function describeScope(
+  p: ScopePlan,
+  { dry, refused = [], backups = [] }: Outcome,
+): string[] {
   const verb = dry ? 'would add' : 'added';
   const s = p.settings;
   const lines = [`${p.scope === 'user' ? 'USER' : 'PROJECT'}  ${p.settingsFile}`];
-  if (s.status === 'invalid') {
+  const refusedSettings = refused.find((r) => r.item === 'settings');
+  const refusedRule = refused.find((r) => r.item === 'rule');
+  // A preview names a refusal as one to come, so the user never confirms a change the
+  // writer will then decline.
+  const refusal = (reason: string): string =>
+    dry ? `will be refused — ${reason}` : `refused — ${reason}; nothing written`;
+  if (refusedSettings !== undefined && s.status !== 'invalid') {
+    lines.push(`  ${refusal(refusedSettings.reason)}`);
+  } else if (s.status === 'invalid') {
     lines.push('  not valid JSON — left alone; fix it and re-run');
   } else {
     const have = GIT_DENY.length - s.denyAdded.length;
@@ -264,9 +320,19 @@ export function describeScope(p: ScopePlan, { dry }: { dry: boolean }): string[]
       lines.push(`  env.${TODO_ENV}  is "${String(s.current)}" — left as set`);
   }
   const r = p.rule;
-  if (r.status === 'add')
+  if (refusedRule !== undefined && r.status === 'add') {
+    lines.push(`  ${r.file}  ${refusal(refusedRule.reason)}`);
+  } else if (r.status === 'add') {
     lines.push(`  ${r.file}  ${verb} the task-tracking rule (${r.how ?? ''})`);
-  else if (r.status === 'present') lines.push(`  ${r.file}  task-tracking rule already there`);
-  else lines.push(`  ${r.file}  absent — /rulegate:init builds it`);
+    // The generated CLAUDE.md carries the new rule only after a sync, and the plugin cannot
+    // run one: its only spawn is read-only git. The skill runs it.
+    if (!dry && r.file === TASK_RULE_FILE) lines.push('  now run `rulegate sync`');
+  } else if (r.status === 'present') lines.push(`  ${r.file}  task-tracking rule already there`);
+  else if (r.status === 'exists') {
+    lines.push(
+      `  ${r.file}  exists without the task-tracking rule — left alone; add the rule by hand, then run \`rulegate sync\``,
+    );
+  } else lines.push(`  ${r.file}  absent — /rulegate:init builds it`);
+  for (const b of backups) lines.push(`  backup  ${b}`);
   return lines;
 }

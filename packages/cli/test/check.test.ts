@@ -55,14 +55,14 @@ describe('rulegate check', () => {
     expect(await check()).toBe(ExitCode.Failure);
     expect(out()).toContain('missing  CLAUDE.md');
     expect(out()).toContain('missing  .cursor/rules/10-style.mdc');
-    expect(err()).toContain('5 files out of sync.');
+    expect(err()).toContain('6 files out of sync.');
     expect(err()).toContain(HINT_SYNC);
   });
 
   it('is in sync immediately after a sync', async () => {
     await sync();
     expect(await check()).toBe(ExitCode.Ok);
-    expect(out()).toContain('in sync (5 artifacts)');
+    expect(out()).toContain('in sync (6 artifacts)');
     expect(err()).toBe('');
   });
 
@@ -125,7 +125,7 @@ describe('rulegate check', () => {
     stdout = [];
     expect(await sync()).toBe(ExitCode.Ok);
     expect(await check()).toBe(ExitCode.Ok);
-    expect(out()).toContain('in sync (4 artifacts)');
+    expect(out()).toContain('in sync (5 artifacts)');
   });
 
   it('reports an edited orphan separately, with the orphan hint', async () => {
