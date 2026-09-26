@@ -18,6 +18,7 @@ export * from './adapter/nesting.js';
 
 export * from './fs/types.js';
 export * from './fs/paths.js';
+export * from './fs/case.js';
 export * from './fs/glob.js';
 export * from './fs/mask.js';
 

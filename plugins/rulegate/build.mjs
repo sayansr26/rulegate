@@ -44,6 +44,13 @@ if (entries.length > 0) {
     format: 'esm',
     legalComments: 'none',
     entryNames: '[name]',
+    // Decision P2: core is bundled from source, as `vitest.config.ts` resolves it, so the
+    // freshness gate needs no `pnpm build` first and the bundle cannot lag a core change
+    // that a stale `packages/core/dist` would hide. `sideEffects: false` in core's manifest
+    // lets esbuild keep only what the hooks import.
+    alias: {
+      '@rulegate/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url)),
+    },
     outdir: distDir,
     write: false,
   });

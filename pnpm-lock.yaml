@@ -165,7 +165,11 @@ importers:
         specifier: workspace:*
         version: link:../adapter-kit
 
-  plugins/rulegate: {}
+  plugins/rulegate:
+    dependencies:
+      '@rulegate/core':
+        specifier: workspace:*
+        version: link:../../packages/core
 
 packages:
 
