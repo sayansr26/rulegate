@@ -5,6 +5,7 @@ import {
   featureOf,
   findMap,
   listFeatures,
+  mapFiles,
 } from '../src/lib/features.js';
 import { sandbox, type Sandbox } from './helpers.js';
 
@@ -71,5 +72,23 @@ describe('features (T106)', () => {
     expect(cov.outdated).toEqual([
       expect.objectContaining({ name: 'auth', changed: '2026-02-01' }),
     ]);
+  });
+  it("never counts an index as a map, including agent-os's kept index (T114)", async () => {
+    const dir = '.claude/agent-memory/rulegate-feature-cartographer';
+    await sb.put('src/features/billing/index.ts', 'x');
+    await sb.put('src/features/orders/index.ts', 'x');
+    // agent-os's index format, one feature named twice — enough for findMap's
+    // "mentions its directory twice" rule, and it sorts before every lowercase map.
+    const index =
+      '- billing — src/features/billing/index.ts — mapped 2025-01-01\n' +
+      '- billing — src/features/billing/api.ts — mapped 2025-02-01\n';
+    await sb.put(`${dir}/MEMORY.md`, index);
+    await sb.put(`${dir}/MEMORY.agent-os.md`, index);
+    await sb.put(`${dir}/MEMORY.agent-os.2.md`, index);
+    await sb.put(`${dir}/orders.md`, '---\nmapped: 2026-01-01\n---\n# src/features/orders\n');
+    expect(mapFiles(sb.root).map((m) => m.file)).toEqual(['orders.md']);
+    const cov = await coverage(sb.root);
+    expect(cov.mapped.map((f) => f.name)).toEqual(['orders']);
+    expect(cov.unmapped.map((f) => f.name)).toEqual(['billing']);
   });
 });

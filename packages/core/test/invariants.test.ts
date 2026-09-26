@@ -309,13 +309,18 @@ describe('the shared rendering path', () => {
    *   - `session/` — once-per-session markers under `os.tmpdir()` (T108);
    *   - `settings-writer/` — the settings pass's `--apply` (T109, D2): the two
    *     `settings.json` files, the user's `CLAUDE.md` with a `.rulegate.bak` first, and a
-   *     new canonical task rule.
-   * T114's `migrate/` is the planned third; it extends this list, its length pin, and the
-   * per-bundle map below.
+   *     new canonical task rule;
+   *   - `migrate/` — agent-os's agent memory moved to `rulegate-*` (T114): copies made
+   *     exclusively, verified, and only then the sources unlinked, never recursively.
    */
   const PLUGIN_MARKER = 'plugins/rulegate/src/session/marker.ts';
   const PLUGIN_SETTINGS_WRITER = 'plugins/rulegate/src/settings-writer/apply.ts';
-  const PLUGIN_WRITERS: readonly string[] = Object.freeze([PLUGIN_MARKER, PLUGIN_SETTINGS_WRITER]);
+  const PLUGIN_MEMORY_MIGRATOR = 'plugins/rulegate/src/migrate/memory.ts';
+  const PLUGIN_WRITERS: readonly string[] = Object.freeze([
+    PLUGIN_MARKER,
+    PLUGIN_SETTINGS_WRITER,
+    PLUGIN_MEMORY_MIGRATOR,
+  ]);
 
   const WRITE_PRIMITIVE =
     /\b(?:writeFile|appendFile|copyFile|unlink|rm|rmdir|mkdir|rename|symlink|truncate|chmod|utimes)(?:Sync)?\(|\b(?:cp|link)Sync\(|\bcreateWriteStream\(|\bdeleteFile\(/;
@@ -335,7 +340,7 @@ describe('the shared rendering path', () => {
       if (!allowed) offenders.push(rel);
     }
     expect(offenders).toEqual([]);
-    expect(PLUGIN_WRITERS).toHaveLength(2);
+    expect(PLUGIN_WRITERS).toHaveLength(3);
   });
 
   /**
@@ -343,7 +348,7 @@ describe('the shared rendering path', () => {
    * The audit and state scripts run on every `/rulegate:init` and the hooks on every
    * session, so a writer reaching one of them through a shared import is the failure this
    * map exists to catch — the source scan above cannot, since the call still sits in an
-   * allowlisted file. T114 adds `migrate-memory.js`.
+   * allowlisted file.
    */
   const BUNDLE_WRITES: Readonly<Record<string, readonly string[]>> = Object.freeze({
     'pre-edit.js': ['mkdirSync(', 'writeFileSync('],
@@ -354,6 +359,18 @@ describe('the shared rendering path', () => {
       'renameSync(',
       'rmSync(',
       'writeFileSync(',
+      'writeFileSync(',
+    ],
+    'migrate-memory.js': [
+      'copyFileSync(',
+      'copyFileSync(',
+      'mkdirSync(',
+      'mkdirSync(',
+      'renameSync(',
+      'rmdirSync(',
+      'rmdirSync(',
+      'unlinkSync(',
+      'unlinkSync(',
       'writeFileSync(',
     ],
   });
@@ -432,6 +449,68 @@ describe('the shared rendering path', () => {
       ].sort(),
     );
     expect(text).not.toMatch(/homedir|process\.env|tmpdir/);
+  });
+
+  it('confines the memory migrator to verified copies, never a recursive delete', async () => {
+    // T114. It deletes files Rulegate never generated, which the CLI never does, so what it
+    // may delete is pinned tighter than any other writer: `unlink` of a file the plan
+    // copied and verified, and `rmdir` of a directory, which fails on anything left in it.
+    // Nothing recursive, no `rm`, and every path from the planner — none built here.
+    const text = await readFile(path.join(repoRoot, PLUGIN_MEMORY_MIGRATOR), 'utf8');
+    expect(text).not.toMatch(/\brmSync\(|recursive\s*:|\bforce\s*:/);
+    expect(text).not.toMatch(/\bjoin\(|homedir|process\.env|tmpdir/);
+    // Every copy is exclusive: neither a map nor the index backup lands on an existing file.
+    const copies = [...text.matchAll(/copyFileSync\(([^)]*)\)/g)].map((m) => m[1]);
+    expect(copies).toEqual([
+      'f.dst, bak, constants.COPYFILE_EXCL',
+      'f.src, f.dst, constants.COPYFILE_EXCL',
+    ]);
+    // The backup sits beside the index it copies, under a `.rulegate[.<n>].bak` name.
+    expect(text).toMatch(/const BACKUP_SUFFIX = '\.rulegate\.bak';/);
+    expect(text).toMatch(/const bak = backupPath\(f\.dst, before\);/);
+    expect(text).toMatch(
+      /n === 1 \? `\$\{dst\}\$\{BACKUP_SUFFIX\}` : `\$\{dst\}\.rulegate\.\$\{String\(n\)\}\.bak`/,
+    );
+    // The index it replaces must be the one the union was built from.
+    expect(text).toMatch(/if \(sha256\(before\) !== f\.dstSha\) throw/);
+    // The index is replaced through a `wx` sibling that keeps its mode, removed on failure
+    // only when this call created it.
+    expect(text.match(/writeFileSync\(/g)).toHaveLength(1);
+    expect(text).toMatch(/writeFileSync\(tmp, next, \{ flag: 'wx', mode \}\)/);
+    expect(text).toMatch(/const mode = lstatSync\(f\.dst\)\.mode & 0o777;/);
+    expect(text.match(/renameSync\(/g)).toHaveLength(1);
+    expect(text).toMatch(/renameSync\(tmp, f\.dst\)/);
+    // Deletions: the temp sibling if created, each planned source file, planned directories.
+    expect([...text.matchAll(/unlinkSync\(([^)]*)\)/g)].map((m) => m[1])).toEqual(['tmp', 'f.src']);
+    expect(text).toMatch(/if \(created\) unlinkSync\(tmp\);/);
+    expect([...text.matchAll(/rmdirSync\(([^)]*)\)/g)].map((m) => m[1])).toEqual([
+      'd.src',
+      'a.srcDir',
+    ]);
+    // Sources go only after every file is verified at the target: the unlink loop comes
+    // after the last verification, and the directory removals after the unlinks.
+    const unlinkAt = text.indexOf('unlinkSync(f.src)');
+    expect(unlinkAt).toBeGreaterThan(text.lastIndexOf('verify(f)'));
+    expect(unlinkAt).toBeGreaterThan(text.indexOf('changed during the move'));
+    expect(text.indexOf('rmdirSync(d.src)')).toBeGreaterThan(unlinkAt);
+    // Only the planner decides what moves, and it is read-only.
+    expect(text).toMatch(/const plan = await planMemoryMigration\(root, claudeDir\);/);
+    const planner = await readFile(
+      path.join(repoRoot, 'plugins/rulegate/src/lib/migrate.ts'),
+      'utf8',
+    );
+    expect(planner).not.toMatch(WRITE_PRIMITIVE);
+    // Sources and targets live under the two agent-memory bases and nowhere else.
+    const legacy = await readFile(
+      path.join(repoRoot, 'plugins/rulegate/src/lib/legacy.ts'),
+      'utf8',
+    );
+    expect(legacy).toMatch(
+      /export const MEMORY_BASES = \['\.claude\/agent-memory', '\.claude\/agent-memory-local'\] as const;/,
+    );
+    expect(planner).toMatch(/const srcDir = join\(root, base, from\);/);
+    expect(planner).toMatch(/const dstDir = join\(root, base, to\);/);
+    expect(planner).toMatch(/const dst = join\(dstDir, rel\);/);
   });
 
   /**

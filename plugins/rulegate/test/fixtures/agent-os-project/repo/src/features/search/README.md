@@ -1,0 +1,3 @@
+# search
+
+The search feature.

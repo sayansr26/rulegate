@@ -1,0 +1,18 @@
+{
+  "targets": [
+    "claude-code",
+    "cursor",
+    "cline",
+    "windsurf",
+    "antigravity",
+    "gemini-cli",
+    "opencode",
+    "kilo"
+  ],
+  "claude": {
+    "features": [
+      "src/features/*"
+    ],
+    "cartographerReminder": false
+  }
+}

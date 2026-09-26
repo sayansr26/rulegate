@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { runGit } from '../git/index.js';
 import { pluginConfig } from './config.js';
-import { isDir, ls, read } from './read.js';
+import { isDir, isTopicFile, ls, read } from './read.js';
 
 /**
  * What counts as a feature, and which features the cartographer has mapped.
@@ -23,7 +23,8 @@ export const DEFAULT_PARENTS = [
 /**
  * Where the cartographer's memory may be, most specific first. A plugin agent's memory
  * directory carries the plugin's name; the `agent-os-` directory is what an agent-os
- * install left behind, read until T114 migrates it; the bare name is a standalone copy.
+ * install left behind — `/rulegate:init` moves it (T114), and it is read here until then,
+ * so an unmigrated project keeps its maps; the bare name is a standalone copy.
  */
 export const CARTOGRAPHER_DIRS = [
   'rulegate-feature-cartographer',
@@ -94,7 +95,7 @@ export function mapFiles(root: string): MapFile[] {
   const dir = cartographerDir(root);
   if (dir === undefined) return [];
   return ls(dir)
-    .filter((f) => f.endsWith('.md') && f !== 'MEMORY.md')
+    .filter(isTopicFile)
     .map((file) => {
       const text = read(join(dir, file)) ?? '';
       const m = /^mapped:\s*["']?(\d{4}-\d{2}-\d{2})/m.exec(text);

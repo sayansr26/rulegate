@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { exists, isDir, isRecord, ls, read } from './read.js';
+import { exists, isDir, isRecord, ls, read, readJson } from './read.js';
 
 /**
  * The settings pass, pure half (decision P4). Everything here computes what the pass would
@@ -84,6 +84,48 @@ export const GIT_DENY: readonly string[] = Object.freeze([
 
 export type Scope = 'project' | 'user';
 
+export const PLUGIN_ID = 'rulegate@rulegate';
+export const MARKETPLACE_NAME = 'rulegate';
+/** An agent-os install still enabled next to this one prints the session block twice (T114). */
+export const LEGACY_PLUGIN_ID = 'agent-os@sayan-plugins';
+export const LEGACY_MARKETPLACE = 'sayan-plugins';
+/** What `claude plugin marketplace add sayansr26/rulegate --scope project` declares (D4). */
+export const MARKETPLACE_ENTRY = {
+  source: { source: 'github', repo: 'sayansr26/rulegate' },
+} as const;
+
+/** The settings file that decides `enabledPlugins[id]`: the most local one that sets it. */
+export type PluginScope = 'local' | 'project' | 'user';
+
+export function enabledAt(
+  root: string,
+  claudeDir: string,
+  id: string,
+): { readonly value: boolean; readonly scope: PluginScope } | undefined {
+  for (const [scope, p] of [
+    ['local', join(root, '.claude/settings.local.json')],
+    ['project', join(root, '.claude/settings.json')],
+    ['user', join(claudeDir, 'settings.json')],
+  ] as const) {
+    const value = enabledIn(p, id);
+    if (value !== undefined) return { value, scope };
+  }
+  return undefined;
+}
+
+/** `enabledPlugins[id]` as one settings file sets it, whatever the other scopes say. */
+export function enabledIn(file: string, id: string): boolean | undefined {
+  const s = readJson(file);
+  return isRecord(s) && isRecord(s.enabledPlugins) && typeof s.enabledPlugins[id] === 'boolean'
+    ? s.enabledPlugins[id]
+    : undefined;
+}
+
+/** `enabledPlugins[id]` from the first settings file that sets it, most local first. */
+export function enabledFlag(root: string, claudeDir: string, id: string): boolean | undefined {
+  return enabledAt(root, claudeDir, id)?.value;
+}
+
 /** `Bash(git commit *)` and `Bash(git commit:*)` are the same rule to Claude Code. */
 export const normRule = (r: string): string => r.replace(/:\*\)$/, ' *)').replace(/\s+/g, ' ');
 
@@ -115,17 +157,50 @@ export function ruleTarget(scope: Scope, root: string, claudeDir: string): strin
 
 export type EnvState = 'added' | 'present' | 'conflict';
 
+/**
+ * agent-os's marketplace in `extraKnownMarketplaces`: `retire` swaps it for Rulegate's,
+ * `blocked` leaves it while agent-os is still enabled here, since removing the marketplace
+ * of a plugin that is still loading is how a session ends up with neither (T114).
+ */
+export type MarketplaceState = 'retire' | 'blocked';
+
 export interface SettingsPlan {
   readonly status: 'changed' | 'unchanged' | 'invalid';
   readonly denyAdded: readonly string[];
   readonly env: EnvState | undefined;
   readonly current: unknown;
+  readonly marketplace?: MarketplaceState;
   /** The merged file, when `status` is `changed`. The writer writes exactly this. */
   readonly next?: string;
 }
 
+export interface SettingsOptions {
+  readonly todo?: boolean;
+  /**
+   * `true` retires a declared `sayan-plugins` marketplace in favour of `rulegate`, `false`
+   * reports it as `blocked`; `undefined` does not look. Only the project file is ever asked:
+   * a user-scope declaration serves every agent-os project on the machine, and the ones not
+   * yet migrated still need it.
+   */
+  readonly retireMarketplace?: boolean | undefined;
+}
+
+/**
+ * `extraKnownMarketplaces` without agent-os's entry, and with Rulegate's — the user's own
+ * entry for `rulegate` wins if there is one. Every other key keeps its place and value.
+ */
+function swapMarketplace(markets: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(markets)) if (k !== LEGACY_MARKETPLACE) out[k] = v;
+  if (!(MARKETPLACE_NAME in out)) out[MARKETPLACE_NAME] = MARKETPLACE_ENTRY;
+  return out;
+}
+
 /** Plan the merge into one settings.json, given its current text (`undefined`: absent). */
-export function planSettings(text: string | undefined, { todo = true } = {}): SettingsPlan {
+export function planSettings(
+  text: string | undefined,
+  { todo = true, retireMarketplace }: SettingsOptions = {},
+): SettingsPlan {
   let settings: Record<string, unknown> = {};
   if (text !== undefined) {
     try {
@@ -136,6 +211,16 @@ export function planSettings(text: string | undefined, { todo = true } = {}): Se
       return { status: 'invalid', denyAdded: [], env: undefined, current: undefined };
     }
   }
+  const markets = isRecord(settings.extraKnownMarketplaces)
+    ? settings.extraKnownMarketplaces
+    : undefined;
+  const marketplace: MarketplaceState | undefined =
+    retireMarketplace === undefined || markets === undefined || !(LEGACY_MARKETPLACE in markets)
+      ? undefined
+      : retireMarketplace
+        ? 'retire'
+        : 'blocked';
+  const withMarket = marketplace === undefined ? {} : { marketplace };
   const perms = isRecord(settings.permissions) ? settings.permissions : {};
   const deny = Array.isArray(perms.deny)
     ? perms.deny.filter((r): r is string => typeof r === 'string')
@@ -153,17 +238,21 @@ export function planSettings(text: string | undefined, { todo = true } = {}): Se
     else env = current === '1' || current === 'true' || current === true ? 'present' : 'conflict';
   }
 
-  if (denyAdded.length === 0 && env !== 'added') {
-    return { status: 'unchanged', denyAdded, env, current };
+  if (denyAdded.length === 0 && env !== 'added' && marketplace !== 'retire') {
+    return { status: 'unchanged', denyAdded, env, current, ...withMarket };
   }
   const next: Record<string, unknown> = { ...settings };
   if (denyAdded.length > 0) next.permissions = { ...perms, deny: [...deny, ...denyAdded] };
   if (env === 'added') next.env = { ...envBlock, [TODO_ENV]: '1' };
+  if (marketplace === 'retire' && markets !== undefined) {
+    next.extraKnownMarketplaces = swapMarketplace(markets);
+  }
   return {
     status: 'changed',
     denyAdded,
     env,
     current,
+    ...withMarket,
     next: `${JSON.stringify(next, null, 2)}\n`,
   };
 }
@@ -269,10 +358,20 @@ export interface ScopePlan {
 
 export function planScope(scope: Scope, root: string, claudeDir: string): ScopePlan {
   const settingsFile = settingsPath(scope, root, claudeDir);
+  // Retired only once agent-os is off in this project — after `claude plugin disable`, which
+  // the migration runs first — so this pass never pulls the marketplace from under a
+  // plugin that is still loading. The file being rewritten is read on its own as well: a
+  // developer's local `false` hides the committed `true` from the effective flag, and
+  // retiring then ships every teammate an enabled agent-os with no marketplace.
+  const retireMarketplace =
+    scope === 'project'
+      ? enabledFlag(root, claudeDir, LEGACY_PLUGIN_ID) !== true &&
+        enabledIn(settingsFile, LEGACY_PLUGIN_ID) !== true
+      : undefined;
   return {
     scope,
     settingsFile,
-    settings: planSettings(read(settingsFile)),
+    settings: planSettings(read(settingsFile), { retireMarketplace }),
     rule: planTaskRule(scope, root, claudeDir),
   };
 }
@@ -318,6 +417,15 @@ export function describeScope(
     else if (s.env === 'present') lines.push(`  env.${TODO_ENV}  already on`);
     else if (s.env === 'conflict')
       lines.push(`  env.${TODO_ENV}  is "${String(s.current)}" — left as set`);
+    if (s.marketplace === 'retire') {
+      lines.push(
+        `  extraKnownMarketplaces  ${dry ? 'would replace' : 'replaced'} ${LEGACY_MARKETPLACE} (agent-os) with ${MARKETPLACE_NAME}`,
+      );
+    } else if (s.marketplace === 'blocked') {
+      lines.push(
+        `  extraKnownMarketplaces  ${LEGACY_MARKETPLACE} (agent-os) kept while ${LEGACY_PLUGIN_ID} is enabled here or in this file — disable it first`,
+      );
+    }
   }
   const r = p.rule;
   if (refusedRule !== undefined && r.status === 'add') {

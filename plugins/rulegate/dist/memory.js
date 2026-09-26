@@ -13,6 +13,7 @@ function read(path) {
     return void 0;
   }
 }
+var isTopicFile = (f) => f.endsWith(".md") && !/^MEMORY(\..+)?\.md$/.test(f);
 function ls(path) {
   try {
     return readdirSync(path).sort();
@@ -175,7 +176,7 @@ async function runMemory({
       const adir = join2(root, base, agent);
       if (!isDir(adir)) continue;
       anyAgent = true;
-      const topics = ls(adir).filter((f) => f.endsWith(".md") && f !== "MEMORY.md");
+      const topics = ls(adir).filter(isTopicFile);
       const idxRaw = read(join2(adir, "MEMORY.md"));
       const idx = idxRaw ? idxRaw.split("\n").filter((l) => l.trim().startsWith("-")) : [];
       say(`${agent}  (${scope})`);
@@ -230,7 +231,7 @@ async function runMemory({
   if (!isDir(autoDir)) say(`  none yet at ${autoDir}`);
   else {
     const idx = read(join2(autoDir, "MEMORY.md"));
-    const topics = ls(autoDir).filter((f) => f.endsWith(".md") && f !== "MEMORY.md");
+    const topics = ls(autoDir).filter(isTopicFile);
     say(`  ${autoDir}`);
     say(
       `  MEMORY.md: ${idx ? `${String(idx.split("\n").length)} lines` : "absent"}   topics: ${String(topics.length)}`

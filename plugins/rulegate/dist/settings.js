@@ -37,6 +37,15 @@ function isUtf8File(path2) {
     return false;
   }
 }
+function readJson(path2) {
+  const text = read(path2);
+  if (text === void 0) return void 0;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return "INVALID";
+  }
+}
 function ls(path2) {
   try {
     return readdirSync(path2).sort();
@@ -116,6 +125,30 @@ var GIT_DENY = Object.freeze([
   "Bash(git update-ref *)",
   "Bash(git worktree *)"
 ]);
+var MARKETPLACE_NAME = "rulegate";
+var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
+var LEGACY_MARKETPLACE = "sayan-plugins";
+var MARKETPLACE_ENTRY = {
+  source: { source: "github", repo: "sayansr26/rulegate" }
+};
+function enabledAt(root2, claudeDir2, id) {
+  for (const [scope2, p] of [
+    ["local", join(root2, ".claude/settings.local.json")],
+    ["project", join(root2, ".claude/settings.json")],
+    ["user", join(claudeDir2, "settings.json")]
+  ]) {
+    const value = enabledIn(p, id);
+    if (value !== void 0) return { value, scope: scope2 };
+  }
+  return void 0;
+}
+function enabledIn(file, id) {
+  const s = readJson(file);
+  return isRecord(s) && isRecord(s.enabledPlugins) && typeof s.enabledPlugins[id] === "boolean" ? s.enabledPlugins[id] : void 0;
+}
+function enabledFlag(root2, claudeDir2, id) {
+  return enabledAt(root2, claudeDir2, id)?.value;
+}
 var normRule = (r) => r.replace(/:\*\)$/, " *)").replace(/\s+/g, " ");
 function claudeHome(env, home) {
   return resolve(env.CLAUDE_CONFIG_DIR || join(home, ".claude"));
@@ -128,7 +161,13 @@ function ruleTarget(scope2, root2, claudeDir2) {
   if (scope2 === "user") return join(claudeDir2, "CLAUDE.md");
   return isRulegateProject(root2) ? join(root2, TASK_RULE_FILE) : join(root2, "CLAUDE.md");
 }
-function planSettings(text, { todo = true } = {}) {
+function swapMarketplace(markets) {
+  const out2 = {};
+  for (const [k, v] of Object.entries(markets)) if (k !== LEGACY_MARKETPLACE) out2[k] = v;
+  if (!(MARKETPLACE_NAME in out2)) out2[MARKETPLACE_NAME] = MARKETPLACE_ENTRY;
+  return out2;
+}
+function planSettings(text, { todo = true, retireMarketplace } = {}) {
   let settings = {};
   if (text !== void 0) {
     try {
@@ -139,6 +178,9 @@ function planSettings(text, { todo = true } = {}) {
       return { status: "invalid", denyAdded: [], env: void 0, current: void 0 };
     }
   }
+  const markets = isRecord(settings.extraKnownMarketplaces) ? settings.extraKnownMarketplaces : void 0;
+  const marketplace = retireMarketplace === void 0 || markets === void 0 || !(LEGACY_MARKETPLACE in markets) ? void 0 : retireMarketplace ? "retire" : "blocked";
+  const withMarket = marketplace === void 0 ? {} : { marketplace };
   const perms = isRecord(settings.permissions) ? settings.permissions : {};
   const deny = Array.isArray(perms.deny) ? perms.deny.filter((r) => typeof r === "string") : [];
   const have = new Set(deny.map(normRule));
@@ -150,17 +192,21 @@ function planSettings(text, { todo = true } = {}) {
     if (current === void 0) env = "added";
     else env = current === "1" || current === "true" || current === true ? "present" : "conflict";
   }
-  if (denyAdded.length === 0 && env !== "added") {
-    return { status: "unchanged", denyAdded, env, current };
+  if (denyAdded.length === 0 && env !== "added" && marketplace !== "retire") {
+    return { status: "unchanged", denyAdded, env, current, ...withMarket };
   }
   const next = { ...settings };
   if (denyAdded.length > 0) next.permissions = { ...perms, deny: [...deny, ...denyAdded] };
   if (env === "added") next.env = { ...envBlock, [TODO_ENV]: "1" };
+  if (marketplace === "retire" && markets !== void 0) {
+    next.extraKnownMarketplaces = swapMarketplace(markets);
+  }
   return {
     status: "changed",
     denyAdded,
     env,
     current,
+    ...withMarket,
     next: `${JSON.stringify(next, null, 2)}
 `
   };
@@ -239,10 +285,11 @@ ${TASK_RULE}
 }
 function planScope(scope2, root2, claudeDir2) {
   const settingsFile = settingsPath(scope2, root2, claudeDir2);
+  const retireMarketplace = scope2 === "project" ? enabledFlag(root2, claudeDir2, LEGACY_PLUGIN_ID) !== true && enabledIn(settingsFile, LEGACY_PLUGIN_ID) !== true : void 0;
   return {
     scope: scope2,
     settingsFile,
-    settings: planSettings(read(settingsFile)),
+    settings: planSettings(read(settingsFile), { retireMarketplace }),
     rule: planTaskRule(scope2, root2, claudeDir2)
   };
 }
@@ -266,6 +313,15 @@ function describeScope(p, { dry, refused: refused2 = [], backups = [] }) {
     else if (s.env === "present") lines.push(`  env.${TODO_ENV}  already on`);
     else if (s.env === "conflict")
       lines.push(`  env.${TODO_ENV}  is "${String(s.current)}" \u2014 left as set`);
+    if (s.marketplace === "retire") {
+      lines.push(
+        `  extraKnownMarketplaces  ${dry ? "would replace" : "replaced"} ${LEGACY_MARKETPLACE} (agent-os) with ${MARKETPLACE_NAME}`
+      );
+    } else if (s.marketplace === "blocked") {
+      lines.push(
+        `  extraKnownMarketplaces  ${LEGACY_MARKETPLACE} (agent-os) kept while ${LEGACY_PLUGIN_ID} is enabled here or in this file \u2014 disable it first`
+      );
+    }
   }
   const r = p.rule;
   if (refusedRule !== void 0 && r.status === "add") {
@@ -534,7 +590,7 @@ function unreadableState(abs) {
   const text = read(state);
   return text?.trim() !== "" && parseState(text) === void 0;
 }
-async function blocked(scope2, root2, claudeDir2, abs) {
+async function blocked(scope2, root2, claudeDir2, abs, { bytes = false } = {}) {
   if (scope2 === "project") {
     if (inside(claudeDir2, abs)) {
       return "this is the user-level Claude config \u2014 `--scope user` changes it, backup first";
@@ -554,10 +610,10 @@ async function blocked(scope2, root2, claudeDir2, abs) {
     if (st.isSymbolicLink()) return "a symlink \u2014 edit the file it points at by hand";
     if (!st.isFile()) return "not a regular file";
   }
-  if (exists(abs) && read(abs) === void 0) {
+  if (!bytes && exists(abs) && read(abs) === void 0) {
     return "could not be read (permissions, or larger than 4 MB) \u2014 left as it is";
   }
-  if (exists(abs) && !isUtf8File(abs)) {
+  if (!bytes && exists(abs) && !isUtf8File(abs)) {
     return "not UTF-8 text \u2014 rewriting it would replace the bytes it cannot decode";
   }
   if (unreadableState(abs)) {

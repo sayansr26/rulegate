@@ -1,6 +1,6 @@
 ---
 name: init
-description: Set up or repair this project's Claude Code context layer. Audits what is already there — CLAUDE.md size, whether .claude/rules/ files are path-scoped, dangling hooks, legacy memory-bank or serena stores, auto-memory state, and machine-level problems like user-scope agents shadowing plugin ones — then creates or migrates what is missing. Use for "set up rulegate", "rulegate init" inside Claude Code, "initialise this project", "bootstrap my context setup", "migrate off memory-bank", "my CLAUDE.md is too big", or when starting work in a repo with no setup.
+description: Set up or repair this project's Claude Code context layer. Audits what is already there — CLAUDE.md size, whether .claude/rules/ files are path-scoped, dangling hooks, legacy memory-bank or serena stores, auto-memory state, and machine-level problems like user-scope agents shadowing plugin ones — then creates or migrates what is missing. Use for "set up rulegate", "rulegate init" inside Claude Code, "initialise this project", "bootstrap my context setup", "migrate off memory-bank", "migrate from agent-os", "my CLAUDE.md is too big", or when starting work in a repo with no setup.
 ---
 
 # Memory bootstrap
@@ -77,10 +77,69 @@ settings pass asks, rather than a question per item:
 | git write protection, task tools, task-tracking rule | the settings pass below                                                                                                                                                                                                                                                                        |
 | plugin version (older than latest)                   | `claude plugin marketplace update rulegate`, then `claude plugin update rulegate@rulegate --scope <its scope> --yes`. Tell the user to run `/reload-plugins` — the running session keeps the old version until then. If `claude` is not on PATH, give them `/plugin update rulegate@rulegate`. |
 | plugin enabled                                       | `claude plugin enable rulegate@rulegate`                                                                                                                                                                                                                                                       |
-| agent-os plugin disabled                             | `claude plugin disable agent-os@sayan-plugins` — both plugins enabled print two session blocks, and agent-os's guard knows nothing of `.rulegate/state.json`                                                                                                                                   |
+| agent-os plugin disabled                             | the migration below — its disable command always carries the `--scope` the `SETUP` line names; both plugins enabled print two session blocks, and agent-os's guard knows nothing of `.rulegate/state.json`                                                                                     |
+| agent-os memory moved to rulegate-\*                 | the migration below                                                                                                                                                                                                                                                                            |
+| `.claude/settings.json` declares rulegate            | the migration below — the settings pass swaps agent-os's marketplace once agent-os is disabled                                                                                                                                                                                                 |
 | CLAUDE.md says when to use each agent                | `references/establishing.md`, Step 4b                                                                                                                                                                                                                                                          |
 | CLAUDE.md                                            | `MODE` routes it (ESTABLISH)                                                                                                                                                                                                                                                                   |
 | `.rulegate/ canonical rules`                         | `npx rulegate init` — the user runs it (it prints a plan and writes nothing without `--yes`); it imports `CLAUDE.md` and the other tools' configs into `.rulegate/`. Without it the plugin's generated-file guard has nothing to protect.                                                      |
+
+## Step 2b — Migrating from agent-os
+
+Run this when the audit's `AGENT-OS` section lists anything, before Step 3. It is **one
+confirmation** for the whole move, and every step before it is a preview.
+
+1. **Preview**, writing nothing:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/dist/migrate-memory.js"
+   ```
+
+   It lists each `agent-os-<agent>` memory directory and where it goes: `rulegate-<agent>`,
+   the name this plugin's agents read. A new directory is copied whole; one that already
+   exists is merged — new files copied, identical ones kept once, and the two `MEMORY.md`
+   indexes unioned. A same-named file with different content is refused, and that agent's
+   memory stays where it is. If `.agent-os/` is listed as not imported, also run
+   `npx --no rulegate init` — it prints the import plan and writes nothing.
+
+2. **Ask once.** One AskUserQuestion naming, in order: the memory moves; the `rulegate init`
+   import (when `.agent-os/` is not imported); the disable command exactly as the audit prints
+   it; and the settings pass at project scope, which replaces agent-os's marketplace
+   (`sayan-plugins`) with `rulegate` in `extraKnownMarketplaces`. _Migrate_ (recommended) or
+   _skip_.
+
+3. **Apply, in this order**, and stop at the first step that fails — agent-os is disabled
+   last, so it keeps working until everything before it has landed. One exception: a
+   memory step that exits 1 only because an agent was **refused** still runs step 2 (the
+   import does not depend on memory), then stops before the disable — agent-os's agent is
+   the only one that reads that memory until it is merged by hand.
+
+   1. `node "${CLAUDE_PLUGIN_ROOT}/dist/migrate-memory.js" --apply`. It copies each file,
+      checks its bytes at the new name, and only then removes the original. A merged
+      `MEMORY.md` keeps agent-os's index whole beside it as `MEMORY.agent-os.md` (a later
+      merge of the same agent uses the next free `MEMORY.agent-os.<n>.md`), backs up the
+      index it replaces as `MEMORY.md.rulegate[.<n>].bak`, and warns when the merged index
+      runs past the 200 lines Claude Code loads. A target index written to while it ran is
+      stopped with "changed during the move" — re-run it. Exit 1
+      means an agent was refused or stopped; report it as printed and do **not** move files
+      by hand. The setup state and the audit name a refusal until it is merged.
+   2. `npx --no rulegate init --yes` when `.agent-os/` is not imported. If it printed a
+      `.claude/rulegate.json` payload and that file does not exist, create it with exactly
+      that payload — it is the plugin's config, not a generated file.
+   3. The disable, as the audit prints it — `claude plugin disable agent-os@sayan-plugins
+--scope local` for a user-scope install, `--scope project` for a project one. Never
+      without `--scope`: for a user-scope install that turns agent-os off in every project
+      on this machine, including the ones not yet migrated.
+   4. `node "${CLAUDE_PLUGIN_ROOT}/dist/settings.js" --scope project --apply`, which now
+      swaps the marketplace. It backs up `.claude/settings.json` first, like any apply.
+
+   Then tell the user to run `/reload-plugins`, so this session stops loading agent-os. If
+   a Bash call is denied, give the user the exact command to run with the `!` prefix.
+
+`.agent-os/` stays where it is. Once imported, the audit calls it "already imported, safe to
+delete": say so, and let the user delete it after `npx --no rulegate check` is clean. A
+`.gitignore` line the preview names stops matching once the memory moves; point it out, do
+not edit it. Committed maps show up in git as deletes plus adds — the user commits them.
 
 ## Step 3 — Route by MODE
 
@@ -120,6 +179,7 @@ Each finding routes to one place. Load only what the audit actually surfaced:
 | `CLAUDE.md` has no "Agents in this project" section                | `references/establishing.md`, Step 4b                                                                                             |
 | user asks how to change an existing feature                        | `references/changing-a-feature.md`                                                                                                |
 | legacy store found; CLAUDE.md over budget                          | `references/migrating.md`                                                                                                         |
+| anything under `AGENT-OS`                                          | Step 2b                                                                                                                           |
 | rule without `paths:`; no rules layer yet; CLAUDE.md to trim       | `references/writing-rules.md` — in a Rulegate project, edit `.rulegate/rules/` and run `rulegate sync`, never the generated files |
 | git write protection or task tools missing                         | the settings pass below — apply, don't hand over                                                                                  |
 | LSP plugin recommended; checked-in generated dirs                  | `references/establishing.md`, "Stop Claude reading what it should not"                                                            |
@@ -134,7 +194,7 @@ Settings are not: the settings pass below writes them, including `~/.claude`.
 ## Step 5 — Verify by re-running
 
 Run the audit again and show the before and after: the `SETUP` verdict (a
-repair should end `HEALTHY`), finding count, startup bytes, token estimate. Do not declare success on vibes — the script already produces the
+repair, and a migration from agent-os, should end `HEALTHY`), finding count, startup bytes, token estimate. Do not declare success on vibes — the script already produces the
 numbers, so quote them.
 
 ## The settings pass

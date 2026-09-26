@@ -1,6 +1,6 @@
 import { basename, join } from 'node:path';
 import { runGit } from '../git/index.js';
-import { isDir, ls, read } from './read.js';
+import { isDir, isTopicFile, ls, read } from './read.js';
 
 /**
  * Every memory store this project has, and each one's health — the deterministic half of
@@ -40,7 +40,7 @@ export async function runMemory({
       const adir = join(root, base, agent);
       if (!isDir(adir)) continue;
       anyAgent = true;
-      const topics = ls(adir).filter((f) => f.endsWith('.md') && f !== 'MEMORY.md');
+      const topics = ls(adir).filter(isTopicFile);
       const idxRaw = read(join(adir, 'MEMORY.md'));
       const idx = idxRaw ? idxRaw.split('\n').filter((l) => l.trim().startsWith('-')) : [];
 
@@ -106,7 +106,7 @@ export async function runMemory({
   if (!isDir(autoDir)) say(`  none yet at ${autoDir}`);
   else {
     const idx = read(join(autoDir, 'MEMORY.md'));
-    const topics = ls(autoDir).filter((f) => f.endsWith('.md') && f !== 'MEMORY.md');
+    const topics = ls(autoDir).filter(isTopicFile);
     say(`  ${autoDir}`);
     say(
       `  MEMORY.md: ${idx ? `${String(idx.split('\n').length)} lines` : 'absent'}   topics: ${String(topics.length)}`,

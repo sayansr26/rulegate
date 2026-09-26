@@ -14,7 +14,8 @@ import { detectTools } from '../detect/engine.js';
 import { collectImports } from '../import/collect.js';
 import { maskPaths } from '../fs/mask.js';
 import { ADAPTER_API_VERSION } from '../adapter/context.js';
-import { dedupeImported, type ImportConflict } from '../import/dedupe.js';
+import { ORDER_STEP, dedupeImported, type ImportConflict } from '../import/dedupe.js';
+import { claimRuleId } from '../import/rule.js';
 import { dedupeMcpServers, type McpImportConflict } from '../import/dedupe-mcp.js';
 import { computePlan, type Plan } from '../pipeline/plan.js';
 import type { CanonicalFile } from '../pipeline/apply.js';
@@ -56,6 +57,9 @@ export interface InteropLike {
     readonly rules: readonly RuleDocument[];
     readonly generated: readonly string[];
     readonly notImported: readonly string[];
+    readonly tools?: readonly string[];
+    readonly notes?: readonly { readonly path: string; readonly message: string }[];
+    readonly errors?: readonly RulegateError[];
   }>;
 }
 
@@ -127,7 +131,9 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   // the files the adapters import from, so without masking the observed outputs every rule
   // arrives twice — once from the source the user edits, once from the copy built out of it.
   const interopRules: RuleDocument[] = [];
-  const generated = new Set<string>();
+  // Path -> the importer that generated it, for the warning about outputs left behind.
+  const generated = new Map<string, string>();
+  const interopTools = new Set<string>();
   const interopFound: string[] = [];
   for (const importer of input.interop ?? []) {
     const ctx = {
@@ -140,13 +146,23 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
     if (!(await importer.detect(ctx))) continue;
     const found = await importer.read(ctx);
     interopRules.push(...found.rules);
-    for (const path of found.generated) generated.add(path);
+    for (const path of found.generated) generated.set(path, importer.displayName);
+    for (const tool of found.tools ?? []) interopTools.add(tool);
+    errors.push(...(found.errors ?? []));
     interopFound.push(importer.displayName);
     for (const path of found.notImported) {
       warnings.push(
         new RulegateError({
           code: 'W_INTEROP_NOT_IMPORTED',
           message: `${importer.displayName}: \`${path}\` was found and not imported. Rulegate imports rules only; copy anything else across by hand before removing it.`,
+        }),
+      );
+    }
+    for (const note of found.notes ?? []) {
+      warnings.push(
+        new RulegateError({
+          code: 'W_INTEROP_NOT_IMPORTED',
+          message: `${importer.displayName}: \`${note.path}\`: ${note.message}`,
         }),
       );
     }
@@ -158,12 +174,19 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
     adapters,
     canonical: emptyCanonical({ file: MANIFEST_PATH }),
   });
-  const detected = detection.tools.filter((t) => t.detected).map((t) => t.name);
-  const present = adapters.filter((a) => detected.includes(a.name));
+  const found = detection.tools.filter((t) => t.detected).map((t) => t.name);
+  const present = adapters.filter((a) => found.includes(a.name));
+  // The tools a competing tool was configured to generate for join the detected ones: its
+  // config is the user's own statement of which tools they use, and the files on disk may
+  // not show all of them yet. Only names an adapter answers to — an importer's word never
+  // puts an unknown id into the manifest.
+  const detected = adapters
+    .map((a) => a.name)
+    .filter((name) => found.includes(name) || interopTools.has(name));
 
   const collected = await collectImports({
     repoRoot,
-    fs: generated.size === 0 ? fs : maskPaths(fs, generated),
+    fs: generated.size === 0 ? fs : maskPaths(fs, generated.keys()),
     adapters: present,
   });
   errors.push(...collected.errors);
@@ -172,7 +195,18 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   // Interop rules first: they are the source a user edits, and document order becomes
   // canonical `order` (T018), so putting the generated copies ahead of them would rank a
   // derived file above its own source.
-  const rules = [...interopRules, ...adapterRules];
+  //
+  // Hence the renumbering: `importedRule` leaves every interop rule at the default order,
+  // which ranks after every numbered adapter rule, and an order is the only thing that
+  // survives serialization. And one id space across both halves, because each was claimed
+  // separately — an importer's `style` rule and a `## Style` section of a hand-written
+  // CLAUDE.md would otherwise both become `.rulegate/rules/style.md`.
+  const taken = new Set<string>();
+  const rules = [...interopRules, ...adapterRules].map((rule, index) => ({
+    ...rule,
+    id: claimRuleId(rule.id, taken),
+    frontmatter: { ...rule.frontmatter, order: (index + 1) * ORDER_STEP },
+  }));
   const { servers: mcpServers, conflicts: mcpConflicts } = dedupeMcpServers(collected.sources);
   const canonical = canonicalFrom(rules, mcpServers, detected);
 
@@ -194,6 +228,9 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   warnings.push(...(await formatterWarnings({ fs, generated: generatedPaths })));
   warnings.push(...(await backupSecretWarnings({ fs, taking: generatedPaths })));
   warnings.push(...leftBehindWarnings(collected.sources, generatedPaths));
+  // Only for a plan that will be applied: the hint is "delete it once init has run", and
+  // when init refuses, the file it names may be the only copy of the output left.
+  if (errors.length === 0) warnings.push(...outputLeftWarnings(generated, generatedPaths));
 
   return {
     adopted: false,
@@ -296,6 +333,51 @@ function leftBehindWarnings(
         hint:
           renamed === undefined
             ? `delete ${file} once init has run; its content is in .rulegate/rules/ now`
+            : `once init has run, list the directory: if it shows both ${file} and ${renamed}, delete ${file}; if it shows one, the filesystem ignores case, they are one file and nothing is left behind`,
+      }),
+    );
+  }
+  return out;
+}
+
+/**
+ * Another tool's outputs that no enabled adapter renders back to the same path.
+ *
+ * They were masked from the import because their source came across instead, so nothing
+ * else reports them: they are not imported, so `W_IMPORT_LEFT_BEHIND` never sees them, and
+ * they are not in `state.json`, so `check` never compares them and `sync` can neither own
+ * nor delete them. The tool that reads one keeps loading a copy of the rules that nothing
+ * updates any more. Case is folded for the reason `leftBehindWarnings` gives: on a
+ * case-insensitive filesystem `API.mdc` and `api.mdc` are one file, and "delete it" would
+ * delete Rulegate's output.
+ */
+function outputLeftWarnings(
+  generated: ReadonlyMap<string, string>,
+  rendered: readonly string[],
+): readonly RulegateError[] {
+  const written = new Set(rendered);
+  const folded = new Map(rendered.map((p) => [p.toLowerCase(), p]));
+  const out: RulegateError[] = [];
+  for (const [file, by] of [...generated].sort(([a], [b]) => compareCodepoint(a, b))) {
+    if (written.has(file)) continue;
+    // An importer may name a directory it generates into — rulesync's `.clinerules` — and
+    // Rulegate renders into the same one. "Delete it" would delete Rulegate's own output
+    // along with it, so a directory holding a rendered path is not left behind. Folded, for
+    // the case-insensitive filesystem where `.ClineRules` is that same directory.
+    const dir = `${file.toLowerCase()}/`;
+    if (rendered.some((p) => p.toLowerCase().startsWith(dir))) continue;
+    const renamed = folded.get(file.toLowerCase());
+    out.push(
+      new RulegateError({
+        code: 'W_INTEROP_OUTPUT_LEFT',
+        message:
+          renamed === undefined
+            ? `${file} was generated by ${by}, and nothing Rulegate generates replaces it: it stays on disk, unowned, and any tool that reads it keeps loading a copy of the rules that nothing updates`
+            : `${file} was generated by ${by} and regenerates as ${renamed}: on a case-sensitive filesystem both stay on disk and its rules load twice`,
+        source: { file },
+        hint:
+          renamed === undefined
+            ? `once init has run, delete ${file} if ${by} generated it: the ${by} source it was built from is in .rulegate/rules/ now`
             : `once init has run, list the directory: if it shows both ${file} and ${renamed}, delete ${file}; if it shows one, the filesystem ignores case, they are one file and nothing is left behind`,
       }),
     );

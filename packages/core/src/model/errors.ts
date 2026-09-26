@@ -84,7 +84,13 @@ export type RulegateErrorCode =
   // stays on disk, unowned, and every tool that still reads it gets its rules twice. Nothing
   // later can see it — `check` compares only what Rulegate owns, and `doctor`'s duplicate
   // count keys on provenance the original never had — so `init` is the one place to say so.
-  | 'W_IMPORT_LEFT_BEHIND';
+  | 'W_IMPORT_LEFT_BEHIND'
+  // A competing tool's generated file that no enabled adapter renders back to the same path
+  // (T113) — masked from the import because its source was imported instead, then left on
+  // disk. A warning: the rules are in canonical, but the file is not in `state.json`, so
+  // Rulegate can neither own nor delete it, and the tool that reads it keeps loading a copy
+  // nothing updates. `init` is the only command that knows the file was derived at all.
+  | 'W_INTEROP_OUTPUT_LEFT';
 
 export interface RulegateErrorInit {
   readonly code: RulegateErrorCode;

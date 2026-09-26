@@ -79,13 +79,19 @@ function generate(fixture, adapter) {
 /**
  * Fixtures belonging to something that is not an adapter (T054).
  *
- * `ruler-import` and `rulesync-import` have the `input`/`expected` shape and no adapter
- * behind them — they are goldens of an interop importer, which this script cannot drive
- * because `INTEROP` is not `ADAPTERS`. Left in the sweep they abort the run, and if that
+ * `ruler-import`, `rulesync-import` and `agent-os-import` have the `input`/`expected` shape
+ * and no adapter behind them — they are goldens of an interop importer, which this script
+ * cannot drive because `INTEROP` is not `ADAPTERS`. `agent-os-import-adopted` has no
+ * `expected/` today; it is listed so that adding one never turns it into an adapter lookup. Left in the sweep they abort the run, and if that
  * abort were ever softened to a skip-and-delete they would be reported as stale goldens to
  * remove: the same aim-at-goldens-it-does-not-own bug T017 hit with `-import`.
  */
-const NOT_ADAPTER_FIXTURES = new Set(['ruler-import', 'rulesync-import']);
+const NOT_ADAPTER_FIXTURES = new Set([
+  'agent-os-import',
+  'agent-os-import-adopted',
+  'ruler-import',
+  'rulesync-import',
+]);
 
 /** Every `fixtures/<dir>` that has both `input/` and `expected/`. */
 async function writeFixtures() {

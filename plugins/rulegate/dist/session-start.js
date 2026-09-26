@@ -35,6 +35,7 @@ function readJson(path) {
     return "INVALID";
   }
 }
+var isTopicFile = (f) => f.endsWith(".md") && !/^MEMORY(\..+)?\.md$/.test(f);
 function ls(path) {
   try {
     return readdirSync(path).sort();
@@ -107,6 +108,22 @@ var GIT_DENY = Object.freeze([
   "Bash(git update-ref *)",
   "Bash(git worktree *)"
 ]);
+var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
+function enabledAt(root, claudeDir, id) {
+  for (const [scope, p] of [
+    ["local", join2(root, ".claude/settings.local.json")],
+    ["project", join2(root, ".claude/settings.json")],
+    ["user", join2(claudeDir, "settings.json")]
+  ]) {
+    const value = enabledIn(p, id);
+    if (value !== void 0) return { value, scope };
+  }
+  return void 0;
+}
+function enabledIn(file, id) {
+  const s = readJson(file);
+  return isRecord(s) && isRecord(s.enabledPlugins) && typeof s.enabledPlugins[id] === "boolean" ? s.enabledPlugins[id] : void 0;
+}
 function claudeHome(env, home) {
   return resolve(env.CLAUDE_CONFIG_DIR || join2(home, ".claude"));
 }
@@ -117,7 +134,7 @@ function claudeDirFromEnv() {
 }
 
 // src/lib/session.ts
-import { join as join5 } from "node:path";
+import { join as join4 } from "node:path";
 
 // src/git/index.ts
 import { execFile } from "node:child_process";
@@ -264,7 +281,7 @@ function cartographerDir(root) {
 function mapFiles(root) {
   const dir = cartographerDir(root);
   if (dir === void 0) return [];
-  return ls(dir).filter((f) => f.endsWith(".md") && f !== "MEMORY.md").map((file) => {
+  return ls(dir).filter(isTopicFile).map((file) => {
     const text = read(join3(dir, file)) ?? "";
     const m = /^mapped:\s*["']?(\d{4}-\d{2}-\d{2})/m.exec(text);
     return { file, text, mapped: m?.[1] };
@@ -316,22 +333,12 @@ async function coverage(root, { stale = false } = {}) {
   };
 }
 
-// src/lib/state.ts
-import { join as join4 } from "node:path";
-var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
-function enabledFlag(root, claudeDir, id) {
-  for (const p of [
-    join4(root, ".claude/settings.local.json"),
-    join4(root, ".claude/settings.json"),
-    join4(claudeDir, "settings.json")
-  ]) {
-    const s = readJson(p);
-    if (isRecord(s) && isRecord(s.enabledPlugins) && typeof s.enabledPlugins[id] === "boolean") {
-      return s.enabledPlugins[id];
-    }
-  }
-  return void 0;
+// src/lib/legacy.ts
+function disableCommand(scope) {
+  return `claude plugin disable ${LEGACY_PLUGIN_ID} --scope ${scope === "project" ? "project" : "local"}`;
 }
+
+// src/lib/state.ts
 var AGENTS_SECTION = /rulegate:(feature-cartographer|builder|reviewer)/;
 
 // src/lib/session.ts
@@ -366,13 +373,13 @@ var AGENT_CONTRACT = [
 var inline = (s) => stripControl(s).replace(/`/g, "");
 var firstLines = (text, n) => text.split("\n").slice(0, n).join("\n").trim();
 async function snapshot({ root, now }) {
-  const [inside, branch, commits, status] = await Promise.all([
+  const [inside2, branch, commits, status] = await Promise.all([
     runGit(["rev-parse", "--is-inside-work-tree"], root),
     runGit(["rev-parse", "--abbrev-ref", "HEAD"], root),
     runGit(["log", "--max-count=3", "--format=%h  %s  (%cr)"], root),
     runGit(["status", "--porcelain"], root)
   ]);
-  if (inside?.trim() !== "true") return [];
+  if (inside2?.trim() !== "true") return [];
   const out = ["## Where you left off", ""];
   if (branch?.trim()) out.push(`Branch: \`${inline(branch.trim())}\``);
   const recent = (commits ?? "").split("\n").filter(Boolean);
@@ -406,7 +413,7 @@ async function snapshot({ root, now }) {
     if (body === void 0) continue;
     const text = firstLines(body, 18);
     if (!text) break;
-    const modified = mtimeMs(join5(root, f));
+    const modified = mtimeMs(join4(root, f));
     const age = modified === void 0 ? void 0 : Math.max(0, Math.round((now - modified) / 864e5));
     const when = age === void 0 ? "" : `, ${age === 0 ? "today" : `${String(age)}d old`}`;
     out.push(
@@ -425,7 +432,7 @@ async function snapshot({ root, now }) {
   return capped;
 }
 function isSetUp(root) {
-  return isDir(join5(root, ".rulegate")) || read(join5(root, ".claude/rulegate.json")) !== void 0 || ls(join5(root, ".claude/agent-memory")).some((d) => d.startsWith("rulegate-")) || AGENTS_SECTION.test(read(join5(root, "CLAUDE.md")) ?? "");
+  return isDir(join4(root, ".rulegate")) || read(join4(root, ".claude/rulegate.json")) !== void 0 || ls(join4(root, ".claude/agent-memory")).some((d) => d.startsWith("rulegate-")) || AGENTS_SECTION.test(read(join4(root, "CLAUDE.md")) ?? "");
 }
 async function contract({ root, claudeDir }) {
   if (!isSetUp(root)) {
@@ -458,14 +465,15 @@ async function contract({ root, claudeDir }) {
     "",
     'Plan mode: its "Explore agents only" phase does not replace the cartographer. Ask the cartographer read-only during planning (it will not write), and let it file its map once plan mode ends.'
   );
-  if (isDir(join5(root, ".rulegate"))) {
+  if (isDir(join4(root, ".rulegate"))) {
     lines.push(
       "Rules: every file listed in `.rulegate/state.json` \u2014 `CLAUDE.md` included \u2014 is generated, and an edit to one is blocked. Edit `.rulegate/rules/`, then run `rulegate sync`; `rulegate sync --import` recovers a hand-edit."
     );
   }
-  if (enabledFlag(root, claudeDir, LEGACY_PLUGIN_ID) === true) {
+  const legacy = enabledAt(root, claudeDir, LEGACY_PLUGIN_ID);
+  if (legacy?.value === true) {
     lines.push(
-      `The agent-os plugin is still enabled here and prints its own block; tell the user once that \`claude plugin disable ${LEGACY_PLUGIN_ID}\` retires it.`
+      `The agent-os plugin is still enabled here and prints its own block; tell the user once that \`/rulegate:init\` migrates it (it runs \`${disableCommand(legacy.scope)}\`).`
     );
   }
   return lines;

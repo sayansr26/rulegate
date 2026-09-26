@@ -96,7 +96,7 @@ describe('SessionStart (T107)', () => {
     await sb.put('.rulegate/rulegate.yaml', 'schemaVersion: 1\n');
     await sb.put('.claude/settings.json', { enabledPlugins: { 'agent-os@sayan-plugins': true } });
     expect((await contract(opts())).join('\n')).toContain(
-      'claude plugin disable agent-os@sayan-plugins',
+      '`/rulegate:init` migrates it (it runs `claude plugin disable agent-os@sayan-plugins --scope project`)',
     );
   });
 });

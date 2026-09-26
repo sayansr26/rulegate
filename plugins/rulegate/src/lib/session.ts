@@ -4,7 +4,9 @@ import { pluginConfig } from './config.js';
 import { coverage } from './features.js';
 import { isDir, ls, mtimeMs, read, readInRepo } from './read.js';
 import { stripControl } from './text.js';
-import { AGENTS_SECTION, LEGACY_PLUGIN_ID, enabledFlag } from './state.js';
+import { disableCommand } from './legacy.js';
+import { LEGACY_PLUGIN_ID, enabledAt } from './settings.js';
+import { AGENTS_SECTION } from './state.js';
 
 /**
  * The SessionStart block (T107): "where you left off", then "how this project works".
@@ -199,9 +201,10 @@ export async function contract({ root, claudeDir }: SessionOptions): Promise<str
       'Rules: every file listed in `.rulegate/state.json` — `CLAUDE.md` included — is generated, and an edit to one is blocked. Edit `.rulegate/rules/`, then run `rulegate sync`; `rulegate sync --import` recovers a hand-edit.',
     );
   }
-  if (enabledFlag(root, claudeDir, LEGACY_PLUGIN_ID) === true) {
+  const legacy = enabledAt(root, claudeDir, LEGACY_PLUGIN_ID);
+  if (legacy?.value === true) {
     lines.push(
-      `The agent-os plugin is still enabled here and prints its own block; tell the user once that \`claude plugin disable ${LEGACY_PLUGIN_ID}\` retires it.`,
+      `The agent-os plugin is still enabled here and prints its own block; tell the user once that \`/rulegate:init\` migrates it (it runs \`${disableCommand(legacy.scope)}\`).`,
     );
   }
   return lines;

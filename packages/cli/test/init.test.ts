@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NodeFileSystem, computeInitPlan, computePlan } from '@rulegate/core';
 import { ADAPTERS } from '../src/registry.js';
 import { runInit } from '../src/commands/init.js';
+import { runCheck } from '../src/commands/check.js';
 import { runSync } from '../src/commands/sync.js';
 import { ExitCode } from '../src/ui/exit.js';
 
@@ -456,5 +457,104 @@ describe('rulegate init', () => {
 
     expect(await read('.prettierignore')).toBe('# mine\n');
     expect(await tree()).not.toContain('.eslintignore');
+  });
+});
+
+/**
+ * T113's validation: an agent-os project migrates in one `init`. The dry run prints a plan
+ * that takes over agent-os's outputs and writes nothing; `--yes` backs every one of them up
+ * before overwriting it, leaves the files it only warned about alone, and hands over a
+ * repository `check` calls clean.
+ */
+describe('rulegate init — from agent-os (T113)', () => {
+  /** agent-os's bannered outputs plus the hand-written files; every one is taken over. */
+  const TAKEN_OVER = [
+    '.agents/rules/api.md',
+    '.agents/rules/style.md',
+    '.agents/rules/tests.md',
+    '.claude/rules/api.md',
+    '.claude/rules/tests.md',
+    '.clinerules/api.md',
+    '.clinerules/tests.md',
+    '.cursor/rules/api.mdc',
+    '.cursor/rules/style.mdc',
+    '.cursor/rules/team.mdc',
+    '.cursor/rules/tests.mdc',
+    '.windsurf/rules/api.md',
+    '.windsurf/rules/style.md',
+    '.windsurf/rules/tests.md',
+    'AGENTS.md',
+    'CLAUDE.md',
+  ];
+  /** Reported, never written: merged configs, skill copies, and agent-os's own sources. */
+  const LEFT_ALONE = [
+    '.agent-os/AGENTS.md',
+    '.agent-os/config.json',
+    '.agent-os/rules/api.md',
+    '.agents/skills/review/SKILL.md',
+    '.claude/skills/review/SKILL.md',
+    '.gemini/settings.json',
+    'kilo.json',
+    'opencode.json',
+  ];
+
+  const seedAgentOs = () =>
+    cp(path.join(fixtures, 'agent-os-import/input'), repo, { recursive: true });
+
+  it('prints the takeover and writes nothing without --yes', async () => {
+    await seedAgentOs();
+    const before = await tree();
+    const spy = vi.spyOn(NodeFileSystem.prototype, 'writeFile');
+    const log = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    try {
+      expect(await runInit({ cwd: repo })).toBe(ExitCode.Ok);
+      expect(spy).not.toHaveBeenCalled();
+      const printed = log.mock.calls.map(([chunk]) => String(chunk)).join('');
+      expect(printed).toContain('migrating from  agent-os');
+      for (const file of TAKEN_OVER) expect(printed).toContain(`  ${file}\n`);
+    } finally {
+      spy.mockRestore();
+      log.mockRestore();
+    }
+    expect(await tree()).toEqual(before);
+  });
+
+  it('backs up every file it takes over, leaves the rest, and check is clean after', async () => {
+    await seedAgentOs();
+    const original = new Map<string, string>();
+    for (const file of [...TAKEN_OVER, ...LEFT_ALONE]) original.set(file, await read(file));
+
+    expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
+
+    for (const file of TAKEN_OVER) {
+      expect(await read(`.rulegate/backup/${file}`), file).toBe(original.get(file));
+    }
+    const state = JSON.parse(await read('.rulegate/state.json')) as {
+      artifacts: { path: string }[];
+    };
+    const owned = new Set(state.artifacts.map((a) => a.path));
+    for (const file of LEFT_ALONE) {
+      expect(await read(file), file).toBe(original.get(file));
+      expect(owned, file).not.toContain(file);
+    }
+    // The plugin's settings file is printed, never written: its existence is how the
+    // plugin tells a project that has run /rulegate:init from one that has not.
+    await expect(read('.claude/rulegate.json')).rejects.toThrow();
+
+    expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+  });
+
+  it('refuses a .agent-os/ built from Rulegate output, and writes nothing (T120)', async () => {
+    await cp(path.join(fixtures, 'agent-os-import-adopted/input'), repo, { recursive: true });
+    const before = await tree();
+    const err = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      expect(await runInit({ cwd: repo, yes: true })).toBe(ExitCode.Failure);
+      const printed = err.mock.calls.map(([chunk]) => String(chunk)).join('');
+      expect(printed).toContain('restore .rulegate/ from git history');
+    } finally {
+      err.mockRestore();
+    }
+    expect(await tree()).toEqual(before);
   });
 });
