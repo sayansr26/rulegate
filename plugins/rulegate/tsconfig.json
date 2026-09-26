@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Typecheck only. `dist/` is esbuild's committed bundle (build.mjs), and a stray `tsc`
+    // emit into it would put files there the freshness gate never produced.
+    "noEmit": true,
+    "rootDir": "src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts", "dist"]
+}

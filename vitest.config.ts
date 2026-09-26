@@ -37,6 +37,7 @@ export default defineConfig({
       'packages/**/src/**/*.test.ts',
       'packages/**/test/**/*.test.ts',
       'action/**/*.test.ts',
+      'plugins/**/test/**/*.test.ts',
     ],
     environment: 'node',
     globals: false,

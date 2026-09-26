@@ -73,10 +73,15 @@ jobs:
       - name: rulegate check (dogfood)
         run: node packages/cli/dist/bin.js check
 
-      - name: generated docs and action bundle are current
+      # The validator pins the plugin's version to the CLI's, and the step below pins the
+      # CLI's to the tag, so a release cannot publish one version of the CLI while the
+      # marketplace serves another of the plugin.
+      - name: generated docs, bundles and plugin are current
         run: |
           node scripts/generate-docs.mjs --check
           node action/build.mjs --check
+          node plugins/rulegate/build.mjs --check
+          node scripts/validate-plugin.mjs
 
       # The tag is the version's only declaration, so a tag that disagrees with the
       # manifests would publish a version nobody asked for under a name that says

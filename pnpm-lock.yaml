@@ -165,6 +165,8 @@ importers:
         specifier: workspace:*
         version: link:../adapter-kit
 
+  plugins/rulegate: {}
+
 packages:
 
   '@esbuild/aix-ppc64@0.25.12':

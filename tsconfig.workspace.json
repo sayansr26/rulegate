@@ -47,6 +47,8 @@
     "packages/**/src/**/*",
     "packages/**/test/**/*",
     "action/**/*.ts",
+    "plugins/**/src/**/*",
+    "plugins/**/test/**/*",
     "scripts/**/*.mjs",
     "*.ts",
     "*.js"

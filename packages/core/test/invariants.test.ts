@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import vitestConfig from '../../../vitest.config.js';
 import { GIT_SUBCOMMANDS, StagedFileSystem } from '../src/git/index.js';
+import {
+  GIT_SAFETY_ARGS as PLUGIN_GIT_SAFETY_ARGS,
+  GIT_SUBCOMMANDS as PLUGIN_GIT_SUBCOMMANDS,
+} from '../../../plugins/rulegate/src/git/index.js';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -42,13 +46,16 @@ async function packageManifests(): Promise<{ name: string; dir: string; json: Pa
   // `packages/interop` is listed explicitly (T054): it is not an adapter and does not live
   // under `packages/adapters/`, but it ships, so the dependency allowlist and the engines
   // pin must cover it. A package that escapes this list is a package where a third-party
-  // dependency can arrive unnoticed.
+  // dependency can arrive unnoticed. `plugins/rulegate` is listed for the same reason
+  // (T104): its bundle ships inside the Claude Code plugin, and whatever it depends on
+  // ships with it.
   const dirs = [
     'packages/core',
     'packages/cli',
     'packages/adapter-kit',
     'packages/interop',
     'action',
+    'plugins/rulegate',
   ].concat(await adapterDirs());
   return Promise.all(
     dirs.map(async (dir) => {
@@ -88,24 +95,32 @@ describe('dependency surface', () => {
 });
 
 /**
- * The only directory in shipped source that may spawn a process (T052). One entry, and
- * the test above pins the length.
+ * The only directories in shipped source that may spawn a process, each running only
+ * read-only git: the CLI's `check --staged` (T052) and the Claude Code plugin's hooks
+ * (T104). The test below pins the length. T115 (D3) will add `packages/cli/src/claude` for
+ * the pinned `claude plugin …` subcommands, and must pin that list the same way.
  */
-const SPAWN_ALLOWLIST = ['packages/core/src/git'];
+const SPAWN_ALLOWLIST = ['packages/core/src/git', 'plugins/rulegate/src/git'];
+
+/**
+ * The `node:` prefix is optional in every pattern. Third-party code imports `https`, not
+ * `node:https`, and esbuild keeps the specifier as written — including as `__require(…)`
+ * in a bundle — so a prefix-only pattern scanned the plugin's bundle and matched nothing a
+ * dependency could bring in.
+ */
+const NETWORK_PRIMITIVES = [
+  /(?:\bfrom|\bimport|\brequire\(|__require\()\s*['"](?:node:)?(?:https?|http2|net|dgram|dns|tls|undici)['"]/,
+  /\bfetch\s*\(/,
+  /\bglobalThis\.fetch\b/,
+  /\bXMLHttpRequest\b/,
+];
 
 describe('zero network calls', () => {
-  const FORBIDDEN = [
-    /from\s+['"]node:(https?|net|dgram|dns|tls)['"]/,
-    /require\(\s*['"]node:(https?|net|dgram|dns|tls)['"]\s*\)/,
-    /\bfetch\s*\(/,
-    /\bXMLHttpRequest\b/,
-  ];
-
   it('has no network primitive anywhere in shipped source', async () => {
     const offenders: string[] = [];
     for (const file of await sourceFiles()) {
       const text = await readFile(file, 'utf8');
-      for (const pattern of FORBIDDEN) {
+      for (const pattern of NETWORK_PRIMITIVES) {
         if (pattern.test(text)) {
           offenders.push(`${relPosix(file)} matches ${String(pattern)}`);
         }
@@ -114,13 +129,14 @@ describe('zero network calls', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('spawns no process outside the one allowlisted directory', async () => {
+  it('spawns no process outside the allowlisted directories', async () => {
     // T023 banned `child_process` outright and said the ban would be narrowed when
     // `check --staged` arrived, because reading the git index means a subprocess. T052 is
-    // that narrowing. The allowlist has **exactly one** entry and the assertion below
-    // pins its length: a ban that grows an entry per feature is not a ban, and `curl` is
-    // one `execFile` away from "zero network calls" being false.
-    expect(SPAWN_ALLOWLIST).toHaveLength(1);
+    // that narrowing, and T104 the second: the plugin's hooks need `git log` and
+    // `ls-files`. The assertion below pins the length, so every entry is a decision
+    // recorded here rather than an accretion: a ban that grows an entry per feature is not
+    // a ban, and `curl` is one `execFile` away from "zero network calls" being false.
+    expect(SPAWN_ALLOWLIST).toHaveLength(2);
 
     const FORBIDDEN_SPAWN = [
       /from\s+['"](node:)?child_process['"]/,
@@ -129,7 +145,9 @@ describe('zero network calls', () => {
     const offenders: string[] = [];
     for (const file of await sourceFiles()) {
       const rel = relPosix(file);
-      if (SPAWN_ALLOWLIST.some((dir) => rel.startsWith(dir))) continue;
+      // Directory boundary, not string prefix: `src/git` must not also exempt
+      // `src/github.ts` or a hook named `src/git-context.ts`.
+      if (SPAWN_ALLOWLIST.some((dir) => rel.startsWith(`${dir}/`))) continue;
       const text = await readFile(file, 'utf8');
       for (const pattern of FORBIDDEN_SPAWN) {
         if (pattern.test(text)) offenders.push(`${rel} matches ${String(pattern)}`);
@@ -155,6 +173,55 @@ describe('zero network calls', () => {
     }
   });
 
+  it("confines the plugin's git to four read-only subcommands", async () => {
+    // The second hole gets the same guard as the first, and more, because hooks fire on
+    // their own at session start. A read-only subcommand is not a read-only call: `status`
+    // takes `index.lock`, `core.fsmonitor` runs a configured program, `log.showSignature`
+    // runs gpg, and a partial clone fetches blobs from its remote. Each switch is asserted
+    // here rather than trusted to survive an edit; the option allowlist that keeps
+    // `--output=` and `-p` out is exercised in `plugins/rulegate/test/git.test.ts`.
+    expect([...PLUGIN_GIT_SUBCOMMANDS].sort()).toEqual(['log', 'ls-files', 'rev-parse', 'status']);
+    expect(PLUGIN_GIT_SAFETY_ARGS).toEqual([
+      '--no-lazy-fetch',
+      '--no-optional-locks',
+      '-c',
+      'core.fsmonitor=false',
+      '-c',
+      'log.showSignature=false',
+    ]);
+
+    const text = await readFile(path.join(repoRoot, SPAWN_ALLOWLIST[1]!, 'index.ts'), 'utf8');
+    expect(text).not.toMatch(/\bexec\s*\(/);
+    expect(text).toMatch(/\bexecFile\s*\(/);
+    expect(text).toMatch(/\[\.\.\.GIT_SAFETY_ARGS, \.\.\.args\]/);
+    expect(text).toContain("GIT_NO_LAZY_FETCH: '1'");
+
+    // Callers live outside the git directory (the hooks), so the literal-subcommand scan
+    // covers every plugin source file rather than the module alone.
+    for (const file of await sourceFiles()) {
+      if (!relPosix(file).startsWith('plugins/')) continue;
+      const src = await readFile(file, 'utf8');
+      for (const [, sub] of src.matchAll(/runGit\(\s*\[\s*['"`]([a-z-]+)['"`]/g)) {
+        expect(PLUGIN_GIT_SUBCOMMANDS, relPosix(file)).toContain(sub);
+      }
+    }
+  });
+
+  it("has no network primitive in the plugin's committed bundle", async () => {
+    // The bundle, not just its source: esbuild inlines whatever the hooks import, so a
+    // dependency that reaches for `fetch` arrives in `dist/` without appearing in
+    // `plugins/rulegate/src` at all. `child_process` is not scanned for here — the git
+    // module legitimately bundles it; the source scans above police who may call it.
+    const offenders: string[] = [];
+    for (const file of await bundleFiles()) {
+      const text = await readFile(file, 'utf8');
+      for (const pattern of NETWORK_PRIMITIVES) {
+        if (pattern.test(text)) offenders.push(`${relPosix(file)} matches ${String(pattern)}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it('has no nondeterministic primitive in shipped source', async () => {
     // See docs/determinism.md. os.EOL, locale-sensitive comparison, and clock or
     // randomness reads all make output depend on where it was produced.
@@ -173,7 +240,11 @@ describe('zero network calls', () => {
 });
 
 async function sourceFiles(): Promise<string[]> {
-  const roots = [path.join(repoRoot, 'packages'), path.join(repoRoot, 'action', 'src')];
+  const roots = [
+    path.join(repoRoot, 'packages'),
+    path.join(repoRoot, 'action', 'src'),
+    path.join(repoRoot, 'plugins', 'rulegate', 'src'),
+  ];
   const out: string[] = [];
   const walk = async (dir: string): Promise<void> => {
     let entries;
@@ -198,6 +269,26 @@ async function sourceFiles(): Promise<string[]> {
   return out.sort();
 }
 
+/** Every `.js` under the plugin's committed `dist/`; empty until the first hook lands. */
+async function bundleFiles(): Promise<string[]> {
+  const out: string[] = [];
+  const walk = async (dir: string): Promise<void> => {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const child = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(child);
+      else if (entry.name.endsWith('.js')) out.push(child);
+    }
+  };
+  await walk(path.join(repoRoot, 'plugins', 'rulegate', 'dist'));
+  return out.sort();
+}
+
 describe('the shared rendering path', () => {
   /**
    * `check` and `sync` must consume one rendering pass. The mechanism is that only
@@ -205,15 +296,21 @@ describe('the shared rendering path', () => {
    * leaks into the CLI, the two commands can drift apart and `check` starts lying.
    * These are structural assertions, not style rules.
    */
+  /**
+   * Async and sync forms alike. The first version matched only `writeFile(`, `copyFile(`,
+   * `unlink(`, `rmSync(` and `deleteFile(`, so `writeFileSync`, `mkdirSync` or `renameSync`
+   * — the forms the plugin's scripts naturally reach for — passed unseen (T106 audit).
+   * `cp` and `link` count only as `cpSync`/`linkSync`: bare, they are ordinary helper names
+   * (Zed's `docs.ts` has a `link()`).
+   */
+  const WRITE_PRIMITIVE =
+    /\b(?:writeFile|appendFile|copyFile|unlink|rm|rmdir|mkdir|rename|symlink|truncate|chmod|utimes)(?:Sync)?\(|\b(?:cp|link)Sync\(|\bcreateWriteStream\(|\bdeleteFile\(/;
+
   it('keeps every filesystem write inside the core io and apply layers', async () => {
     const offenders: string[] = [];
     for (const file of await sourceFiles()) {
       const rel = relPosix(file);
-      if (
-        !/\bwriteFile\(|\bcopyFile\(|\bunlink\(|\brmSync\(|\bdeleteFile\(/.test(
-          await readFile(file, 'utf8'),
-        )
-      ) {
+      if (!WRITE_PRIMITIVE.test(await readFile(file, 'utf8'))) {
         continue;
       }
       const allowed =
@@ -415,7 +512,8 @@ async function adapterFiles(): Promise<string[]> {
  */
 describe('workspace source maps', () => {
   // `action` is private and nothing imports it, so it needs no entry in either map.
-  const UNIMPORTED = new Set(['@rulegate/action']);
+  // The same holds for the plugin: Claude Code runs its bundle, nothing imports it.
+  const UNIMPORTED = new Set(['@rulegate/action', '@rulegate/claude-code-plugin']);
 
   /** `@rulegate/adapter-kit/testing` is a subpath of `@rulegate/adapter-kit`. */
   function basePackage(key: string): string {

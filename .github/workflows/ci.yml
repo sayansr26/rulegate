@@ -84,6 +84,12 @@ jobs:
       - name: action bundle is current
         run: node action/build.mjs --check
 
+      # Same gate, same reason, for the Claude Code plugin: Claude Code runs its hooks from
+      # a plugin cache with no install step, so the committed bundle is what every user's
+      # session enforces. A stale one enforces an older commit's idea of ownership.
+      - name: plugin bundle is current
+        run: node plugins/rulegate/build.mjs --check
+
       # The precedence pages under docs/tools/ and the adapter registry are generated from
       # each adapter's `docs.ts`. Committed and stale, they are worse than absent: they are
       # the project's most public claim about what each tool reads, and a wrong one is a
@@ -92,6 +98,13 @@ jobs:
       # the Action bundle check above is here too.
       - name: generated docs are current
         run: node scripts/generate-docs.mjs --check
+
+      # The Claude Code plugin ships from this repository's marketplace, straight from git:
+      # no build step stands between a malformed agent file and a user's session. Frontmatter
+      # that loses its closing delimiter is dropped by Claude Code without an error, and a
+      # plugin whose version drifts from the CLI's is a release that forgot one half.
+      - name: plugin is valid
+        run: node scripts/validate-plugin.mjs
 
   smoke:
     name: install and run end to end

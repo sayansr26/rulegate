@@ -1,0 +1,27 @@
+{
+  "name": "rulegate",
+  "owner": {
+    "name": "Sayan Choudhury"
+  },
+  "metadata": {
+    "description": "Rulegate for Claude Code: your project's rules, agents and codebase map, enforced inside the agent.",
+    "version": "0.3.0"
+  },
+  "plugins": [
+    {
+      "name": "rulegate",
+      "source": "./plugins/rulegate",
+      "description": "Enforces a Rulegate project inside Claude Code: a session contract naming the project's agents, a guard that blocks edits to generated files, and a codebase cartographer with per-project memory.",
+      "category": "workflow",
+      "keywords": [
+        "rulegate",
+        "context-engineering",
+        "claude-md",
+        "agents-md",
+        "memory",
+        "agents",
+        "codebase-navigation"
+      ]
+    }
+  ]
+}

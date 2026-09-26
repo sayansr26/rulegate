@@ -2,12 +2,15 @@ node_modules/
 dist/
 coverage/
 
-# The one exception. A published GitHub Action gets no `npm install` — the runner checks
+# The two exceptions. A published GitHub Action gets no `npm install` — the runner checks
 # the repository out and runs `dist/main.js` as it stands — so the Action's bundle is a
 # committed artifact. `node action/build.mjs --check` is the CI gate that keeps it from
 # going stale, since a stale bundle keeps working while reporting an older commit's
-# behaviour. Everything else under `dist/` stays ignored.
+# behaviour. The Claude Code plugin is the same case: Claude Code runs its hooks from a
+# plugin cache with no install step, and `node plugins/rulegate/build.mjs --check` is its
+# gate. Everything else under `dist/` stays ignored.
 !action/dist/
+!plugins/rulegate/dist/
 *.tsbuildinfo
 .eslintcache
 .vitest/
@@ -32,10 +35,7 @@ coverage/
 # own .rulegate/, rendered from public-safe rules and committed. An ignored file cannot
 # be gated by `rulegate check`, so ignoring one would silently opt it out of the very
 # guarantee this project sells. The hand-written working guide CLAUDE.md replaced now
-# lives in the `09-working-guide` serena memory.
 #
-# `memory-bank/` was that store until 2026-09-09 and is now `.serena/memories/`, ignored
-# by .serena/.gitignore rather than here — the entry has to sit beside the directory it
 # protects, because a reader of this file would not think to look for one there.
 task-breakdown.md
 docs/PRD.md
@@ -44,3 +44,7 @@ docs/reserch-report.md
 # Copies of files that predated rulegate, saved by `sync --force`. Local recovery
 # material, not project content.
 .rulegate/backup/
+
+# A maintainer-local list of identifiers the plugin must never publish; read by
+# scripts/validate-plugin.mjs. Committing it would publish the very terms it guards.
+.leakcheck

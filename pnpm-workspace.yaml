@@ -2,6 +2,7 @@ packages:
   - 'packages/*'
   - 'packages/adapters/*'
   - 'action'
+  - 'plugins/rulegate'
 
 # Rulegate needs no dependency build scripts. Keeping this empty means pnpm 10's
 # default lifecycle-script blocking stays in force: a transitive dependency cannot

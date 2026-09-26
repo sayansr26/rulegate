@@ -121,6 +121,33 @@ export default tseslint.config(
     },
   },
   {
+    // The plugin's hooks run on their own at session start, in every user's repository.
+    // Network modules are banned by name with and without the `node:` prefix, and only
+    // `src/git/` may spawn — the same allowlist `invariants.test.ts` pins.
+    files: ['plugins/rulegate/src/**/*.ts'],
+    ignores: ['plugins/rulegate/src/git/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['http', 'https', 'http2', 'net', 'tls', 'dns', 'dgram', 'undici']
+            .flatMap((m) => [m, `node:${m}`])
+            .map((name) => ({ name, message: 'Zero network calls, in any code path, ever.' }))
+            .concat(
+              ['child_process', 'node:child_process'].map((name) => ({
+                name,
+                message: 'Only plugins/rulegate/src/git may spawn, and only read-only git.',
+              })),
+            ),
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'fetch', message: 'Zero network calls, in any code path, ever.' },
+      ],
+    },
+  },
+  {
     // Adapter *tests* may use Node freely, but not the core bypass: a test that imports
     // core is where the next adapter author copies their import block from.
     files: ['packages/adapters/*/test/**/*.ts'],
@@ -152,7 +179,7 @@ export default tseslint.config(
     // honest; adding casts to satisfy them would not be. Everything that guards the
     // product — the dependency allowlist, the write allowlist, the network and
     // determinism scans — is a test over `packages/` and is unaffected.
-    files: ['scripts/**/*.mjs', 'action/build.mjs'],
+    files: ['scripts/**/*.mjs', 'action/build.mjs', 'plugins/rulegate/build.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       globals: { URL: 'readonly', console: 'readonly', process: 'readonly' },

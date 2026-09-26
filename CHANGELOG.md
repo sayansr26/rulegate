@@ -5,6 +5,26 @@ All notable changes to this project are recorded here. This project follows
 
 ## [Unreleased]
 
+### Internal
+
+- **The Claude Code plugin has a home; its hooks and skills are still to come.** agent-os's
+  Claude Code plugin is moving into this repository as the Rulegate plugin for Claude Code.
+  The groundwork: a `rulegate` marketplace at the repository root, `plugins/rulegate/`, a
+  validator CI runs on every push (agent frontmatter, hook paths, and
+  one version shared by the plugin, the marketplace and the CLI), and a committed hook bundle
+  with a freshness gate. The zero-network and spawn invariants now cover the plugin's source
+  and its bundle; its scripts may run four read-only git subcommands and nothing else.
+- **The plugin's seven agents are ported from agent-os** — `rulegate:feature-cartographer`,
+  `architect`, `builder`, `tester`, `reviewer`, `documenter` and `orchestrator`. They send
+  rule changes to `.rulegate/rules/` and `rulegate sync`, and never edit a file recorded in
+  `.rulegate/state.json`.
+- **`/rulegate:init`, `/rulegate:map` and `/rulegate:memory`** — the plugin's skills, ported
+  from agent-os. `/rulegate:init` audits the project's Claude Code context layer and setup
+  (FRESH, REPAIR or HEALTHY) in one read-only call, hands drift to `rulegate check` and token
+  cost to `rulegate doctor`, and puts anything bound for `CLAUDE.md` in `.rulegate/rules/`
+  instead, because `CLAUDE.md` is generated. Its settings pass previews in this version and
+  does not apply yet.
+
 ## [0.3.0] — unreleased
 
 ### Breaking

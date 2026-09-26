@@ -1,0 +1,9 @@
+{
+  "targets": [
+    "claude-code",
+    "cline",
+    "cursor",
+    "windsurf",
+    "gemini-cli"
+  ]
+}
