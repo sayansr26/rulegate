@@ -65,7 +65,12 @@ function flipCase(name: string): string {
  * A directory that already lists both spellings is skipped rather than believed: the
  * second file is real there, not an alias for the first, so it proves nothing either way.
  */
-export async function probeCaseInsensitive(fs: ReadOnlyFileSystem): Promise<boolean> {
+export async function probeCaseInsensitive(
+  // Only the two methods it calls: the Claude Code plugin's PreToolUse guard (T108) asks the
+  // same question with a two-method view, rather than bundling a filesystem class whose
+  // other half writes.
+  fs: Pick<ReadOnlyFileSystem, 'listDir' | 'exists'>,
+): Promise<boolean> {
   let entries: readonly DirEntry[];
   try {
     entries = await fs.listDir('');

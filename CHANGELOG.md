@@ -29,6 +29,13 @@ All notable changes to this project are recorded here. This project follows
   for what, which features are mapped, and that rules are edited in `.rulegate/rules/`.
   Handoff and task paths are configurable in `.claude/rulegate.json` and must stay inside
   the repository.
+- **A PreToolUse guard blocks edits to generated files** — any path `.rulegate/state.json`
+  records, `state.json` itself and `.rulegate/backup/` — and says where the change belongs:
+  the rule in `.rulegate/rules/`, then `rulegate sync`, or `rulegate sync --import` to keep a
+  hand-edit. It decides ownership exactly as the CLI does, case-insensitively where the
+  filesystem is. On the first edit to an unmapped feature it also suggests asking the
+  cartographer, once per session; `"cartographerReminder": false` in `.claude/rulegate.json`
+  turns that off.
 
 ## [0.3.0] — unreleased
 

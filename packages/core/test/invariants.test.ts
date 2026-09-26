@@ -303,6 +303,9 @@ describe('the shared rendering path', () => {
    * `cp` and `link` count only as `cpSync`/`linkSync`: bare, they are ordinary helper names
    * (Zed's `docs.ts` has a `link()`).
    */
+  /** The plugin's only writer (P3): once-per-session markers under `os.tmpdir()`. */
+  const PLUGIN_MARKER = 'plugins/rulegate/src/session/marker.ts';
+
   const WRITE_PRIMITIVE =
     /\b(?:writeFile|appendFile|copyFile|unlink|rm|rmdir|mkdir|rename|symlink|truncate|chmod|utimes)(?:Sync)?\(|\b(?:cp|link)Sync\(|\bcreateWriteStream\(|\bdeleteFile\(/;
 
@@ -316,10 +319,34 @@ describe('the shared rendering path', () => {
       const allowed =
         rel.startsWith('packages/core/src/io/') ||
         rel === 'packages/core/src/pipeline/apply.ts' ||
-        rel === 'packages/core/src/fs/types.ts';
+        rel === 'packages/core/src/fs/types.ts' ||
+        rel === PLUGIN_MARKER;
       if (!allowed) offenders.push(rel);
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("keeps every write in the plugin's bundles to the marker's two calls", async () => {
+    // The source scan above cannot see this: core is bundled from source (P2), so what
+    // keeps `NodeFileSystem` and `applyPlan` out of `dist/` is esbuild dropping unused code.
+    // A hook that one day imports a core symbol dragging a writer along stays green in every
+    // source scan — `core/src/io/` is allowlisted — and ships the writer. The bundle says.
+    const calls: string[] = [];
+    for (const file of await bundleFiles()) {
+      const text = await readFile(file, 'utf8');
+      for (const m of text.matchAll(new RegExp(WRITE_PRIMITIVE.source, 'g'))) calls.push(m[0]);
+    }
+    expect(calls.sort()).toEqual(['mkdirSync(', 'writeFileSync(']);
+  });
+
+  it("confines the plugin's one writer to empty marker files in the OS temp directory", async () => {
+    // Decision P3: the PreToolUse reminder's once-per-session memory. It is allowed above
+    // only because of what this pins — a temp-directory base, exclusive creation that
+    // neither overwrites nor follows a planted link, and nothing written but ''.
+    const text = await readFile(path.join(repoRoot, PLUGIN_MARKER), 'utf8');
+    expect(text).toMatch(/join\(tmpdir\(\), MARKER_DIR\)/);
+    expect(text).toMatch(/writeFileSync\(join\(base, [^\n]*\), '', \{ flag: 'wx' \}\)/);
+    expect(text.match(/writeFileSync\(/g)).toHaveLength(1);
   });
 
   /**

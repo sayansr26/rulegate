@@ -2,13 +2,26 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume|clear|compact",
+        "matcher": "startup|resume|clear|compact|fork",
         "hooks": [
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/session-start.js\"",
             "timeout": 10,
             "statusMessage": "Loading where you left off"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/pre-edit.js\"",
+            "timeout": 10,
+            "statusMessage": "Checking Rulegate ownership and maps"
           }
         ]
       }

@@ -11,5 +11,8 @@
   "scripts": {
     "build": "node build.mjs",
     "build:check": "node build.mjs --check"
+  },
+  "dependencies": {
+    "@rulegate/core": "workspace:*"
   }
 }
