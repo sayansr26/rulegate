@@ -1,7 +1,6 @@
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { isRecord, readJson } from './read.js';
-import { claudeHome } from './settings.js';
+import { isRecord, readJson, claudeHome } from '@rulegate/claude';
 
 /**
  * What every script entry point resolves from its environment, kept out of the libraries

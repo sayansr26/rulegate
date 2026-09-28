@@ -1,6 +1,6 @@
 import { basename, join } from 'node:path';
 import { runGit } from '../git/index.js';
-import { isDir, isTopicFile, ls, read } from './read.js';
+import { isDir, isTopicFile, ls, read } from '@rulegate/claude';
 
 /**
  * Every memory store this project has, and each one's health — the deterministic half of

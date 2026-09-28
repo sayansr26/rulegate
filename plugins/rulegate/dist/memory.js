@@ -1,7 +1,7 @@
 // src/lib/entry.ts
 import { homedir } from "node:os";
 
-// src/lib/read.ts
+// ../../packages/claude/src/read.ts
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 var MAX_READ_BYTES = 4 * 1024 * 1024;
 function read(path) {
@@ -29,7 +29,7 @@ function isDir(path) {
   }
 }
 
-// src/lib/settings.ts
+// ../../packages/claude/src/settings.ts
 import { join, resolve } from "node:path";
 var GIT_DENY = Object.freeze([
   "Bash(git -C*)",

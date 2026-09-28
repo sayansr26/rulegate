@@ -6,9 +6,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runAudit } from '../src/lib/audit.js';
 import { contract } from '../src/lib/session.js';
 import { coverage } from '../src/lib/features.js';
-import { KEPT_INDEX, keptPointer, planMemoryMigration } from '../src/lib/migrate.js';
-import { describeScope, planTaskRule, TASK_RULE_FILE } from '../src/lib/settings.js';
-import { describeState, setupState } from '../src/lib/state.js';
+import {
+  KEPT_INDEX,
+  keptPointer,
+  planMemoryMigration,
+  describeScope,
+  planTaskRule,
+  TASK_RULE_FILE,
+  describeState,
+  setupState,
+} from '@rulegate/claude';
 import { applyMemoryMigration } from '../src/migrate/memory.js';
 import { applyScope, BACKUP_SUFFIX } from '../src/settings-writer/apply.js';
 import { buildProgram } from 'rulegate';

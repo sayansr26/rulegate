@@ -22,7 +22,9 @@ do that much. What Rulegate adds is the half that makes it trustworthy:
   so `check` structurally cannot lie about what `sync` would write.
 
 **Zero network calls. Zero telemetry.** Not a setting — a test that fails the build if a
-network primitive appears anywhere in shipped source, including every dependency.
+network primitive appears anywhere in shipped source, including every dependency. The one
+exception is one you type by name: `init --plugin --yes` asks your `claude` CLI to fetch the
+Claude Code plugin.
 
 > **Status: pre-release.** The adapter API is frozen (`docs/adapter-api-v1.md`), ten
 > adapters ship, and this repository generates its own agent config with them. `rulegate` is
@@ -71,6 +73,21 @@ npx rulegate check    # verify they match — exit 1 on drift. Put this in CI.
 
 `init` writes nothing without `--yes`, backs up every file it takes ownership of into
 `.rulegate/backup/`, and `rulegate restore` puts them back.
+
+### Claude Code
+
+When Claude Code is configured, `init` also reports its setup state and the Rulegate plugin's
+version, and prints the `claude plugin …` commands that would install or update it. It does
+not run them: they fetch from GitHub, and `init` stays offline unless you ask.
+
+```bash
+npx rulegate init --plugin --yes            # run those commands through the `claude` CLI
+npx rulegate claude settings                # preview git protection + task tools for Claude Code
+npx rulegate claude settings --scope project --apply   # write it; each file backed up first
+```
+
+`rulegate doctor` shows the plugin's installed and latest version, and names the settings file
+when one turns it off.
 
 ### What `check` catches
 
@@ -288,7 +305,8 @@ and 22:
   cry wolf.
 - **Never writes a literal secret.** MCP secrets are references (`env:GITHUB_TOKEN`) under
   every flag.
-- **Never writes outside the repository.**
+- **Never writes outside the repository**, except where you name it:
+  `rulegate claude settings --scope user --apply` backs `~/.claude/settings.json` up first.
 
 ## Documentation
 

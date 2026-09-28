@@ -39,6 +39,7 @@
       "@rulegate/adapter-roo-code": ["packages/adapters/roo-code/src/index.ts"],
       "@rulegate/adapter-zed": ["packages/adapters/zed/src/index.ts"],
       "@rulegate/interop": ["packages/interop/src/index.ts"],
+      "@rulegate/claude": ["packages/claude/src/index.ts"],
       "@rulegate/adapter-windsurf": ["packages/adapters/windsurf/src/index.ts"],
       "@rulegate/adapter-gemini": ["packages/adapters/gemini/src/index.ts"],
       "@rulegate/adapter-antigravity": ["packages/adapters/antigravity/src/index.ts"],

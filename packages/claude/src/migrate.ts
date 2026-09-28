@@ -6,8 +6,8 @@ import { ls, read } from './read.js';
 import { blocked, inside } from './refusals.js';
 
 /**
- * The memory migration's planner (T114) — pure, so the preview and the writer
- * (`src/migrate/`) share one answer, and the writer re-plans rather than trusting a
+ * The memory migration's planner (T114) — pure, so the preview and the writer (the
+ * plugin's `src/migrate/`) share one answer, and the writer re-plans rather than trusting a
  * preview the tree may have moved on from.
  *
  * Each `agent-os-<agent>` directory under `.claude/agent-memory{,-local}/` goes to
@@ -24,7 +24,7 @@ import { blocked, inside } from './refusals.js';
  *
  * Refused: a name that is not a plain agent name; a symlink or special file anywhere in
  * the source; a same-named file whose bytes differ (other than `MEMORY.md`); anything
- * `lib/refusals.ts` refuses for the settings writer too — a symlinked path component, a
+ * `refusals.ts` refuses for the settings writer too — a symlinked path component, a
  * path `state.json` records, a `state.json` that does not parse — and a project whose
  * `.claude/` is the user's Claude config dir. Only the two `MEMORY.md` files of a union are
  * decoded, so only they must be readable UTF-8: every other file moves as bytes, and a

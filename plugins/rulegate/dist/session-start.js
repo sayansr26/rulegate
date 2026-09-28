@@ -1,7 +1,7 @@
 // src/lib/entry.ts
 import { homedir } from "node:os";
 
-// src/lib/read.ts
+// ../../packages/claude/src/read.ts
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 var MAX_READ_BYTES = 4 * 1024 * 1024;
@@ -62,7 +62,16 @@ function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-// src/lib/settings.ts
+// ../../packages/claude/src/text.ts
+var isControl = (c) => {
+  const n = c.charCodeAt(0);
+  return n < 32 || n === 127;
+};
+var hasControl = (s) => Array.from(s).some(isControl);
+var stripControl = (s) => Array.from(s, (c) => isControl(c) ? " " : c).join("");
+var inline = (s) => stripControl(s).replace(/`/g, "");
+
+// ../../packages/claude/src/settings.ts
 import { join as join2, resolve } from "node:path";
 var GIT_DENY = Object.freeze([
   "Bash(git -C*)",
@@ -127,6 +136,14 @@ function enabledIn(file, id) {
 function claudeHome(env, home) {
   return resolve(env.CLAUDE_CONFIG_DIR || join2(home, ".claude"));
 }
+
+// ../../packages/claude/src/legacy.ts
+function disableCommand(scope) {
+  return `claude plugin disable ${LEGACY_PLUGIN_ID} --scope ${scope === "project" ? "project" : "local"}`;
+}
+
+// ../../packages/claude/src/state.ts
+var AGENTS_SECTION = /rulegate:(feature-cartographer|builder|reviewer)/;
 
 // src/lib/entry.ts
 function claudeDirFromEnv() {
@@ -195,14 +212,6 @@ function runGit(args, cwd) {
     );
   });
 }
-
-// src/lib/text.ts
-var isControl = (c) => {
-  const n = c.charCodeAt(0);
-  return n < 32 || n === 127;
-};
-var hasControl = (s) => Array.from(s).some(isControl);
-var stripControl = (s) => Array.from(s, (c) => isControl(c) ? " " : c).join("");
 
 // src/lib/config.ts
 var CONFIG_PATH = ".claude/rulegate.json";
@@ -333,14 +342,6 @@ async function coverage(root, { stale = false } = {}) {
   };
 }
 
-// src/lib/legacy.ts
-function disableCommand(scope) {
-  return `claude plugin disable ${LEGACY_PLUGIN_ID} --scope ${scope === "project" ? "project" : "local"}`;
-}
-
-// src/lib/state.ts
-var AGENTS_SECTION = /rulegate:(feature-cartographer|builder|reviewer)/;
-
 // src/lib/session.ts
 var MAX_SNAPSHOT_LINES = 40;
 var MAX_DIRTY = 10;
@@ -370,16 +371,15 @@ var AGENT_CONTRACT = [
     "for work spanning several of the above, or that cannot be stated in one sentence."
   ]
 ];
-var inline = (s) => stripControl(s).replace(/`/g, "");
 var firstLines = (text, n) => text.split("\n").slice(0, n).join("\n").trim();
 async function snapshot({ root, now }) {
-  const [inside2, branch, commits, status] = await Promise.all([
+  const [inside, branch, commits, status] = await Promise.all([
     runGit(["rev-parse", "--is-inside-work-tree"], root),
     runGit(["rev-parse", "--abbrev-ref", "HEAD"], root),
     runGit(["log", "--max-count=3", "--format=%h  %s  (%cr)"], root),
     runGit(["status", "--porcelain"], root)
   ]);
-  if (inside2?.trim() !== "true") return [];
+  if (inside?.trim() !== "true") return [];
   const out = ["## Where you left off", ""];
   if (branch?.trim()) out.push(`Branch: \`${inline(branch.trim())}\``);
   const recent = (commits ?? "").split("\n").filter(Boolean);

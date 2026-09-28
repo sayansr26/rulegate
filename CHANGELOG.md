@@ -7,6 +7,34 @@ All notable changes to this project are recorded here. This project follows
 
 ### Added
 
+- **`rulegate init` knows Claude Code.** When the claude-code adapter is enabled, `init` prints
+  the setup state — FRESH, REPAIR with each missing item named, or HEALTHY — and the
+  `rulegate@rulegate` plugin's version and scope, then the `claude plugin …` commands that would
+  install, enable or update it. Plain `init` still makes no network call: the commands are
+  printed, not run. `init --plugin --yes` runs them through the `claude` CLI in the repository
+  root — marketplace add or update, install at project scope, enable where a settings file turns
+  the plugin off, update at the install's own scope — and reports `from → to`. An enable never
+  goes to a scope less local than the install, so a fresh project install never flips
+  `~/.claude/settings.json`. A list it cannot read, a `claude --version` that fails, a step that
+  times out, and a plugin still disabled after the steps all exit 1, the last naming the
+  settings file that decides. A missing `claude` prints the `/plugin` commands and exits 0.
+  `--no-plugin` hides the section. `packages/cli/src/claude/` is the third directory allowed to
+  spawn a process, with a fixed argv allowlist; `--yes` is never passed to `claude`.
+- **`rulegate claude settings [--scope project|user|both] [--apply]`** adds git write
+  protection, the task tools and the task-tracking rule to Claude Code's settings — the pass
+  `/rulegate:init settings` runs, from the CLI. It previews by default, naming what `--apply`
+  would refuse; `--apply` needs an explicit `--scope`, backs each replaced file up to
+  `<file>.rulegate.bak` first, and exits 1 when any item was refused. It is the one command
+  that writes outside the repository, and only at user scope when asked.
+- **`doctor` has a Claude Code plugin line**: the installed version and scope against the
+  marketplace cache's latest, whether a settings file turns it off, and agent-os leftovers. It
+  reads Claude Code's files and runs nothing. When the plugin is off in a settings file more
+  local than its install, the hint names that file rather than a command that cannot reach it.
+  `doctor --json` carries it as `claudePlugin`, with `userDir`, `active` and `decidedAt`.
+- **`@rulegate/claude`**, a new published package: what Rulegate knows about a Claude Code
+  setup — setup state, the settings planner and its refusals, the generated-file guard and the
+  agent-os detection — read-only, moved out of the plugin's `src/lib/`. The CLI imports it and
+  the plugin bundles it; it depends only on `@rulegate/core`, and core never depends on it.
 - **Adapters for Antigravity, OpenCode and Kilo Code.** Antigravity gets one
   `.agents/rules/<id>.md` per rule with a native `trigger: glob` for scoped rules. OpenCode gets
   `.opencode/rules/*.md` plus a `.opencode/opencode.json` that Rulegate owns outright and that

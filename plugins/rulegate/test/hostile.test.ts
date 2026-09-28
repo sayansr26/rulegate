@@ -5,9 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runAudit } from '../src/lib/audit.js';
-import { planMemoryMigration } from '../src/lib/migrate.js';
-import { planTaskRule } from '../src/lib/settings.js';
-import { setupState } from '../src/lib/state.js';
+import { planMemoryMigration, planTaskRule, setupState } from '@rulegate/claude';
 import { applyMemoryMigration } from '../src/migrate/memory.js';
 import { sandbox, type Sandbox } from './helpers.js';
 

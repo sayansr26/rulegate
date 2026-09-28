@@ -4,8 +4,8 @@ import { exists, isDir, isRecord, ls, read, readJson } from './read.js';
 /**
  * The settings pass, pure half (decision P4). Everything here computes what the pass would
  * change and never writes: the audit and the setup state need the same answers, and the
- * writer (`src/settings-writer/`, T109) writes exactly the `next` planned here, so there is
- * one merge and a preview cannot promise something the apply does differently.
+ * writer (the plugin's `src/settings-writer/`, T109) writes exactly the `next` planned here,
+ * so there is one merge and a preview cannot promise something the apply does differently.
  *
  * Three things, at project scope, user scope, or both:
  *
@@ -112,6 +112,15 @@ export function enabledAt(
   }
   return undefined;
 }
+
+/**
+ * Whether `a`'s settings file outranks `b`'s — local over project over user. A flag written
+ * at `b` changes nothing while a more local file sets it, and fixes it otherwise.
+ */
+export const moreLocal = (a: string, b: string): boolean => {
+  const order = ['user', 'project', 'local'];
+  return order.indexOf(a) > order.indexOf(b);
+};
 
 /** `enabledPlugins[id]` as one settings file sets it, whatever the other scopes say. */
 export function enabledIn(file: string, id: string): boolean | undefined {

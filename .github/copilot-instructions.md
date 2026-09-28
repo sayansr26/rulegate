@@ -11,8 +11,8 @@ Rulegate differentiates on **verify** (`check` — render in memory, compare to 
 fail CI on drift) and **inspect** (`doctor` — which tools are configured, which file
 wins, roughly what it costs). Build those before broadening coverage.
 
-This repository is a pnpm workspace. `cli → core`, `cli → adapters/* → adapter-kit →
-core`, and `action/` depends on `cli` for `check` only.
+This repository is a pnpm workspace. `cli → core`, `cli → claude → core`, `cli → adapters/*
+→ adapter-kit → core`, and `action/` depends on `cli` for `check` only.
 
 ## Architecture
 
@@ -44,8 +44,8 @@ treat it as versioned data, not comments.
 
 Verify these still hold whenever `packages/core` changes:
 
-- **Zero network calls** in any code path — including every adapter and every
-  dependency.
+- **Zero network calls** in any code path — every adapter and dependency included — save
+  `init --plugin --yes`, which asks the `claude` CLI to fetch the plugin by name.
 - **Never write over a file Rulegate did not generate.** `state.json` is the only
   record of ownership; a path absent from it is somebody else's. `--force` may take
   ownership, but only after copying the original to `.rulegate/backup/`.
@@ -108,14 +108,15 @@ methods on it and never calls `applyPlan`. `--staged` checks the **git index** i
 the working tree, which is what a pre-commit hook needs: both sides come from the index, so
 an unstaged edit never blocks a commit and stale staged artifacts never slip through one.
 Outside a git working tree it refuses rather than quietly checking the working tree.
-`packages/core/src/git/` is the only directory in shipped source allowed to spawn a process,
-it runs three read-only git subcommands, and `invariants.test.ts` pins both facts.
+Shipped source spawns from three directories only — `packages/core/src/git/` and
+`plugins/rulegate/src/git/` (read-only git), `packages/cli/src/claude/` (`claude plugin`) —
+and `invariants.test.ts` pins their commands.
 
 `rulegate sync --import` merges a hand-edit on a generated file back into
 `.rulegate/`. It prints the merge as a diff and **writes nothing without `--yes`**. The
 ancestor is the current render, valid only while `state.json`'s recorded hash still matches
-it — if the canonical source moved on too, the version you edited cannot be reconstructed
-from anything, and the file is **refused** rather than merged from a guessed ancestor.
+it — if the canonical source moved on too, the version you edited cannot be rebuilt, and
+the file is **refused** rather than merged from a guessed ancestor.
 Matching is by position via `Artifact.provenance.ruleIds`, because a rule's id does not
 survive rendering; a file whose section count no longer matches the rules that produced it
 is refused for the same reason. `sync --force` is the other half: it discards the edit
@@ -134,14 +135,13 @@ command that reports a correct permanent condition as a CI failure is one people
 
 `rulegate adapter new <tool>` scaffolds an adapter — a working concatenated-Markdown
 stub, its three fixture layouts, its tests, and its registration in the registry, the
-CLI's dependencies, the Vitest alias and RFC-0001 §4.1. It is the one command aimed at
-contributors rather than users: it writes into a checkout of this monorepo and refuses
-anywhere else. Like `init` it **writes nothing without `--yes`**, and it never overwrites —
-every generated path must be absent and every patched file must exist, checked before the
-first write so a collision leaves the tree untouched. Registration is part of the scaffold
-because `registry.test.ts` pins `ADAPTERS` to the directory listing: an unregistered
-adapter fails the suite. What is left for the author is the artifact path, the real
-precedence rules in `src/docs.ts`, and a hand-written golden.
+CLI's dependencies, the Vitest alias and RFC-0001 §4.1. It is for contributors: it writes
+into a checkout of this monorepo and refuses anywhere else. Like `init` it **writes nothing
+without `--yes`**, and it never overwrites — every generated path must be absent and every
+patched file must exist, checked before the first write so a collision leaves the tree
+untouched. Registration is part of the scaffold because `registry.test.ts` pins `ADAPTERS`
+to the directory listing: an unregistered adapter fails the suite. Left for the author: the
+artifact path, the real precedence rules in `src/docs.ts`, and a hand-written golden.
 
 Exit codes: `0` ok · `1` drift or failure · `2` usage. CI reads the code, not the
 message, so a usage error must never be reported as drift.

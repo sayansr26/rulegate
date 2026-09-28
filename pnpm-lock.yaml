@@ -126,6 +126,12 @@ importers:
         specifier: workspace:*
         version: link:../../adapter-kit
 
+  packages/claude:
+    dependencies:
+      '@rulegate/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/cli:
     dependencies:
       '@rulegate/adapter-aider':
@@ -167,6 +173,9 @@ importers:
       '@rulegate/adapter-zed':
         specifier: workspace:*
         version: link:../adapters/zed
+      '@rulegate/claude':
+        specifier: workspace:*
+        version: link:../claude
       '@rulegate/core':
         specifier: workspace:*
         version: link:../core
@@ -194,6 +203,9 @@ importers:
 
   plugins/rulegate:
     dependencies:
+      '@rulegate/claude':
+        specifier: workspace:*
+        version: link:../../packages/claude
       '@rulegate/core':
         specifier: workspace:*
         version: link:../../packages/core

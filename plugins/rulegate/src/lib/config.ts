@@ -1,5 +1,4 @@
-import { isRecord, readInRepo } from './read.js';
-import { hasControl } from './text.js';
+import { isRecord, readInRepo, hasControl } from '@rulegate/claude';
 
 /**
  * `.claude/rulegate.json` — the plugin's own settings (decision P1, 2026-09-26).

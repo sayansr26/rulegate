@@ -9,15 +9,15 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { exists } from '../lib/read.js';
 import {
+  exists,
   indexEntries,
   planMemoryMigration,
   sha256,
   type AgentMove,
   type FileMove,
   type MemoryPlan,
-} from '../lib/migrate.js';
+} from '@rulegate/claude';
 
 /**
  * The memory migration's writer (T114) — the plugin's third writer under the amended P3,

@@ -21,11 +21,20 @@ const ANSI = new RegExp(`${String.fromCharCode(27)}\\[`);
 const HOME_RULES = '# machine-wide rules\n\nnot from any repository.\n';
 
 let repo: string;
+let isolated: string;
 let stdout: string[];
 let stderr: string[];
 
 beforeEach(async () => {
   repo = await mkdtemp(path.join(tmpdir(), 'rulegate-doctor-'));
+  // Every fixture here has a CLAUDE.md, so every run without --no-global reads Claude Code's
+  // plugin records (T115). Point both routes to them at an empty directory, or a test's
+  // output depends on what the machine running it has installed.
+  isolated = await mkdtemp(path.join(tmpdir(), 'rulegate-doctor-home-'));
+  vi.stubEnv('HOME', isolated);
+  // os.homedir() reads USERPROFILE on Windows, not HOME.
+  vi.stubEnv('USERPROFILE', isolated);
+  vi.stubEnv('CLAUDE_CONFIG_DIR', path.join(isolated, '.claude'));
   stdout = [];
   stderr = [];
   // Doctor reports warnings on stderr by design, so an uncaptured run floods the test log
@@ -42,7 +51,9 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await rm(repo, { recursive: true, force: true });
+  await rm(isolated, { recursive: true, force: true });
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 const inspect = (): Promise<DoctorReport> =>

@@ -7,6 +7,7 @@ import { runDoctor } from './commands/doctor.js';
 import { runLintCommand } from './commands/lint.js';
 import { runRestore } from './commands/restore.js';
 import { runAdapterNew } from './commands/adapter/index.js';
+import { runClaudeSettings } from './commands/claude.js';
 import { resolveGlobalCwd } from './cwd.js';
 import { ExitCode } from './ui/exit.js';
 
@@ -42,6 +43,10 @@ export function buildProgram(): Command {
       'Import existing tool configs into .rulegate/ (prints a plan; writes nothing without --yes)',
     )
     .option('--yes', 'apply the plan instead of only printing it')
+    // Opt-in (T115): `claude plugin marketplace add|update` fetch from GitHub, and plain
+    // `init` makes no network call. Without either flag the commands are printed.
+    .option('--plugin', 'with --yes, install or update the Claude Code plugin via `claude plugin`')
+    .option('--no-plugin', 'hide the Claude Code section')
     .action(async (opts: { yes?: boolean }, cmd: Command) => {
       const globals = cmd.optsWithGlobals<{ cwd?: string; quiet?: boolean; color?: boolean }>();
       const { root, searched } = resolveGlobalCwd(globals.cwd);
@@ -49,6 +54,7 @@ export function buildProgram(): Command {
         cwd: root,
         ...(searched ? { announceRoot: true } : {}),
         ...(opts.yes === undefined ? {} : { yes: opts.yes }),
+        ...triState(cmd, 'plugin'),
         ...(globals.quiet === undefined ? {} : { quiet: globals.quiet }),
         ...(globals.color === undefined ? {} : { color: globals.color }),
       });
@@ -179,6 +185,31 @@ export function buildProgram(): Command {
       process.exitCode = code;
     });
 
+  // Grouped under its own noun: the one command that writes outside the repository, and
+  // only at user scope, only with --apply (D2).
+  const claude = program.command('claude').description('Claude Code helpers');
+
+  claude
+    .command('settings')
+    .description(
+      'Add git write protection, task tools and the task rule to Claude Code settings (preview; --apply writes)',
+    )
+    .option('--scope <scope>', 'project, user or both (required with --apply)')
+    .option('--apply', 'write the merge, backing each replaced file up to <file>.rulegate.bak')
+    .action(async (opts: { scope?: string; apply?: boolean }, cmd: Command) => {
+      const globals = cmd.optsWithGlobals<{ cwd?: string; quiet?: boolean; color?: boolean }>();
+      const { root, searched } = resolveGlobalCwd(globals.cwd);
+      const code = await runClaudeSettings({
+        cwd: root,
+        ...(searched ? { announceRoot: true } : {}),
+        ...(opts.scope === undefined ? {} : { scope: opts.scope }),
+        ...(opts.apply === undefined ? {} : { apply: opts.apply }),
+        ...(globals.quiet === undefined ? {} : { quiet: globals.quiet }),
+        ...(globals.color === undefined ? {} : { color: globals.color }),
+      });
+      process.exitCode = code;
+    });
+
   // Last, and grouped under its own noun, because it is the only command aimed at
   // contributors rather than at users: it writes into a checkout of this monorepo, not
   // into the repository being managed.
@@ -218,13 +249,18 @@ export function buildProgram(): Command {
  * where the distinction has already been lost.
  */
 function recursiveOption(cmd: Command): { recursive?: boolean } {
+  return triState(cmd, 'recursive');
+}
+
+/** A `--x` / `--no-x` pair read as set, unset or cleared; see `recursiveOption`. */
+function triState<K extends string>(cmd: Command, name: K): { [P in K]?: boolean } {
   // Two ways to be unset, and both must map to `{}`. Defining `--recursive` before
   // `--no-recursive` leaves the value `undefined` rather than commander's usual implied
   // `true`, so a bare `=== true` coercion turns "not passed" into `recursive: false` —
   // which is the escape hatch, not the default, and silently reintroduces every trap the
   // default exists to avoid. Caught by running the built binary, not by the types.
-  if (cmd.getOptionValueSource('recursive') === 'default') return {};
-  const value: unknown = cmd.getOptionValue('recursive');
+  if (cmd.getOptionValueSource(name) === 'default') return {};
+  const value: unknown = cmd.getOptionValue(name);
   if (typeof value !== 'boolean') return {};
-  return { recursive: value };
+  return { [name]: value } as { [P in K]?: boolean };
 }

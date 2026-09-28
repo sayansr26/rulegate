@@ -102,7 +102,9 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          patterns: ['@rulegate/adapter-*'],
+          // `@rulegate/claude` depends on core, never the reverse: what Claude Code's
+          // settings look like is exactly the tool-specific knowledge core must not hold.
+          patterns: ['@rulegate/adapter-*', '@rulegate/claude', '@rulegate/claude/*'],
           paths: [
             { name: 'node:fs', message: 'Filesystem access belongs in core/src/io only.' },
             {
@@ -148,6 +150,34 @@ export default tseslint.config(
     },
   },
   {
+    // `@rulegate/claude` is read-only by construction: the CLI and the plugin's hooks both
+    // run it, and the writers stay in the plugin (P3). The write scan in
+    // `invariants.test.ts` covers it as shipped source; this bans the rest at author time.
+    files: ['packages/claude/src/**/*.ts'],
+    ignores: ['packages/claude/src/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['@rulegate/adapter-*'],
+          paths: ['http', 'https', 'http2', 'net', 'tls', 'dns', 'dgram', 'undici']
+            .flatMap((m) => [m, `node:${m}`])
+            .map((name) => ({ name, message: 'Zero network calls, in any code path, ever.' }))
+            .concat(
+              ['child_process', 'node:child_process'].map((name) => ({
+                name,
+                message: '@rulegate/claude never spawns; packages/cli/src/claude runs `claude`.',
+              })),
+            ),
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'fetch', message: 'Zero network calls, in any code path, ever.' },
+      ],
+    },
+  },
+  {
     // Adapter *tests* may use Node freely, but not the core bypass: a test that imports
     // core is where the next adapter author copies their import block from.
     files: ['packages/adapters/*/test/**/*.ts'],
@@ -179,7 +209,12 @@ export default tseslint.config(
     // honest; adding casts to satisfy them would not be. Everything that guards the
     // product — the dependency allowlist, the write allowlist, the network and
     // determinism scans — is a test over `packages/` and is unaffected.
-    files: ['scripts/**/*.mjs', 'action/build.mjs', 'plugins/rulegate/build.mjs'],
+    files: [
+      'scripts/**/*.mjs',
+      'action/build.mjs',
+      'plugins/rulegate/build.mjs',
+      '.claude/**/*.mjs',
+    ],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       globals: { URL: 'readonly', console: 'readonly', process: 'readonly' },

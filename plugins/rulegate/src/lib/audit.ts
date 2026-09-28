@@ -1,8 +1,9 @@
 import { basename, join } from 'node:path';
 import { coverage } from './features.js';
-import { agentOsInstall, disableCommand } from './legacy.js';
-import { planMemoryMigration } from './migrate.js';
 import {
+  agentOsInstall,
+  disableCommand,
+  planMemoryMigration,
   isDir,
   isFile,
   isRealDir,
@@ -12,8 +13,6 @@ import {
   read,
   readJson,
   size,
-} from './read.js';
-import {
   GIT_DENY,
   LEGACY_MARKETPLACE,
   LEGACY_PLUGIN_ID,
@@ -21,8 +20,10 @@ import {
   TODO_ENV,
   isRulegateProject,
   normRule,
-} from './settings.js';
-import { AGENTS_SECTION, describeState, setupState } from './state.js';
+  AGENTS_SECTION,
+  describeState,
+  setupState,
+} from '@rulegate/claude';
 
 /**
  * The audit behind `/rulegate:init` — one call, whole picture.

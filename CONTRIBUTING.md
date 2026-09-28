@@ -69,12 +69,13 @@ errors began exiting 1, which is the code that means _drift_.
 This repository ships `.pre-commit-hooks.yaml`, so `rulegate check --staged` can run as a
 commit hook in any repository that adopts Rulegate. See the README for the two snippets.
 
-`--staged` is the one place in shipped source that spawns a process, and
-`packages/core/src/git/` is the only directory allowed to — `invariants.test.ts` pins that
-allowlist to exactly one entry, pins the three read-only git subcommands it may run, and
-asserts the module uses `execFile` rather than `exec`. `git fetch` is one argument away from
-making "zero network calls" false, so the hole gets its own guard rather than relying on the
-file scan that no longer covers it.
+`--staged` spawns git from `packages/core/src/git/`, one of three directories in shipped
+source allowed to spawn a process — the plugin's `plugins/rulegate/src/git/` (read-only git)
+and the CLI's `packages/cli/src/claude/` (`claude plugin …`, for `init --plugin --yes` only)
+are the others. `invariants.test.ts` pins that allowlist to exactly three entries and pins the
+command set each may run, and the git module uses `execFile` rather than `exec`. `git fetch`
+is one argument away from making "zero network calls" false, so each hole gets its own guard
+rather than relying on the file scan that no longer covers it.
 
 ## Invariants a pull request must not break
 
@@ -86,8 +87,9 @@ inline `eslint-disable` defeats a lint rule and nothing defeats a file scan.
   `node:dgram`, `node:dns`, `node:tls`, `fetch(` and `XMLHttpRequest` are banned in all
   shipped source. So is a runtime dependency that would bring one: the allowlist is `yaml`,
   `commander`, `picocolors`, and it is asserted by test.
-- **No process spawning.** `node:child_process` appears nowhere in shipped source. Scripts
-  under `scripts/` may spawn; they are not shipped.
+- **No process spawning** outside the three allowlisted directories above.
+  `node:child_process` appears nowhere else in shipped source. Scripts under `scripts/` may
+  spawn; they are not shipped.
 - **Nothing that makes output depend on the machine.** `os.EOL`, `.localeCompare(` and
   `Math.random()` are banned. Sort with `compareCodepoint`. See
   [`docs/determinism.md`](docs/determinism.md) — nondeterminism is a P0 bug, because it is

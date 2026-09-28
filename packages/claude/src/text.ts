@@ -12,3 +12,10 @@ export const hasControl = (s: string): boolean => Array.from(s).some(isControl);
 
 export const stripControl = (s: string): string =>
   Array.from(s, (c) => (isControl(c) ? ' ' : c)).join('');
+
+/**
+ * Repo-derived text printed inside a line: control characters become spaces and backticks
+ * are dropped, so a branch, path or directory name can neither break the line nor close the
+ * inline code span around it.
+ */
+export const inline = (s: string): string => stripControl(s).replace(/`/g, '');
