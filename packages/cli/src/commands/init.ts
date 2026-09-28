@@ -113,7 +113,16 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
   if (init.plan.artifacts.length > 0) {
     out.log('');
     out.log(`then \`rulegate sync\` would write ${pluralize(init.plan.artifacts.length, 'file')}:`);
-    for (const artifact of init.plan.artifacts) out.log(`  ${artifact.path}`);
+    // Named on the line itself as well as in its warning (T132): the list is what a reader
+    // scans, and "would write" beside a file nothing was imported from reads as a create.
+    const unimported = new Set(init.unimported);
+    for (const artifact of init.plan.artifacts) {
+      out.log(
+        unimported.has(artifact.path)
+          ? `  ${artifact.path}  (exists, not imported: backed up, then replaced)`
+          : `  ${artifact.path}`,
+      );
+    }
   }
 
   for (const warning of init.warnings) {
@@ -165,10 +174,11 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
 
   const canonicalWritten = await applyCanonicalFiles(init.canonicalFiles, fs, { dryRun: false });
 
-  // `force` because every file this plan touches is one `init` just imported *from*.
-  // Taking ownership is exactly what the user asked for, and `applyPlan` copies each
-  // original into `.rulegate/backup/` before overwriting it — which is the difference
-  // between taking ownership and taking someone's work.
+  // `force` because every file this plan touches is one `init` just imported *from*, or
+  // one `init.unimported` named above (T132). Taking ownership is exactly what the user
+  // asked for, and `applyPlan` copies each original into `.rulegate/backup/` before
+  // overwriting it — which is the difference between taking ownership and taking
+  // someone's work.
   const report = await applyPlan(init.plan, fs, { dryRun: false, force: true });
 
   out.log('');

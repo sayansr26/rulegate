@@ -36,7 +36,11 @@ So `init` hides each tool's observed output from the adapter pass. Two details m
   writes no marker of its own, so the only available signal is that the repository is a
   rulesync repository and the file is one of rulesync's known outputs. In a repository that
   uses rulesync _and_ keeps a hand-written `CLAUDE.md` at a path rulesync also targets, that
-  file will not be imported. Check the plan `init` prints before applying it.
+  file will not be imported. `init` does not take it on trust, though: any such file whose
+  bytes differ from what Rulegate would render is named with `W_INIT_NOT_IMPORTED` and marked
+  in the plan as backed up, then replaced. A genuine rulesync output usually differs as well,
+  so expect the warning on those too. Copy anything you wrote by hand into `.rulegate/rules/`
+  before `init --yes`; afterwards the original is in `.rulegate/backup/`.
 
 ## What does not come across
 

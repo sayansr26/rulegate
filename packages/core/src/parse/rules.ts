@@ -1,14 +1,17 @@
 import { isMap, isScalar, isSeq, type Node } from 'yaml';
 import type { RulegateError } from '../model/errors.js';
-import { DEFAULT_RULE_ORDER, type RuleDocument, type RuleFrontmatter } from '../model/rule.js';
+import {
+  DEFAULT_RULE_ORDER,
+  RULE_FRONTMATTER_KEYS,
+  type RuleDocument,
+  type RuleFrontmatter,
+} from '../model/rule.js';
 import { ALL_TOOLS, type ToolSelector } from '../model/selector.js';
 import { deriveRuleId } from '../model/paths.js';
 import { splitFrontmatter } from './frontmatter.js';
 import { parseYaml } from './yaml.js';
 import { Validator } from './validate.js';
 import type { JsonValue } from '../model/ids.js';
-
-const KNOWN_KEYS = new Set(['description', 'globs', 'tools', 'order']);
 
 export interface ParsedRule {
   readonly rule?: RuleDocument;
@@ -42,7 +45,7 @@ export function parseRuleFile(relPath: string, raw: string): ParsedRule {
 
   const unknown: Record<string, JsonValue> = {};
   for (const key of v.keys(map)) {
-    if (KNOWN_KEYS.has(key)) continue;
+    if (RULE_FRONTMATTER_KEYS.has(key)) continue;
     unknown[key] = v.plain(v.get(map, key));
   }
 

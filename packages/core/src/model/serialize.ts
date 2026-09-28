@@ -97,6 +97,11 @@ function serializeRule(rule: RuleDocument): string {
   }
 
   const body = ensureSingleTrailingNewline(rule.body);
+  // A body that opens with a `---` line — a Markdown rule, or a block another tool wrote —
+  // would be read back as the file's frontmatter, so it always gets a real one (T123).
+  if (Object.keys(doc).length === 0 && body.split('\n', 1)[0]?.trim() === '---') {
+    doc['order'] = fm.order;
+  }
   if (Object.keys(doc).length === 0) return body;
 
   const yaml = ensureSingleTrailingNewline(stringifyYaml(doc, { lineWidth: 0 }));

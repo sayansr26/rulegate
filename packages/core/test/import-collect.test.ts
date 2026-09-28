@@ -59,4 +59,34 @@ describe('collectImports', () => {
     });
     expect(result.sources.map((s) => s.tool)).toEqual(['good', 'empty']);
   });
+
+  it('renames a preserved key canonical would interpret, and never onto a key already there', async () => {
+    // T123. `unknown` is serialized into the same frontmatter as `order` and `tools`, so a
+    // native file's own `order: 1` came back from .rulegate/ as the rule's order — a string,
+    // which fails every later `check` — and its `tools:` moved the rule between tools.
+    const native = adapter('x', () =>
+      Promise.resolve({
+        rules: [
+          importedRule({
+            id: 'a',
+            body: 'a\n',
+            unknown: { order: '1', tools: '[claude-code]', 'x-order': 'mine', priority: '3' },
+            source: { file: 'a' },
+          }),
+        ],
+      }),
+    );
+    const result = await collectImports({
+      repoRoot: '/repo',
+      fs: new MemoryFileSystem(),
+      adapters: [native],
+    });
+
+    expect(result.sources[0]?.rules[0]?.frontmatter.unknown).toEqual({
+      'x-order-2': '1',
+      'x-tools': '[claude-code]',
+      'x-order': 'mine',
+      priority: '3',
+    });
+  });
 });

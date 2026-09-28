@@ -446,7 +446,8 @@ export interface CanonicalWriteReport {
  *
  * Unlike `applyPlan` this has no ownership rules to apply: `.rulegate/` is Rulegate's
  * own directory, and a file already there with different contents means the repository
- * has been adopted, which `computeInitPlan` refuses before reaching this point.
+ * has been adopted or holds hand-written rules, both of which `computeInitPlan` refuses
+ * before reaching this point.
  */
 export async function applyCanonicalFiles(
   files: readonly CanonicalFile[],

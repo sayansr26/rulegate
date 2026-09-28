@@ -1,6 +1,7 @@
 import { RulegateError } from '../model/errors.js';
 import { ADAPTER_API_VERSION } from '../adapter/context.js';
 import { compareCodepoint } from '../render/order.js';
+import { filesOnly } from '../fs/files-only.js';
 import { joinPosix } from '../fs/paths.js';
 import { matchesGlob } from '../fs/glob.js';
 import { parseGlobalPattern, toDisplayPath } from './global.js';
@@ -41,7 +42,8 @@ export interface DetectInput {
  * would be unusable for exactly that.
  */
 export async function detectTools(input: DetectInput): Promise<DetectionReport> {
-  const { repoRoot, fs, canonical, adapters, globalFs } = input;
+  const { repoRoot, canonical, adapters, globalFs } = input;
+  const fs = filesOnly(input.fs);
   const tools: ToolDetection[] = [];
 
   // Sequential, not `Promise.all`. Five elements make the concurrency worthless, and a

@@ -135,7 +135,8 @@ async function read(ctx: AdapterContext): Promise<InteropResult> {
     if (await ctx.fs.exists(candidate)) generated.push(candidate);
   }
 
-  return { rules, generated, notImported };
+  // Every one of them inferred, never read, so `init` still checks what it would replace.
+  return { rules, generated, inferred: generated, notImported };
 }
 
 export const rulesync: InteropImporter = {
