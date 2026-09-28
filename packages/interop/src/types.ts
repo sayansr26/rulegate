@@ -37,6 +37,18 @@ export interface InteropResult {
    */
   readonly generated: readonly string[];
   /**
+   * The paths in `generated` taken as this tool's output on its presence alone, without
+   * reading anything in the file that says so (T132).
+   *
+   * rulesync writes no marker, so a hand-written `CLAUDE.md` in a repository that uses
+   * rulesync only for Cursor is listed in `generated` all the same. Masking it is still
+   * right — importing a real rulesync output would import every rule twice — but `init`
+   * must not also take it as covered by the import: it checks these paths like any other
+   * file it would replace, and names one whose bytes differ. Optional, and absent means
+   * every entry was verified from content, as ruler's marker and agent-os's banner are.
+   */
+  readonly inferred?: readonly string[];
+  /**
    * What was found and deliberately not imported — MCP servers, skills, subagents.
    *
    * Printed by `init`. Silence here would be the quiet loss this project refuses everywhere

@@ -96,7 +96,28 @@ export type RulegateErrorCode =
   // Windsurf caps at 12,000. A warning: the plan is correct and may be what the user wants,
   // but the growth happens on a file they did not ask to change, and `init` is the one
   // command that knows its size before and after.
-  | 'W_SIZE_CAP_CROSSED';
+  | 'W_SIZE_CAP_CROSSED'
+  // A file already on disk where `init` renders, that no adapter imported from and no
+  // competing tool generated (T132) — OpenCode's `.opencode/opencode.json` holding settings,
+  // an unlisted `.opencode/rules/<id>.md` an imported rule's name lands on. A warning: `init`
+  // backs it up before replacing it, so nothing is lost, but none of its content came across
+  // to `.rulegate/` either, and a replacement the dry run never named is the silent kind.
+  | 'W_INIT_NOT_IMPORTED'
+  // The `.rulegate/` `init` would write does not render what it imported (T123): a file
+  // that does not parse back, or a generated file whose content changed on the trip. Always
+  // Rulegate's bug, and an error so that nothing is written: applying would take ownership
+  // of the user's files with content that is not theirs, and the next `check` would fail.
+  | 'E_INIT_CANONICAL_MISMATCH'
+  // A canonical file already in `.rulegate/`, with no manifest beside it, that `init` would
+  // overwrite or that `check` would read beside what `init` writes. Refused: it is the
+  // user's hand-written source, which `init` has no backup path for, and planning around it
+  // renders a repository the first `check` reports as drifted.
+  | 'E_INIT_CANONICAL_EXISTS'
+  // A path `init` would generate a file at is a directory, or lies beneath a file (T156): a
+  // `.rules/` directory enables Zed and a legacy `.clinerules` file enables Cline, and both
+  // adapters render onto that very path. Refused by name before anything is written, where it
+  // otherwise surfaced as a bare EISDIR or ENOTDIR.
+  | 'E_INIT_NOT_A_FILE';
 
 export interface RulegateErrorInit {
   readonly code: RulegateErrorCode;

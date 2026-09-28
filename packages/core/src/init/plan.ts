@@ -8,17 +8,23 @@ import {
   emptyCanonical,
 } from '../model/canonical.js';
 import { DEFAULT_LINT_CONFIG } from '../model/lint.js';
-import { MANIFEST_PATH } from '../model/paths.js';
+import { MANIFEST_PATH, MCP_SERVERS_PATH, RULES_DIR, RULES_GLOB } from '../model/paths.js';
 import { serializeCanonical } from '../model/serialize.js';
+import { parse } from '../parse/index.js';
+import { MemoryFileSystem } from '../io/memory.js';
 import { compareCodepoint } from '../render/order.js';
 import { detectTools } from '../detect/engine.js';
 import { collectImports } from '../import/collect.js';
+import { filesOnly, notAFile } from '../fs/files-only.js';
 import { maskPaths } from '../fs/mask.js';
+import { pathKeyFor, probeCaseInsensitive, type PathKey } from '../fs/case.js';
 import { ADAPTER_API_VERSION } from '../adapter/context.js';
 import { ORDER_STEP, dedupeImported, type ImportConflict } from '../import/dedupe.js';
 import { claimRuleId } from '../import/rule.js';
 import { dedupeMcpServers, type McpImportConflict } from '../import/dedupe-mcp.js';
 import { computePlan, type Plan } from '../pipeline/plan.js';
+import { hashContents } from '../state/state.js';
+import type { Artifact } from '../adapter/artifact.js';
 import type { CanonicalFile } from '../pipeline/apply.js';
 import type { Adapter } from '../adapter/adapter.js';
 import type { AdapterContext } from '../adapter/context.js';
@@ -57,6 +63,7 @@ export interface InteropLike {
   read(ctx: AdapterContext): Promise<{
     readonly rules: readonly RuleDocument[];
     readonly generated: readonly string[];
+    readonly inferred?: readonly string[];
     readonly notImported: readonly string[];
     readonly tools?: readonly string[];
     readonly notes?: readonly { readonly path: string; readonly message: string }[];
@@ -91,6 +98,13 @@ export interface InitPlan {
   readonly mcpConflicts: readonly McpImportConflict[];
   /** Competing rule-sync tools found in the repository and imported from (T054). */
   readonly interop: readonly string[];
+  /**
+   * Paths in `plan` that already exist with other bytes and that nothing was imported from
+   * (T132). Applying backs each up and replaces it like every other file init takes over;
+   * listed so the caller can say so beside the path, because nothing in it reached
+   * `.rulegate/`.
+   */
+  readonly unimported: readonly string[];
   readonly warnings: readonly RulegateError[];
   readonly errors: readonly RulegateError[];
 }
@@ -123,6 +137,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
       conflicts: [],
       mcpConflicts: [],
       interop: [],
+      unimported: [],
       warnings: adoptedPlan.warnings,
       errors: adoptedPlan.errors,
     };
@@ -132,22 +147,28 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   // the files the adapters import from, so without masking the observed outputs every rule
   // arrives twice — once from the source the user edits, once from the copy built out of it.
   const interopRules: RuleDocument[] = [];
+  // Every file anything was imported from, for T132's check of what init replaces.
+  const importedFrom = new Set<string>();
   // Path -> the importer that generated it, for the warning about outputs left behind.
   const generated = new Map<string, string>();
+  // The subset of `generated` an importer took on its presence alone, not its content.
+  const inferred = new Set<string>();
   const interopTools = new Set<string>();
   const interopFound: string[] = [];
   for (const importer of input.interop ?? []) {
     const ctx = {
       repoRoot,
       canonical: emptyCanonical({ file: MANIFEST_PATH }),
-      fs,
+      fs: filesOnly(fs),
       options: {},
       apiVersion: ADAPTER_API_VERSION,
     };
     if (!(await importer.detect(ctx))) continue;
     const found = await importer.read(ctx);
     interopRules.push(...found.rules);
+    for (const rule of found.rules) importedFrom.add(rule.source.file);
     for (const path of found.generated) generated.set(path, importer.displayName);
+    for (const path of found.inferred ?? []) inferred.add(path);
     for (const tool of found.tools ?? []) interopTools.add(tool);
     errors.push(...(found.errors ?? []));
     interopFound.push(importer.displayName);
@@ -220,16 +241,57 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
     }
   }
 
-  const plan = await computePlan({ repoRoot, fs, adapters, canonical });
+  // The plan is rendered from the canonical files as `check` will read them, not from the
+  // model they were serialized out of (T123). Rendering the in-memory model applied a plan
+  // that the written `.rulegate/` did not describe whenever the trip lost something — two
+  // rules on one path, a preserved `order` key read back as a string — and the first
+  // `check` after `init --yes` exited 1. What is lost on the trip is refused below.
+  const serialized = serializeCanonical(canonical);
+  const canonicalFiles = await classify(serialized, fs);
+  errors.push(...(await canonicalInTheWay(fs, serialized)));
+  const written = await parse({
+    fs: new MemoryFileSystem(serialized),
+    knownTools: adapters.map((a) => a.name),
+  });
+  const plan = await computePlan({
+    repoRoot,
+    fs,
+    adapters,
+    canonical: written.errors.length === 0 ? written.canonical : canonical,
+  });
+  errors.push(...written.errors.map(unreadableCanonical));
   errors.push(...plan.errors);
   warnings.push(...plan.warnings);
-
-  const canonicalFiles = await classify(serializeCanonical(canonical), fs);
+  if (errors.length === 0) {
+    const imported = await computePlan({ repoRoot, fs, adapters, canonical });
+    errors.push(...lostInWriting(imported.artifacts, plan.artifacts));
+  }
   const generatedPaths = plan.artifacts.map((a) => a.path);
-  warnings.push(...(await formatterWarnings({ fs, generated: generatedPaths })));
-  warnings.push(...(await backupSecretWarnings({ fs, taking: generatedPaths })));
+  errors.push(...(await notFiles(fs, plan.artifacts)));
+  for (const source of collected.sources) {
+    for (const rule of source.rules) importedFrom.add(rule.source.file);
+    for (const server of source.mcpServers) importedFrom.add(server.source.file);
+  }
+  const key = pathKeyFor(await probeCaseInsensitive(fs));
+  const verified = [...generated.keys()].filter((path) => !inferred.has(path));
+  // Through `filesOnly`: a path `notFiles` refused is already an error, and each check below
+  // would otherwise throw on it with a bare errno before the refusal could be reported.
+  const probe = filesOnly(fs);
+  const unimported = await unimportedPaths(probe, plan.artifacts, importedFrom, verified, key);
+  const inferredBy = (file: string): string | undefined => {
+    const by = [...inferred].find((g) => covers(g, file, key));
+    return by === undefined ? undefined : generated.get(by);
+  };
+  warnings.push(...unimported.map((file) => unimportedWarning(file, inferredBy(file))));
+  warnings.push(...(await formatterWarnings({ fs: probe, generated: generatedPaths })));
+  warnings.push(...(await backupSecretWarnings({ fs: probe, taking: generatedPaths })));
   warnings.push(
-    ...(await sizeCapWarnings({ fs, artifacts: plan.artifacts, adapters, enabled: detected })),
+    ...(await sizeCapWarnings({
+      fs: probe,
+      artifacts: plan.artifacts,
+      adapters,
+      enabled: detected,
+    })),
   );
   warnings.push(...leftBehindWarnings(collected.sources, generatedPaths));
   // Only for a plan that will be applied: the hint is "delete it once init has run", and
@@ -245,9 +307,192 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
     conflicts,
     mcpConflicts,
     interop: interopFound,
+    unimported,
     warnings,
     errors,
   };
+}
+
+/**
+ * Rendered paths that exist with other bytes and that init did not import from (T132).
+ *
+ * `init` applies with `force`, on the premise that everything it overwrites is a file it
+ * just imported from — so its content is in `.rulegate/` and the copy in
+ * `.rulegate/backup/` is only a courtesy. A file an adapter renders to but did not read
+ * breaks that premise: OpenCode's `.opencode/opencode.json` with settings in it, or an
+ * unlisted `.opencode/rules/<id>.md` whose name an imported rule takes. Asked generically,
+ * of every rendered path, rather than left to each adapter to warn about its own, because
+ * the next adapter with a config file of its own would otherwise repeat the bug.
+ *
+ * A competing tool's generated output counts as imported only when the importer read the
+ * file and found its mark (`verified`): its source came across instead, and a directory it
+ * generates into covers every file in it. An output inferred from the tool's presence alone
+ * is checked like any other file, because a hand-written `CLAUDE.md` in a repository that
+ * uses rulesync for Cursor only is masked from the adapter pass all the same, and nothing
+ * in it reached `.rulegate/`.
+ *
+ * Paths are compared under `key`, case-folded only where the filesystem folds: on APFS the
+ * imported `TypeScript.mdc` *is* the rendered `typescript.mdc`, and calling it a file
+ * nothing was imported from contradicts the warning that says it was.
+ * Byte-equal files are not listed: applying leaves them untouched.
+ */
+async function unimportedPaths(
+  fs: ReadOnlyFileSystem,
+  artifacts: readonly Artifact[],
+  importedFrom: ReadonlySet<string>,
+  verified: readonly string[],
+  key: PathKey,
+): Promise<readonly string[]> {
+  const imported = new Set([...importedFrom].map(key));
+  const out: string[] = [];
+  for (const artifact of artifacts) {
+    if (imported.has(key(artifact.path))) continue;
+    if (verified.some((g) => covers(g, artifact.path, key))) continue;
+    const onDisk = await fs.tryReadFile(artifact.path);
+    if (onDisk === undefined) continue;
+    if (hashContents(onDisk) === hashContents(artifact.contents)) continue;
+    out.push(artifact.path);
+  }
+  return out.sort(compareCodepoint);
+}
+
+/**
+ * Rendered paths that no file can be written to: a directory stands there, or a file stands
+ * where one of its parent directories must go (T156).
+ *
+ * Detection counts a directory as evidence as readily as a file — `.rules/` enables Zed, a
+ * legacy `.clinerules` file enables Cline, whose output is the `.clinerules/` directory — and
+ * once another tool's rules arrive unscoped, that adapter renders onto the very path.
+ * Reported here, by path and before anything is written, rather than left to the reads below
+ * and to `applyPlan`, where it surfaced as a bare EISDIR or ENOTDIR with no path in it.
+ */
+async function notFiles(
+  fs: ReadOnlyFileSystem,
+  artifacts: readonly Artifact[],
+): Promise<readonly RulegateError[]> {
+  const out: RulegateError[] = [];
+  for (const { path: file, adapter } of artifacts) {
+    try {
+      await fs.tryReadFile(file);
+    } catch (e) {
+      if (!notAFile(e)) throw e;
+      const what =
+        (e as { code?: string }).code === 'EISDIR'
+          ? 'a directory stands there'
+          : 'a file stands where one of its parent directories goes';
+      out.push(
+        new RulegateError({
+          code: 'E_INIT_NOT_A_FILE',
+          message: `${adapter} generates this file, and ${what}`,
+          source: { file },
+          hint: `${adapter} is enabled because its configuration was detected here; move or rename what is in the way and run init again`,
+        }),
+      );
+    }
+  }
+  return out;
+}
+
+/** Is `file` the generated path `output`, or inside the directory it names? */
+function covers(output: string, file: string, key: PathKey): boolean {
+  const [o, f] = [key(output), key(file)];
+  return f === o || f.startsWith(`${o}/`);
+}
+
+function unimportedWarning(file: string, inferredBy: string | undefined): RulegateError {
+  return new RulegateError({
+    code: 'W_INIT_NOT_IMPORTED',
+    message:
+      inferredBy === undefined
+        ? `${file} exists and nothing was imported from it: applying backs it up to .rulegate/backup/${file} and replaces it with generated output`
+        : `${file} exists and was not imported: it is taken for ${inferredBy}'s output only because ${inferredBy} is set up here, and applying backs it up to .rulegate/backup/${file} and replaces it with generated output`,
+    source: { file },
+    hint:
+      inferredBy === undefined
+        ? `if it holds anything you still need, such as settings or rules the tool does not load, copy it out before running init --yes; afterwards the original is only in .rulegate/backup/${file}`
+        : `if ${inferredBy} generated it, its rules came across from ${inferredBy}'s source; if you wrote it by hand, copy what you need into .rulegate/rules/ before running init --yes; afterwards the original is only in .rulegate/backup/${file}`,
+  });
+}
+
+/**
+ * Canonical files already on disk that `init` would overwrite, or that `check` would read
+ * beside the ones `init` writes.
+ *
+ * Reachable without a manifest: the parser's `rules-only` mode reads `.rulegate/rules/`
+ * alone, and init's own no-tools hint says to write it by hand. The parse-back above runs
+ * over only the files init writes, so a rule already there is invisible to it and the first
+ * `check` renders it into files init just generated; one init would replace is the user's
+ * source, and `applyCanonicalFiles` has no backup for it. Byte-equal files are fine, which
+ * is the leave-alone case.
+ */
+async function canonicalInTheWay(
+  fs: ReadOnlyFileSystem,
+  serialized: ReadonlyMap<string, string>,
+): Promise<readonly RulegateError[]> {
+  const onDisk = (await fs.glob(RULES_GLOB)).filter((p) => p.startsWith(`${RULES_DIR}/`));
+  if (await fs.exists(MCP_SERVERS_PATH)) onDisk.push(MCP_SERVERS_PATH);
+  const out: RulegateError[] = [];
+  for (const file of [...new Set(onDisk)].sort(compareCodepoint)) {
+    const ours = serialized.get(file);
+    if (ours !== undefined && (await fs.tryReadFile(file)) === ours) continue;
+    out.push(
+      new RulegateError({
+        code: 'E_INIT_CANONICAL_EXISTS',
+        message:
+          ours === undefined
+            ? `${file} already exists and is not one of the files init would write: \`check\` would render it beside what init imported`
+            : `${file} already exists with other contents, and init would overwrite it`,
+        source: { file },
+        hint: `nothing was written. To keep it, create ${MANIFEST_PATH} and run: rulegate sync; to import instead, move it out of .rulegate/ and run init again`,
+      }),
+    );
+  }
+  return out;
+}
+
+/**
+ * A canonical file `init` would write that does not parse back (T123). Always Rulegate's
+ * bug, never the user's — they have not written anything yet — so it names the file and
+ * stops before anything is written, instead of leaving a `.rulegate/` no command can read.
+ */
+function unreadableCanonical(error: RulegateError): RulegateError {
+  const file = error.source?.file ?? '.rulegate/';
+  return new RulegateError({
+    code: 'E_INIT_CANONICAL_MISMATCH',
+    message: `${file}, as init would write it, does not read back: ${error.message}`,
+    source: { file },
+    hint: 'this is a Rulegate bug; nothing was written. Please report it with the file init imported this rule from',
+  });
+}
+
+/**
+ * Generated files whose render from the written `.rulegate/` differs from the render of
+ * what was imported (T123).
+ *
+ * The applied plan is the first; a difference means the trip through `.rulegate/` changed
+ * a rule, and applying it would take ownership of the user's files with content that is
+ * not the content they had. Refused, not warned: that is the silent loss the T032 gate
+ * exists to catch, and a refusal leaves every file where it was.
+ */
+function lostInWriting(
+  imported: readonly Artifact[],
+  written: readonly Artifact[],
+): readonly RulegateError[] {
+  const render = new Map(written.map((a) => [a.path, a.contents]));
+  const paths = new Set([...imported.map((a) => a.path), ...render.keys()]);
+  const importedBy = new Map(imported.map((a) => [a.path, a.contents]));
+  return [...paths]
+    .filter((path) => importedBy.get(path) !== render.get(path))
+    .sort(compareCodepoint)
+    .map(
+      (file) =>
+        new RulegateError({
+          code: 'E_INIT_CANONICAL_MISMATCH',
+          message: `${file} would not be generated from .rulegate/ as it was imported: the canonical rules init would write lose part of it`,
+          source: { file },
+          hint: 'this is a Rulegate bug; nothing was written. Please report it with the files init imported from',
+        }),
+    );
 }
 
 function canonicalFrom(

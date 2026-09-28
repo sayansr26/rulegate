@@ -111,6 +111,33 @@ All notable changes to this project are recorded here. This project follows
   instead of writing raw YAML into canonical. It refuses a scope edit that would move the rule
   to another file (an emptied `paths:`, an `**Applies to:**` typed into `CLAUDE.md`), which the
   next `sync` could neither replace nor delete, and names `sync --force` as the recovery.
+- **`rulegate init` names every existing file it would replace without having imported from
+  it** (`W_INIT_NOT_IMPORTED`), such as an `.opencode/opencode.json` holding settings or a
+  hand-written `CLAUDE.md` in a rulesync repository. The dry run marks the line
+  `(exists, not imported: backed up, then replaced)`, and `--yes` copies the file to
+  `.rulegate/backup/` before replacing it. rulesync's outputs are recognised by their paths
+  alone, because rulesync writes no marker, so they are checked like any other file rather than
+  assumed to be its output. On a case-insensitive filesystem an imported
+  `.cursor/rules/TypeScript.mdc` counts as the rendered `typescript.mdc`.
+- **`rulegate check` is clean straight after `init --yes`.** `init` renders what it applies
+  from the `.rulegate/` it writes, read back the way `check` reads it, not from the model in
+  memory. One rule arriving from two sources (`AGENTS.md` and `.ruler/AGENTS.md`, or Codex and
+  Cursor) no longer leaves a drifted repository. A native `order:` or `tools:` key in an
+  imported rule is kept under a renamed key (`cursor-order:`) instead of being read back as
+  Rulegate's own, and a rule body that opens with `---` is no longer taken for frontmatter. If
+  the round trip would still lose anything, `init` refuses with `E_INIT_CANONICAL_MISMATCH` and
+  writes nothing.
+- **`rulegate init` refuses (`E_INIT_CANONICAL_EXISTS`) a hand-written `.rulegate/rules/` or
+  `.rulegate/mcp/servers.yaml` with no manifest** when its files differ from what `init` would
+  write, or are ones `init` would not write. Before, `init` either overwrote them without a
+  backup or left them for the first `check` to render as drift. Nothing is written; the hint
+  says to add the manifest and run `rulegate sync`, or move the files out and run `init` again.
+- **`rulegate init` no longer crashes with EISDIR or ENOTDIR on a directory or a file standing
+  where another tool's file goes.** Ruler or OpenCode beside Cline's `.clinerules/` directory
+  imports, with the Cline rules once. When an enabled tool would generate a file where a
+  directory stands (Zed's `.rules` beside a `.rules/` directory), or beneath a file (Cline's
+  `.clinerules/<id>.md` beside a legacy `.clinerules` file), `init` refuses with
+  `E_INIT_NOT_A_FILE`, naming the path and the tool, and writes nothing.
 
 ### Internal
 

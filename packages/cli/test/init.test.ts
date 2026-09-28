@@ -1,9 +1,10 @@
+import { readdirSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { NodeFileSystem, computeInitPlan, computePlan } from '@rulegate/core';
+import { MemoryFileSystem, NodeFileSystem, computeInitPlan, computePlan } from '@rulegate/core';
 import { ADAPTERS } from '../src/registry.js';
 import { runInit } from '../src/commands/init.js';
 import { runCheck } from '../src/commands/check.js';
@@ -170,6 +171,101 @@ describe('rulegate init', () => {
     expect(warnings[1]?.hint).toContain('delete .claude/rules/backend/db.md');
   });
 
+  // `init` applies with `force` on the premise that it imported from everything it
+  // replaces. A file an adapter renders to but never read breaks that premise, so it is named
+  // in the dry run and backed up before it is replaced — never overwritten silently (T132).
+  describe('a rendered path nothing was imported from (T132)', () => {
+    const SETTINGS = `{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-sonnet-4-5",
+  "instructions": [".opencode/rules/review.md", "docs/style.md"]
+}
+`;
+    const UNLISTED = 'Old style notes OpenCode never loads.\n';
+
+    async function seedUnimported(): Promise<void> {
+      await mkdir(path.join(repo, '.opencode/rules'), { recursive: true });
+      await mkdir(path.join(repo, 'docs'), { recursive: true });
+      await writeFile(path.join(repo, '.opencode/opencode.json'), SETTINGS);
+      await writeFile(path.join(repo, '.opencode/rules/review.md'), 'Review every diff.\n');
+      await writeFile(path.join(repo, 'docs/style.md'), 'Use tabs.\n');
+      // Unlisted, so not imported — and the listed `docs/style.md` renders onto its name.
+      await writeFile(path.join(repo, '.opencode/rules/style.md'), UNLISTED);
+    }
+
+    const UNIMPORTED = ['.opencode/opencode.json', '.opencode/rules/style.md'];
+
+    it('names each one in the plan, and nothing it did import', async () => {
+      await seedUnimported();
+      const init = await plan();
+      expect(init.errors).toEqual([]);
+      expect(init.unimported).toEqual(UNIMPORTED);
+      const warnings = init.warnings.filter((w) => w.code === 'W_INIT_NOT_IMPORTED');
+      expect(warnings.map((w) => w.source?.file)).toEqual(UNIMPORTED);
+      expect(warnings[0]?.message).toContain('.rulegate/backup/.opencode/opencode.json');
+    });
+
+    it('says so in the dry run, and writes nothing', async () => {
+      await seedUnimported();
+      const before = await tree();
+      const log = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      const err = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        expect(await runInit({ cwd: repo, plugin: false })).toBe(ExitCode.Ok);
+        const printed = log.mock.calls.map(([chunk]) => String(chunk)).join('');
+        for (const file of UNIMPORTED) {
+          expect(printed).toContain(
+            `  ${file}  (exists, not imported: backed up, then replaced)\n`,
+          );
+        }
+        expect(printed).toContain('  .opencode/rules/review.md\n');
+        const warned = err.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(warned).toContain('W_INIT_NOT_IMPORTED');
+      } finally {
+        log.mockRestore();
+        err.mockRestore();
+      }
+      expect(await tree()).toEqual(before);
+    });
+
+    it('backs each one up before replacing it', async () => {
+      await seedUnimported();
+      expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
+      expect(await read('.rulegate/backup/.opencode/opencode.json')).toBe(SETTINGS);
+      expect(await read('.rulegate/backup/.opencode/rules/style.md')).toBe(UNLISTED);
+      expect(await read('.opencode/rules/style.md')).not.toBe(UNLISTED);
+    });
+
+    // On APFS the imported `TypeScript.mdc` is the rendered `typescript.mdc`: listing it
+    // would call a file its rules came from one nothing was imported from.
+    it('matches an imported file case-folded where the filesystem folds case', async () => {
+      // A cased root file gives `probeCaseInsensitive` something to ask about.
+      const files: [string, string][] = [
+        ['README.md', '# app\n'],
+        ['.cursor/rules/TypeScript.mdc', '---\nalwaysApply: true\n---\n\nStrict mode.\n'],
+      ];
+      const planFor = (caseInsensitive: boolean) =>
+        computeInitPlan({
+          repoRoot: '/repo',
+          fs: new MemoryFileSystem(files, { caseInsensitive }),
+          adapters: ADAPTERS,
+        });
+      const folded = await planFor(true);
+      expect(folded.errors).toEqual([]);
+      expect(folded.plan.artifacts.map((a) => a.path)).toContain('.cursor/rules/typescript.mdc');
+      expect(folded.unimported).toEqual([]);
+      // Where case is significant the rendered name is a different, absent file.
+      expect((await planFor(false)).unimported).toEqual([]);
+    });
+
+    it('names nothing when every replaced file was imported from', async () => {
+      await seedNativeConfigs();
+      const init = await plan();
+      expect(init.unimported).toEqual([]);
+      expect(init.warnings.map((w) => w.code)).not.toContain('W_INIT_NOT_IMPORTED');
+    });
+  });
+
   it('loses nothing from the file it takes over', async () => {
     await seedNativeConfigs();
     expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
@@ -230,6 +326,43 @@ describe('rulegate init', () => {
       adapters: ADAPTERS,
     });
     expect(second.canonicalFiles.find((f) => f.path === rule!.path)?.kind).toBe('leave-alone');
+    expect(second.errors).toEqual([]);
+  });
+
+  describe('refuses a hand-written .rulegate/ with no manifest', () => {
+    // Reachable the same way, and init's own no-tools hint tells people to write it. The
+    // parse-back T123 plans from sees only the files init writes, so a rule already there
+    // was rendered by the first `check` and not by init — drift — and one init would
+    // rewrite was overwritten with no backup anywhere.
+    const refused = async (file: string, contents: string): Promise<void> => {
+      await seedNativeConfigs();
+      await mkdir(path.dirname(path.join(repo, file)), { recursive: true });
+      await writeFile(path.join(repo, file), contents);
+      const before = await tree();
+
+      const planned = await plan();
+      expect(planned.errors.map((e) => [e.code, e.source?.file])).toEqual([
+        ['E_INIT_CANONICAL_EXISTS', file],
+      ]);
+      expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Failure);
+      expect(await tree()).toEqual(before);
+      expect(await read(file)).toBe(contents);
+    };
+
+    it('a rule init would not write, which check would render beside its import', () =>
+      refused('.rulegate/rules/by-hand.md', '# By hand\n\nKeep me.\n'));
+
+    it('a rule init would overwrite with the imported section', async () => {
+      await seedNativeConfigs();
+      const rule = (await plan()).canonicalFiles.find((f) => f.path.startsWith('.rulegate/rules/'));
+      expect(rule).toBeDefined();
+      await rm(repo, { recursive: true, force: true });
+      await mkdir(repo);
+      await refused(rule!.path, `${rule!.contents}\nA line only the hand-written copy has.\n`);
+    });
+
+    it('an MCP servers file', () =>
+      refused('.rulegate/mcp/servers.yaml', 'servers:\n  by-hand:\n    command: npx\n'));
   });
 
   it('reports a repository with no AI tool configuration rather than failing on it', async () => {
@@ -567,5 +700,109 @@ describe('rulegate init — from agent-os (T113)', () => {
       err.mockRestore();
     }
     expect(await tree()).toEqual(before);
+  });
+});
+
+/**
+ * T123: `init --yes` applies the plan rendered from the `.rulegate/` it writes, so the first
+ * `check` after it is clean. It used to render the in-memory import model instead, and
+ * every way that model failed to survive serialization showed up as drift on a repository
+ * the user had just adopted — or as a rule silently moved between tools.
+ */
+describe('rulegate init — then check is clean (T123)', () => {
+  const mdc = (frontmatter: string, body: string) => `---\n${frontmatter}---\n${body}`;
+
+  async function seed(files: Readonly<Record<string, string>>): Promise<void> {
+    for (const [file, contents] of Object.entries(files)) {
+      await mkdir(path.dirname(path.join(repo, file)), { recursive: true });
+      await writeFile(path.join(repo, file), contents);
+    }
+  }
+
+  async function initThenCheck(): Promise<void> {
+    expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
+    expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+  }
+
+  it('keeps both rules when AGENTS.md and .ruler/AGENTS.md would claim one id', async () => {
+    // The shape T111's review found: the ruler source and a hand-written AGENTS.md both
+    // import as `agents`, and one canonical file overwrote the other.
+    await seed({ '.ruler/AGENTS.md': 'From ruler.\n', 'AGENTS.md': 'By hand.\n' });
+    await initThenCheck();
+
+    const rules = (await tree()).filter((f) => f.startsWith('.rulegate/rules/'));
+    const bodies = await Promise.all(rules.map(read));
+    expect(bodies.join('')).toContain('From ruler.');
+    expect(bodies.join('')).toContain('By hand.');
+  });
+
+  it('stays in sync when one rule arrives from codex and ruler', async () => {
+    await seed({ '.ruler/style.md': 'Use tabs.\n', 'AGENTS.md': 'Use tabs.\n' });
+    await initThenCheck();
+  });
+
+  it('collapses one rule arriving from codex and cursor, and stays in sync', async () => {
+    await seed({
+      'AGENTS.md': 'Use tabs.\n',
+      '.cursor/rules/style.mdc': mdc('alwaysApply: true\n', 'Use tabs.\n'),
+    });
+    await initThenCheck();
+    expect((await tree()).filter((f) => f.startsWith('.rulegate/rules/'))).toEqual([
+      '.rulegate/rules/style.md',
+    ]);
+  });
+
+  it('keeps a native `order` or `tools` key preserved, never obeyed', async () => {
+    // codex+cursor: the .mdc's own `order: 1` came back from .rulegate/ as the string "1",
+    // which no `check` parses, and its `tools:` scoped the rule out of Cursor entirely.
+    await seed({
+      'AGENTS.md': 'Alpha.\n',
+      '.cursor/rules/a.mdc': mdc('alwaysApply: true\norder: 1\ntools: [claude-code]\n', 'Zeta.\n'),
+    });
+    await initThenCheck();
+
+    const rule = await read('.rulegate/rules/a.md');
+    expect(rule).toContain('cursor-order: "1"');
+    expect(rule).toContain('cursor-tools: "[claude-code]"');
+    expect(rule).toMatch(/^tools:\n {2}- cursor$/m);
+    expect(await read('.cursor/rules/a.mdc')).toContain('Zeta.');
+  });
+
+  it('keeps a rule that opens with a horizontal rule a body, at the default order', async () => {
+    // Cursor alone, so every rule is `tools: all`; the tenth lands on `order: 100`, the
+    // default, and with every key at its default the file used to be written bare.
+    const files: Record<string, string> = {};
+    for (let i = 1; i <= 9; i += 1) {
+      files[`.cursor/rules/r${i}.mdc`] = mdc('alwaysApply: true\n', `Rule ${i}.\n`);
+    }
+    files['.cursor/rules/z.mdc'] = mdc('alwaysApply: true\n', '---\n\nAfter a rule.\n');
+    await seed(files);
+    await initThenCheck();
+    expect(await read('.rulegate/rules/z.md')).toMatch(/^---\norder: 100\n---\n\n---\n/);
+  });
+
+  /**
+   * Fixtures `init` has nothing to adopt from: rulesync with neither a config nor any
+   * generated output enables no tool, so `init` says so and writes nothing, which `check`
+   * then reports as a repository with no canonical source.
+   */
+  const NOTHING_TO_ADOPT = new Set(['rulesync-import']);
+  const importFixtures = readdirSync(fixtures)
+    .filter((name) => name.endsWith('-import'))
+    .sort();
+
+  it('covers at least the adapter and interop import fixtures', () => {
+    expect(importFixtures.length).toBeGreaterThan(15);
+  });
+
+  it.each(importFixtures)('init --yes then check is clean on %s', async (name) => {
+    await cp(path.join(fixtures, name, 'input'), repo, { recursive: true });
+    if (NOTHING_TO_ADOPT.has(name)) {
+      const before = await tree();
+      expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
+      expect(await tree()).toEqual(before);
+      return;
+    }
+    await initThenCheck();
   });
 });

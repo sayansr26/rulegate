@@ -147,6 +147,28 @@ describe('canonical round trip', () => {
     });
   });
 
+  it('keeps a body that opens with `---` a body, even with every key at its default', async () => {
+    // T123. With nothing but defaults the file is written bare, and a Markdown rule opening
+    // with a horizontal rule was then read back as unterminated frontmatter: the tenth rule
+    // `init` imports lands on `order: 100`, the default, so a Cursor-only repository hit it.
+    const bare: Canonical = {
+      ...threeRuleModel,
+      rules: [
+        {
+          id: 'divider',
+          path: ruleIdToPath('divider'),
+          body: '---\n\nAfter a rule.\n',
+          frontmatter: { globs: [], tools: ALL_TOOLS, order: DEFAULT_RULE_ORDER, unknown: {} },
+          source: { file: ruleIdToPath('divider') },
+        },
+      ],
+    };
+
+    const result = await parseFrom(serializeCanonical(bare));
+    expect(result.errors).toEqual([]);
+    expect(stripSources(result.canonical)).toEqual(stripSources(bare));
+  });
+
   it('is stable: parse -> serialize -> parse reaches a fixed point', async () => {
     const once = await parseFrom(serializeCanonical(threeRuleModel));
     const twice = await parseFrom(serializeCanonical(once.canonical));

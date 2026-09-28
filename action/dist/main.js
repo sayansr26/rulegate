@@ -10578,6 +10578,12 @@ function selects(selector, tool) {
 
 // ../packages/core/dist/model/rule.js
 var DEFAULT_RULE_ORDER = 100;
+var RULE_FRONTMATTER_KEYS = /* @__PURE__ */ new Set([
+  "description",
+  "globs",
+  "tools",
+  "order"
+]);
 function appliesRepoWide(rule) {
   return rule.frontmatter.globs.length === 0;
 }
@@ -11482,7 +11488,6 @@ function splitFrontmatter(raw, file) {
 }
 
 // ../packages/core/dist/parse/rules.js
-var KNOWN_KEYS2 = /* @__PURE__ */ new Set(["description", "globs", "tools", "order"]);
 function parseRuleFile(relPath, raw) {
   const split = splitFrontmatter(raw, relPath);
   if (!split.ok)
@@ -11504,7 +11509,7 @@ function parseRuleFile(relPath, raw) {
   const tools = parseToolSelector(v, v.get(map, "tools"));
   const unknown = {};
   for (const key of v.keys(map)) {
-    if (KNOWN_KEYS2.has(key))
+    if (RULE_FRONTMATTER_KEYS.has(key))
       continue;
     unknown[key] = v.plain(v.get(map, key));
   }

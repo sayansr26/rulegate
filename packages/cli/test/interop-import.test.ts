@@ -16,6 +16,7 @@ import { ADAPTERS } from '../src/registry.js';
 import { ADAPTER_NAMES } from '../src/registry.js';
 import { runInit } from '../src/commands/init.js';
 import { runCheck } from '../src/commands/check.js';
+import { runDoctor } from '../src/commands/doctor.js';
 import { ExitCode } from '../src/ui/exit.js';
 
 const fixtures = path.resolve(import.meta.dirname, '../../../fixtures');
@@ -148,11 +149,182 @@ describe('interop — T054', () => {
     }
   });
 
+  // rulesync writes no marker, so its "generated" list is every known output that exists.
+  // A hand-written CLAUDE.md in a repository whose rulesync never targeted Claude Code is
+  // masked from the import all the same — so init must still name it before replacing it (T132).
+  it('names a rulesync output it only inferred, when its bytes differ from the render', async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), 'rulegate-rulesync-'));
+    try {
+      await mkdir(path.join(repo, '.rulesync/rules'), { recursive: true });
+      await writeFile(path.join(repo, '.rulesync/rules/style.md'), 'Tabs.\n');
+      await writeFile(path.join(repo, 'CLAUDE.md'), 'Hand-written: never force-push.\n');
+      const planFor = () =>
+        computeInitPlan({
+          repoRoot: repo,
+          fs: new NodeFileSystem(repo),
+          adapters: ADAPTERS,
+          interop: INTEROP,
+        });
+      const plan = await planFor();
+      expect(plan.errors).toEqual([]);
+      expect(plan.plan.artifacts.map((a) => a.path)).toContain('CLAUDE.md');
+      expect(plan.unimported).toContain('CLAUDE.md');
+      const warning = plan.warnings.find(
+        (w) => w.code === 'W_INIT_NOT_IMPORTED' && w.source?.file === 'CLAUDE.md',
+      );
+      expect(warning?.message).toContain('rulesync');
+      expect(warning?.message).toContain('.rulegate/backup/CLAUDE.md');
+
+      // The paired control: a file already equal to the render is left alone, so not named.
+      const rendered = plan.plan.artifacts.find((a) => a.path === 'CLAUDE.md')!.contents;
+      await writeFile(path.join(repo, 'CLAUDE.md'), rendered);
+      expect((await planFor()).unimported).not.toContain('CLAUDE.md');
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
   it('does not import from a repository that uses neither tool', async () => {
     // The negative half. Without it every assertion above would pass against an importer
     // that reported the same thing for every repository.
     const plan = await init('claude-code-import');
     expect(plan.interop).toEqual([]);
+  });
+});
+
+// `.clinerules` is a file in Cline's legacy layout and a directory in its current one. Ruler
+// lists it among its outputs and OpenCode's `instructions` may name it, and reading the
+// directory as a file threw EISDIR out of `init` before anything was planned (T156).
+describe('interop — a directory where a file may stand (T156)', () => {
+  let repo = '';
+  const put = async (rel: string, contents: string) => {
+    await mkdir(path.dirname(path.join(repo, rel)), { recursive: true });
+    await writeFile(path.join(repo, rel), contents);
+  };
+  const planAt = () =>
+    computeInitPlan({
+      repoRoot: repo,
+      fs: new NodeFileSystem(repo),
+      adapters: ADAPTERS,
+      interop: INTEROP,
+    });
+  const count = (bodies: readonly string[], text: string) =>
+    bodies.filter((b) => b.includes(text)).length;
+
+  it('imports ruler beside a .clinerules/ directory, and the Cline rule once', async () => {
+    repo = await mkdtemp(path.join(tmpdir(), 'rulegate-t156-'));
+    try {
+      await put('.ruler/AGENTS.md', 'Prefer small modules.\n');
+      await put('.clinerules/style.md', '## Style\n\nIndent with tabs.\n');
+
+      const plan = await planAt();
+      expect(plan.errors).toEqual([]);
+      expect(plan.interop).toEqual(['ruler']);
+      const bodies = plan.canonical.rules.map((r) => r.body);
+      expect(count(bodies, 'Prefer small modules')).toBe(1);
+      expect(count(bodies, 'Indent with tabs')).toBe(1);
+      expect(plan.canonical.rules.map((r) => r.source.file)).toContain('.clinerules/style.md');
+
+      expect(await runInit({ cwd: repo, yes: true, quiet: true, plugin: false })).toBe(ExitCode.Ok);
+      expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+      expect(await runDoctor({ cwd: repo, quiet: true, noGlobal: true })).toBe(ExitCode.Ok);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('imports OpenCode instructions beside a .clinerules/ directory, and the Cline rule once', async () => {
+    repo = await mkdtemp(path.join(tmpdir(), 'rulegate-t156-'));
+    try {
+      await put(
+        'opencode.json',
+        `${JSON.stringify({ instructions: ['.clinerules', 'docs/rules.md'] })}\n`,
+      );
+      await put('docs/rules.md', 'Be terse.\n');
+      await put('.clinerules/style.md', '## Style\n\nIndent with tabs.\n');
+
+      const plan = await planAt();
+      expect(plan.errors).toEqual([]);
+      expect(plan.detected).toEqual(expect.arrayContaining(['cline', 'opencode']));
+      const bodies = plan.canonical.rules.map((r) => r.body);
+      expect(count(bodies, 'Be terse')).toBe(1);
+      expect(count(bodies, 'Indent with tabs')).toBe(1);
+
+      expect(await runInit({ cwd: repo, yes: true, quiet: true, plugin: false })).toBe(ExitCode.Ok);
+      expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+      expect(await runDoctor({ cwd: repo, quiet: true, noGlobal: true })).toBe(ExitCode.Ok);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('reads no adapter’s single-file location as a file when it is a directory', async () => {
+    // The generic half: every adapter with a one-file location reads it with `tryReadFile`,
+    // and a directory there is somebody's unrelated tree, not that tool's file. The failure
+    // was an `E_ADAPTER_FAILED` error that refused the whole import.
+    repo = await mkdtemp(path.join(tmpdir(), 'rulegate-t156-'));
+    try {
+      await put('CLAUDE.md', '# Project\n\nNever force-push.\n');
+      for (const dir of ['.cursorrules', '.windsurfrules', '.roorules', 'CONVENTIONS.md']) {
+        await put(`${dir}/notes.md`, 'Not a rule file.\n');
+      }
+
+      const plan = await planAt();
+      expect(plan.errors).toEqual([]);
+      const bodies = plan.canonical.rules.map((r) => r.body);
+      expect(count(bodies, 'Never force-push')).toBe(1);
+      expect(plan.canonical.rules.map((r) => r.source.file)).toEqual(['CLAUDE.md']);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+// The other side of T156: the tool a directory (or a legacy file) enabled renders onto that
+// very path once another tool's rules arrive unscoped. Refused by name, with nothing written,
+// instead of a bare EISDIR or ENOTDIR from the reads after planning.
+describe('interop — a generated path something else stands on (T156)', () => {
+  let repo = '';
+  const put = async (rel: string, contents: string) => {
+    await mkdir(path.dirname(path.join(repo, rel)), { recursive: true });
+    await writeFile(path.join(repo, rel), contents);
+  };
+  const planAt = () =>
+    computeInitPlan({
+      repoRoot: repo,
+      fs: new NodeFileSystem(repo),
+      adapters: ADAPTERS,
+      interop: INTEROP,
+    });
+
+  it.each([
+    ['a .rules/ directory, where Zed generates .rules', '.rules/notes.txt', 'zed', '.rules'],
+    [
+      'a legacy .clinerules file, where Cline generates .clinerules/<id>.md',
+      '.clinerules',
+      'cline',
+      '.clinerules/',
+    ],
+  ])('refuses %s, by path, and writes nothing', async (_, standing, tool, generated) => {
+    repo = await mkdtemp(path.join(tmpdir(), 'rulegate-t156-'));
+    try {
+      await put('.ruler/AGENTS.md', 'Prefer small modules.\n');
+      await put(standing, 'Not generated.\n');
+
+      const plan = await planAt();
+      expect(plan.detected).toContain(tool);
+      const refused = plan.errors.filter((e) => e.code === 'E_INIT_NOT_A_FILE');
+      expect(refused).toHaveLength(1);
+      expect(refused[0]?.source?.file.startsWith(generated)).toBe(true);
+      expect(refused[0]?.message).toContain(tool);
+
+      expect(await runInit({ cwd: repo, yes: true, quiet: true, plugin: false })).toBe(
+        ExitCode.Failure,
+      );
+      expect((await readdir(repo)).sort()).toEqual(['.ruler', standing.split('/')[0] ?? ''].sort());
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
   });
 });
 

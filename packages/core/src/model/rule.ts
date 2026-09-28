@@ -4,6 +4,19 @@ import type { ToolSelector } from './selector.js';
 export const DEFAULT_RULE_ORDER = 100;
 
 /**
+ * The frontmatter keys canonical interprets. An `unknown` key must never be one of them:
+ * `unknown` is serialized into the same YAML map, so a preserved `order: 1` from another
+ * tool's file would be read back as the rule's order — as the string `"1"`, which no later
+ * `check` parses (T123).
+ */
+export const RULE_FRONTMATTER_KEYS: ReadonlySet<string> = new Set([
+  'description',
+  'globs',
+  'tools',
+  'order',
+]);
+
+/**
  * The five frontmatter keys of RFC-0001, and nothing else.
  *
  * `unknown` is not a convenience — it is the losslessness guarantee (T017) and the
