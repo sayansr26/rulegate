@@ -10,8 +10,8 @@ import { applyMemoryMigration } from '../src/migrate/memory.js';
 import { sandbox, type Sandbox } from './helpers.js';
 
 /**
- * A repository controls every path these scripts read, and T107/T108's hooks run the same
- * libraries automatically. Each case here hung a script before the T106 audit's fixes; a
+ * A repository controls every path these scripts read, and T100/T101's hooks run the same
+ * libraries automatically. Each case here hung a script before the T099 audit's fixes; a
  * regression shows up as a Vitest timeout.
  */
 let sb: Sandbox;
@@ -25,7 +25,7 @@ afterEach(async () => {
 const audit = (): Promise<string[]> =>
   runAudit({ root: sb.root, claudeDir: sb.claudeDir, today: '2026-09-26' });
 
-describe('hostile repositories (T106 audit)', () => {
+describe('hostile repositories (T099 audit)', () => {
   it('does not follow symlink loops when sizing a store', async () => {
     await sb.put('memory-bank/note.md', 'x');
     for (const n of ['a', 'b', 'c']) await symlink('.', path.join(sb.root, 'memory-bank', n));
@@ -96,7 +96,7 @@ describe('dist/settings.js exit codes', () => {
   });
 });
 
-describe('the memory migrator against a hostile repository (T114)', () => {
+describe('the memory migrator against a hostile repository (T107)', () => {
   const MEM = '.claude/agent-memory';
   const plan = () => planMemoryMigration(sb.root, sb.claudeDir);
 

@@ -7,7 +7,7 @@ import type { ReadOnlyFileSystem } from './types.js';
  * Importers and detectors probe fixed paths that are a file for one tool and a directory for
  * another — `.clinerules` is Cline's legacy file and its current directory, and ruler lists
  * it among its outputs. `NodeFileSystem` throws EISDIR there, which escaped `init` from an
- * interop importer and refused the whole import from an adapter (T156). The legacy file is
+ * interop importer and refused the whole import from an adapter (T149). The legacy file is
  * the mirror case: a probe of `.clinerules/<name>` throws ENOTDIR, as does `.agent-os/…` or
  * `.github/…` where that name is a file, so `exists` and `listDir` answer absent there too.
  * `MemoryFileSystem` already answers that way, so this is also the two agreeing.

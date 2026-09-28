@@ -34,9 +34,9 @@ export type {
 
 export { ADAPTER_API_VERSION, detected, NOT_DETECTED } from '@rulegate/core';
 
-// The model an adapter reads. `Canonical.skills` is still a T057 stub: the freeze covers
+// The model an adapter reads. `Canonical.skills` is still a T052 stub: the freeze covers
 // its presence as an array, not its element shape. `Canonical.mcpServers` is no longer one
-// — T043 settled `McpServer` and it is exported below. See README.
+// — T036 settled `McpServer` and it is exported below. See README.
 export type {
   Canonical,
   RulegateManifest,
@@ -51,10 +51,10 @@ export type {
   ToolSelector,
 } from '@rulegate/core';
 
-// MCP (T043/T045). No `Adapter` signature changed and `ADAPTER_API_VERSION` did not move:
+// MCP (T036/T038). No `Adapter` signature changed and `ADAPTER_API_VERSION` did not move:
 // `read()` already returns `Partial<Canonical>` and `write()` already returns artifacts,
 // so an MCP-capable adapter returns `{ mcpServers }` from one and an `Artifact` with
-// `kind: 'mcp'` from the other. A rules-only adapter needs no edit at all, which is T045's
+// `kind: 'mcp'` from the other. A rules-only adapter needs no edit at all, which is T038's
 // stated validation.
 //
 // `SecretValue` is `EnvRef` and nothing else, which is what makes "never write a literal
@@ -66,12 +66,12 @@ export { DEFAULT_MCP_SCOPE, envRef, formatEnvRef, parseEnvRef } from '@rulegate/
 // selector — and two adapters restating it independently is how one of them ends up
 // writing a server the other was told to skip.
 export { selectMcpServers } from '@rulegate/core';
-// MCP import (T048). Three of the four target formats are the same object-of-servers JSON
+// MCP import (T041). Three of the four target formats are the same object-of-servers JSON
 // shape, differing only in the top-level key and the reference spelling, so the inverse is
 // one shared function parameterized by those two — the same argument that put
 // `importConcatenated` here at T017. Codex's TOML is the fourth and has its own reader.
 //
-// Added 2026-09-04 (T048). Eight exports, none removed. `read()`'s return type widened by
+// Added 2026-09-04 (T041). Eight exports, none removed. `read()`'s return type widened by
 // one OPTIONAL field, which every v1 adapter already satisfies, so no `ADAPTER_API_VERSION`
 // bump is owed — see `ImportResult` and docs/adapter-api-v1.md.
 export type {
@@ -83,7 +83,7 @@ export type {
   ReferenceParse,
 } from '@rulegate/core';
 export { importMcpJson, importedServer } from '@rulegate/core';
-// Added 2026-09-26 (T111). OpenCode and Kilo keep their `instructions` in `opencode.jsonc`
+// Added 2026-09-26 (T104). OpenCode and Kilo keep their `instructions` in `opencode.jsonc`
 // and `kilo.jsonc`, and `JSON.parse` throws on the comments those tools load happily. The
 // stripper `importMcpJson` already runs is string-aware; a second one written per adapter
 // is how a `//` inside a URL string ends up read as a comment in one tool and not another.

@@ -28,7 +28,7 @@ let stderr: string[];
 beforeEach(async () => {
   repo = await mkdtemp(path.join(tmpdir(), 'rulegate-doctor-'));
   // Every fixture here has a CLAUDE.md, so every run without --no-global reads Claude Code's
-  // plugin records (T115). Point both routes to them at an empty directory, or a test's
+  // plugin records (T108). Point both routes to them at an empty directory, or a test's
   // output depends on what the machine running it has installed.
   isolated = await mkdtemp(path.join(tmpdir(), 'rulegate-doctor-home-'));
   vi.stubEnv('HOME', isolated);
@@ -135,7 +135,7 @@ describe('rulegate doctor — T026 warnings', () => {
   });
 });
 
-describe('rulegate doctor — T078 duplicate loading', () => {
+describe('rulegate doctor — T073 duplicate loading', () => {
   it('names the tool, the count and the tokens paid twice', async () => {
     await cp(path.join(fixtures, 'doctor/adopted'), repo, { recursive: true });
     const r = await inspect();
@@ -152,10 +152,10 @@ describe('rulegate doctor — T078 duplicate loading', () => {
     expect(dup?.paths).toContain('CLAUDE.md');
   });
 
-  // T110 moved a scoped rule's second copy from CLAUDE.md prose into `.claude/rules/`. Copilot
+  // T103 moved a scoped rule's second copy from CLAUDE.md prose into `.claude/rules/`. Copilot
   // still receives it twice; the warning keeps saying so only because copilot's docs declare
   // that directory. Claude Code itself must stay silent: its two files are disjoint.
-  it('follows a scoped rule into .claude/rules (T110)', async () => {
+  it('follows a scoped rule into .claude/rules (T103)', async () => {
     await mkdir(path.join(repo, '.rulegate/rules'), { recursive: true });
     await writeFile(
       path.join(repo, '.rulegate/rulegate.yaml'),
@@ -237,10 +237,10 @@ describe('rulegate doctor — contract', () => {
     expect(await snapshotTree(repo)).not.toEqual(before);
   });
 
-  // T055. The global half had data since T016 and no way to be exercised: `runDoctor`
+  // T050. The global half had data since T016 and no way to be exercised: `runDoctor`
   // built the home filesystem itself, so every test ran with `noGlobal: true` and the
   // rows this feature is about were never rendered by any of them.
-  describe('user-level files (T055)', () => {
+  describe('user-level files (T050)', () => {
     let home: string;
 
     beforeEach(async () => {
@@ -286,7 +286,7 @@ describe('rulegate doctor — contract', () => {
     // User-level rules load for every project before the project's own, so leaving them
     // out under-states what Claude Code loads. One level only: the probe never recurses
     // into the home directory, and the subdirectory file is the control for that.
-    it('measures user-level ~/.claude/rules files, top level only (T110)', async () => {
+    it('measures user-level ~/.claude/rules files, top level only (T103)', async () => {
       await mkdir(path.join(home, '.claude/rules/sub'), { recursive: true });
       await writeFile(path.join(home, '.claude/rules/style.md'), 'Use tabs.\n');
       await writeFile(path.join(home, '.claude/rules/sub/deep.md'), 'Deep.\n');
@@ -314,7 +314,7 @@ describe('rulegate doctor — contract', () => {
       expect(stdout.join('')).not.toContain('user-level, read-only');
     });
 
-    // T055's stated validation, and it is about `sync` rather than `doctor`: reporting a
+    // T050's stated validation, and it is about `sync` rather than `doctor`: reporting a
     // user's home directory is only acceptable while nothing can write to it. Every write
     // in the codebase goes through one of these three methods — the same allowlist
     // `invariants.test.ts` pins to `core/src/io` and `pipeline/apply.ts` — so a spy on all
@@ -360,7 +360,7 @@ describe('rulegate doctor — contract', () => {
 
     // The label must not be bought with the annotation that matters most. Copilot reads
     // three files two other adapters generate, and `from codex` / `from claude-code` is
-    // how T078's duplicate load is visible at all. Adding the label to a global row that
+    // how T073's duplicate load is visible at all. Adding the label to a global row that
     // matched nothing widened the column past 80 and the degradation dropped the whole
     // annotation column, silently.
     it('does not cost Copilot its cross-adapter attribution at 80 columns', async () => {

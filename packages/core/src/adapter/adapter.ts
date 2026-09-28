@@ -30,7 +30,7 @@ export interface DetectResult {
 /**
  * What `read()` returns: canonical content, plus anything the importer needs to say.
  *
- * `warnings` was added at T048 and is **optional**, so every adapter written against v1
+ * `warnings` was added at T041 and is **optional**, so every adapter written against v1
  * still satisfies this and no `ADAPTER_API_VERSION` bump is owed — the policy in
  * `docs/adapter-api-v1.md`, and the reason `Exact<A, B>` cannot see an added optional
  * member (recorded at T011).
@@ -42,7 +42,7 @@ export interface DetectResult {
  * `RulegateError`s because these are not failures: `init` prints them and continues.
  *
  * **Never quote a value in one.** A message naming the secret would print it into a CI
- * log — T044's failure, committed to a different file.
+ * log — T037's failure, committed to a different file.
  */
 export type ImportResult = Partial<Canonical> & {
   readonly warnings?: readonly string[];

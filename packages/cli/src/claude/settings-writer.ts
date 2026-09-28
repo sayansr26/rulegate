@@ -21,7 +21,7 @@ import {
 } from '@rulegate/claude';
 
 /**
- * `rulegate claude settings --apply` — D2's CLI writer (T115), pinned in `invariants.test.ts`
+ * `rulegate claude settings --apply` — D2's CLI writer (T108), pinned in `invariants.test.ts`
  * by the same shape as the plugin's `src/settings-writer/apply.ts`, of which it is a copy.
  * The CLI cannot import the plugin and `@rulegate/claude` never writes, so the one merge is
  * shared (`planScope`, re-planned here, never taken from the preview) and the one set of

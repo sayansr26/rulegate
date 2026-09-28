@@ -9,7 +9,7 @@ describe('roo-code MCP', () => {
   });
 
   it('writes `streamable-http`, not `http`', () => {
-    // The Roo-shaped version of the divergence T046 found. Every other target spells
+    // The Roo-shaped version of the divergence T039 found. Every other target spells
     // streamable HTTP `http` or omits the discriminator; Roo spells it in full, and `http`
     // here would parse cleanly and select no transport Roo recognizes — the `servers` key
     // trap again: valid JSON that supplies nothing.

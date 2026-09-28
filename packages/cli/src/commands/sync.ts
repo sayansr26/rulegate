@@ -27,7 +27,7 @@ export interface SyncOptions {
   readonly dryRun?: boolean;
   readonly force?: boolean;
   /**
-   * Merge hand-edits on generated files back into `.rulegate/` (T051).
+   * Merge hand-edits on generated files back into `.rulegate/` (T046).
    *
    * Prints the merge and writes nothing without `--yes`, like `init` and `restore`. It is
    * a separate mode rather than a fallback inside an ordinary `sync` because recovering
@@ -39,12 +39,12 @@ export interface SyncOptions {
   readonly yes?: boolean;
   /**
    * Name the repository root in the output. Set only when the root was found by walking
-   * up (T074): artifact paths are repo-relative, so from a subdirectory `wrote CLAUDE.md`
+   * up (T069): artifact paths are repo-relative, so from a subdirectory `wrote CLAUDE.md`
    * is ambiguous without an anchor. Running at the root prints exactly what it always did.
    */
   readonly announceRoot?: boolean;
   /**
-   * Cover every nested `.rulegate/`, or the repository root alone (T062).
+   * Cover every nested `.rulegate/`, or the repository root alone (T057).
    *
    * Unset — the default — means "whatever the repository has": one level in an ordinary
    * repository, every level in a monorepo. Passed straight to `computePlan`, which owns

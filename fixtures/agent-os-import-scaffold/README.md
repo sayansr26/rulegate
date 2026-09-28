@@ -1,6 +1,6 @@
 # `agent-os-import-scaffold`
 
-An agent-os project whose `.agent-os/AGENTS.md` was never filled in (T149). The file is
+An agent-os project whose `.agent-os/AGENTS.md` was never filled in (T142). The file is
 lmsfront's, byte for byte: the placeholder `agent-os init` writes, followed by the
 path-scoped index agent-os 0.5.0 compiled into an unbannered `AGENTS.md`, which 0.6.0's
 `init` then adopted back as the source. Every line of it is agent-os's text, and the

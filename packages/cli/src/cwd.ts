@@ -11,7 +11,7 @@ export interface ResolvedCwd {
  * An explicit `--cwd` is taken literally. Searching upward from a directory the user
  * named would make `--cwd packages/core` unable to mean what it says, and would give
  * `init` (T019) the wrong root the day it lands. Without the flag we behave like git
- * and walk up (T074).
+ * and walk up (T069).
  */
 export function resolveGlobalCwd(explicit: string | undefined): ResolvedCwd {
   if (explicit !== undefined) return { root: resolveRepoRoot(explicit), searched: false };

@@ -17,7 +17,7 @@ export interface DirEntry {
  * filesystem use. Whether two names differing only in case are one file is a property of
  * the filesystem, answered by `probeCaseInsensitive` in `fs/case.ts` and applied to
  * lookup keys only. Do not key a map on a path without deciding which of the two you
- * mean — getting that wrong is T085.
+ * mean — getting that wrong is T078.
  *
  * There is deliberately no write method. Adapters receive this interface and return
  * Artifacts; only the pipeline's apply step writes. That is what makes `check` and

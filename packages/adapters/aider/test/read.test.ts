@@ -14,7 +14,7 @@ describe('aider read()', () => {
   });
 });
 
-describe('aider read() — never imports the user’s config (T050c)', () => {
+describe('aider read() — never imports the user’s config (T045c)', () => {
   it('imports nothing from .aider.conf.yml, credentials included', async () => {
     const { aider } = await import('../src/index.js');
     const { importContextFor } = await import('@rulegate/adapter-kit/testing');

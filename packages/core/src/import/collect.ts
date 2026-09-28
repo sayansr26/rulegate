@@ -87,7 +87,7 @@ export async function collectImports(options: CollectOptions): Promise<CollectRe
 }
 
 /**
- * A rule whose preserved keys are all ones canonical does not interpret (T123).
+ * A rule whose preserved keys are all ones canonical does not interpret (T116).
  *
  * An adapter keeps the frontmatter keys its format does not understand in `unknown`, and
  * `unknown` is serialized into the same YAML map as `order` and `tools`. A Cursor rule
@@ -121,7 +121,7 @@ function withoutCanonicalKeys(rule: RuleDocument, owner: string): RuleDocument {
  * Does this adapter generate a project-level MCP file?
  *
  * Read off the adapter's own `docs` rather than from a list of tool names, for the reason
- * T078 established: a warning or a selector derived from a hardcoded roster stops being
+ * T073 established: a warning or a selector derived from a hardcoded roster stops being
  * true the moment somebody writes a sixth adapter.
  */
 function carriesMcp(adapter: Adapter): boolean {

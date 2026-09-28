@@ -31,7 +31,7 @@ export interface LintOptions {
  * the one function that writes.
  *
  * **Exit 1 only on an `error`-severity finding**, never on a warning or an `info` (a
- * finding about a tool that is neither enabled nor detected, T150). This is not the
+ * finding about a tool that is neither enabled nor detected, T143). This is not the
  * same call `doctor` makes, and the difference is that lint's severities are
  * configurable: a repository that disagrees with a default can say so in its manifest,
  * so failing on what it did not silence is a gate it chose. `doctor`'s warnings cannot

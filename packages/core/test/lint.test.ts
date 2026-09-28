@@ -77,8 +77,8 @@ const BARE = 'schemaVersion: 1\ntools: []\n';
 
 describe('runLint — the engine with zero rules', () => {
   it('reports nothing and counts nothing', async () => {
-    // T063's validation clause. It was written when the shipped registry was genuinely
-    // empty and passed for that reason; T064 filled it, so the empty case is now stated
+    // T058's validation clause. It was written when the shipped registry was genuinely
+    // empty and passed for that reason; T059 filled it, so the empty case is now stated
     // explicitly. The registry is asserted non-empty alongside, because a test named
     // "with zero rules" that silently became "with the real rules" is how a contract
     // stops being checked without anybody noticing.
@@ -238,7 +238,7 @@ describe('runLint — contract', () => {
   });
 });
 
-describe('runLint — findings about tools nobody uses (T150)', () => {
+describe('runLint — findings about tools nobody uses (T143)', () => {
   /** `alpha` is detected; `beta` never is, so only the manifest can put it in use. */
   const unseen = (): Adapter => ({
     ...stub('beta'),

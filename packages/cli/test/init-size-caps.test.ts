@@ -45,7 +45,7 @@ afterEach(async () => {
 
 const lint = () => runLintCommand({ cwd: repo, noGlobal: true });
 
-describe('T150 — a migrated agent-os project on day one', () => {
+describe('T143 — a migrated agent-os project on day one', () => {
   it("names AGENTS.md's growth past Windsurf's cap in the plan, before writing", async () => {
     expect(await runInit({ cwd: repo, plugin: false })).toBe(ExitCode.Ok);
     const printed = stderr.join('');

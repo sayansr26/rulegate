@@ -53,7 +53,7 @@ const run = (
   enabled: ToolId[] = [],
 ) => sizeCapWarnings({ fs: new MemoryFileSystem(files), artifacts, adapters, enabled });
 
-describe('sizeCapWarnings — T150', () => {
+describe('sizeCapWarnings — T143', () => {
   it('names the growth, the cap and the tool when a file crosses it', async () => {
     const [w, ...rest] = await run([['AGENTS.md', 'small\n']], [art('AGENTS.md', 150)]);
     expect(rest).toEqual([]);

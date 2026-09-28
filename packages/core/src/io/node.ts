@@ -78,7 +78,7 @@ export class NodeFileSystem implements WritableFileSystem {
    * **Symlinks used to be skipped entirely** (`entry.kind === 'dir'` is false for one), so
    * a repository whose `.cursor/rules` was a link — an ordinary way to share one rule set
    * between checkouts — detected as using Cursor and imported **zero rules**, silently
-   * (T069).
+   * (T064).
    *
    * Following them needs a containment check of its own, and this is the part that must not
    * be simplified away: `escapesRoot` is purely *lexical*, so `.cursor/rules -> ~/shared`
@@ -95,7 +95,7 @@ export class NodeFileSystem implements WritableFileSystem {
     const seen = new Set<string>();
     // Descend only where a match could be. Without this every glob walks the entire
     // repository, so a monorepo with one canonical level per package pays one full
-    // traversal per level — quadratic, and measurably so at fifty packages (T062).
+    // traversal per level — quadratic, and measurably so at fifty packages (T057).
     const prefix = literalPrefix(pattern);
 
     const contained = async (abs: string): Promise<boolean> => {
@@ -141,7 +141,7 @@ export class NodeFileSystem implements WritableFileSystem {
    * `fs.writeFile` and `fs.copyFile` both **follow** a symlink at the destination, so a
    * repository where `CLAUDE.md` links to `AGENTS.md` had its `AGENTS.md` silently rewritten
    * by a render aimed at `CLAUDE.md` — and `runInit` passes `force: true`, so `init --yes`
-   * did it on a first run (T069).
+   * did it on a first run (T064).
    *
    * Replacing the link is the right product behaviour: Rulegate exists to own that path.
    * `restore` will put the bytes back as a regular file rather than as a link, which is
@@ -196,7 +196,7 @@ export function resolveRepoRoot(cwd: string): string {
  * `packages/core` fails with `E_NO_CANONICAL_SOURCE` and hints `rulegate init` — advice
  * that would create a second, nested `.rulegate/`.
  *
- * The answer is the **outermost** canonical root, not the nearest one (T062): a nested
+ * The answer is the **outermost** canonical root, not the nearest one (T057): a nested
  * level inherits its ancestors' rules, so stopping at `packages/a/.rulegate` would render
  * that package without the repository's conventions and make the same artifact depend on
  * which directory the command was typed in. `--cwd packages/a` is still taken literally
@@ -225,7 +225,7 @@ export function findRepoRoot(startDir: string): string {
   const home = path.resolve(os.homedir());
   let dir = start;
 
-  // The **outermost** `.rulegate/` inside the repository, not the nearest (T062). A nested
+  // The **outermost** `.rulegate/` inside the repository, not the nearest (T057). A nested
   // level inherits its ancestors' rules, so a run from `packages/a` that stopped at
   // `packages/a/.rulegate` would render that package without the repository's conventions
   // — the same file, different bytes depending on which directory you were standing in.

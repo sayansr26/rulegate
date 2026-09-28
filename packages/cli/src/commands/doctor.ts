@@ -199,7 +199,7 @@ function describePath(f: FileDiagnosis): string {
 function annotate(f: FileDiagnosis, tool: ToolDiagnosis): string {
   const notes: string[] = [];
   if (f.role !== 'instructions') notes.push(f.role);
-  // T055. A global file's status reads `unmanaged`, which is the same word a project file
+  // T050. A global file's status reads `unmanaged`, which is the same word a project file
   // somebody else wrote gets — and the two are nothing alike. One is a file standing where
   // our output goes; the other is the user's own machine-wide context, outside the
   // repository, which Rulegate reads to explain behaviour and will never write. Saying so
@@ -209,7 +209,7 @@ function annotate(f: FileDiagnosis, tool: ToolDiagnosis): string {
   // Only when something is actually there. A global pattern that matched nothing has no
   // file to be read-only about, and annotating it anyway widened the column enough that
   // the 80-column degradation dropped it — taking Copilot's `from codex` attribution with
-  // it, which is the single most load-bearing annotation in this table (T078).
+  // it, which is the single most load-bearing annotation in this table (T073).
   if (f.scope === 'global' && f.paths.length > 0) notes.push('user-level, read-only');
   if (f.shadowed) notes.push('shadowed');
   if (f.managedBy !== undefined && f.managedBy !== tool.name) notes.push(`from ${f.managedBy}`);

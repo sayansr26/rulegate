@@ -28,7 +28,7 @@ describe('nestedTargets — over the shipped adapters', () => {
 
   it('maps each to the artifact that is actually nestable', () => {
     // Pairs rather than a map keyed by tool: Claude Code has two nestable artifacts since
-    // T110, and a map would keep whichever came last and hide the other.
+    // T103, and a map would keep whichever came last and hide the other.
     expect(targets.map((t) => [t.tool, t.pattern])).toEqual([
       ['antigravity', '.agents/rules/*.md'],
       ['claude-code', 'CLAUDE.md'],

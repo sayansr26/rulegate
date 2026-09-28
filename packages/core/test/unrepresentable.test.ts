@@ -5,7 +5,7 @@ import { codex } from '@rulegate/adapter-codex';
 import { claudeCode } from '@rulegate/adapter-claude-code';
 
 /**
- * T083. One server Codex cannot express must not take down the whole run.
+ * T042. One server Codex cannot express must not take down the whole run.
  *
  * This lived at the pipeline level, not in the adapter: `renderConfigToml` threw,
  * `computePlan` recorded it as an error, and `applyPlan` writes **nothing** while any
@@ -47,7 +47,7 @@ async function plan(files: readonly (readonly [string, string])[]) {
   });
 }
 
-describe('a server one tool cannot express (T083)', () => {
+describe('a server one tool cannot express (T042)', () => {
   it('does not abort the run, and every other artifact still renders', async () => {
     const result = await plan([MANIFEST, SERVERS, RULE]);
 
@@ -75,7 +75,7 @@ describe('a server one tool cannot express (T083)', () => {
 
     expect(toml).toContain('# omitted: `github`');
     expect(toml).toContain('rename the variable to API_KEY');
-    // T044 still holds: never name the value.
+    // T037 still holds: never name the value.
     expect(toml).not.toContain('MY_TOKEN=');
   });
 

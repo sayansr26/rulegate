@@ -1,6 +1,6 @@
 # `agent-os-import-oversized`
 
-The T117 preflight's lmsfront, at fixture size (T150). `config.json` targets Claude Code
+The T110 preflight's lmsfront, at fixture size (T143). `config.json` targets Claude Code
 alone, so agent-os 0.6.0 wrote `.claude/rules/` and an `AGENTS.md` that lists the scoped
 rules as a short index — every file here past `.agent-os/` and `CLAUDE.md` is its own
 `agent-os sync` output, byte for byte. `CLAUDE.md` has no banner because a person wrote it.

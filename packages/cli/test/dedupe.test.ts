@@ -36,7 +36,7 @@ describe('content dedupe on import (T018)', () => {
   it('collapses the same rules in four formats into one canonical set', async () => {
     const sources = await importFrom('four-formats');
     // The premise the fixture rests on: without dedupe this is ten rules for two — the
-    // number T078 measured on this repository, arriving as content instead of as bytes.
+    // number T073 measured on this repository, arriving as content instead of as bytes.
     expect(sources.flatMap((s) => s.rules)).toHaveLength(10);
 
     const { rules, conflicts } = dedupeImported(sources);

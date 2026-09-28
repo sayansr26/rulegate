@@ -37,7 +37,7 @@ describe('RFC-0001 covers the canonical format', () => {
     expect(rfc).toContain('CLAUDE.md');
     // The filename comes from the rule id, prefix and all. The RFC said `style.mdc` for
     // a rule at `rules/10-style.md` for the whole of M0, and this assertion pinned the
-    // wrong value rather than catching it (T076).
+    // wrong value rather than catching it (T071).
     expect(rfc).toContain('.cursor/rules/10-style.mdc');
     expect(rfc).toContain('.cursor/rules/30-frontend.mdc');
   });

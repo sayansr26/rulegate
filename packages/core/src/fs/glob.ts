@@ -68,7 +68,7 @@ export function matchesGlob(relPath: string, pattern: string): boolean {
  * a pattern beginning with a wildcard yields `''`. A walker can use it to skip every
  * subtree that cannot contain a match, which is the difference between one traversal per
  * glob and one traversal of the whole repository per glob — quadratic once a monorepo has
- * one canonical level per package (T062).
+ * one canonical level per package (T057).
  *
  * Only whole segments count. A segment such as `p*` narrows nothing safely, because the
  * directory that matches it is not known until it is read.

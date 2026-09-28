@@ -54,7 +54,7 @@ describe('windsurf write()', () => {
     const ctx = await contextFor('windsurf/input', windsurf);
     const artifacts = await windsurf.write(ctx);
 
-    // One rule per artifact, unlike the concatenating adapters — so `sync --import` (T051)
+    // One rule per artifact, unlike the concatenating adapters — so `sync --import` (T046)
     // can map an edit back to exactly one canonical rule.
     expect(artifacts.map((a) => a.provenance?.ruleIds)).toEqual([
       ['10-style'],

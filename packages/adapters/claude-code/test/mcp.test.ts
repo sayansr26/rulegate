@@ -16,7 +16,7 @@ async function render(mutate: (c: Canonical) => Canonical = (c) => c): Promise<s
   return artifacts.find((a) => a.path === MCP_FILE)?.contents;
 }
 
-describe('claude-code MCP output (T046)', () => {
+describe('claude-code MCP output (T039)', () => {
   it('matches the hand-written golden byte for byte', async () => {
     await expectFixtureMatch(FIXTURE, claudeCode);
   });
@@ -37,7 +37,7 @@ describe('claude-code MCP output (T046)', () => {
     const artifact = (await claudeCode.write(ctx)).find((a) => a.path === MCP_FILE);
 
     expect(artifact?.kind).toBe('mcp');
-    // No canonical rule contributed, and claiming one would mislead `doctor` and T051.
+    // No canonical rule contributed, and claiming one would mislead `doctor` and T046.
     expect(artifact?.provenance).toBeUndefined();
   });
 
@@ -65,7 +65,7 @@ describe('claude-code MCP output (T046)', () => {
 
   it('re-emits keys Rulegate does not interpret', async () => {
     // RFC-0001 §11.1. It is also the only path by which a literal secret can reach
-    // generated output, which is what T044's scan over rendered bytes exists for.
+    // generated output, which is what T037's scan over rendered bytes exists for.
     expect((await render()) ?? '').toContain('"timeout": 600000');
   });
 

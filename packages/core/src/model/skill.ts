@@ -1,7 +1,7 @@
 import type { JsonValue, SourceRef } from './ids.js';
 import type { ToolSelector } from './selector.js';
 
-/** Stub for v1 (T057). Present now so later phases extend rather than rewrite. */
+/** Stub for v1 (T052). Present now so later phases extend rather than rewrite. */
 export interface Skill {
   readonly id: string;
   readonly name: string;

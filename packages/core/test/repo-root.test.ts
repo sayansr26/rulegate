@@ -79,7 +79,7 @@ describe('findRepoRoot', () => {
   });
 
   it('prefers the outermost .rulegate, so a subpackage resolves its ancestors', async () => {
-    // A nested level inherits (T061), so the root is what a run from `packages/core` has
+    // A nested level inherits (T056), so the root is what a run from `packages/core` has
     // to see: stopping at the nearer one renders the package without the repository's
     // conventions, and the same file then depends on which directory you typed the
     // command in. `--cwd packages/core` is still the way to ask for that level alone.

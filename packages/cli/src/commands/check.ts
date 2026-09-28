@@ -27,13 +27,13 @@ import { ExitCode, type ExitCodeValue } from '../ui/exit.js';
 
 export interface CheckOptions {
   readonly cwd: string;
-  /** Name the repository root in the output; set only when the root was found by walking up (T074). */
+  /** Name the repository root in the output; set only when the root was found by walking up (T069). */
   readonly announceRoot?: boolean;
   readonly quiet?: boolean;
   readonly color?: boolean;
   /**
    * Check the git **index** instead of the working tree — what a pre-commit hook needs
-   * (T052), and its only consumer.
+   * (T047), and its only consumer.
    *
    * Both sides come from the index. The question being asked is "if this commit lands, is
    * the repository in sync?", so canonical is read from the index too; rendering from the
@@ -42,7 +42,7 @@ export interface CheckOptions {
    */
   readonly staged?: boolean;
   /**
-   * Cover every nested `.rulegate/`, or the repository root alone (T062).
+   * Cover every nested `.rulegate/`, or the repository root alone (T057).
    *
    * Unset — the default — means "whatever the repository has": one level in an ordinary
    * repository, every level in a monorepo. Passed straight to `computePlan`, which owns
@@ -54,11 +54,11 @@ export interface CheckOptions {
 /**
  * What a check found, before anybody decides how to say it.
  *
- * The seam exists for the GitHub Action (T053), which needs per-file results and line
+ * The seam exists for the GitHub Action (T048), which needs per-file results and line
  * numbers to emit inline annotations and cannot get them from an exit code. The Action
  * consumes *this*, not `computePlan`/`verifyPlan` directly, so there is exactly one path
  * from a repository to a verdict: two consumers rendering one report cannot disagree
- * about whether a file is in sync, which is the failure T079 found in `doctor` and the
+ * about whether a file is in sync, which is the failure T074 found in `doctor` and the
  * reason `computePlan` is the only renderer in the first place.
  */
 export type CheckResult =

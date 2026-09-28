@@ -46,7 +46,7 @@ async function handEdit(artifact: string, line: string): Promise<void> {
   await writeFile(path.join(repo, artifact), text.replace('## Style', `## Style\n\n${line}`));
 }
 
-describe('rulegate sync --import (T051)', () => {
+describe('rulegate sync --import (T046)', () => {
   it('recovers the edit into the rule it came from, and writes nothing without --yes', async () => {
     await handEdit('CLAUDE.md', 'A line the user added by hand.');
     const before = await read(rulePath);
@@ -133,7 +133,7 @@ describe('rulegate sync --import (T051)', () => {
 
   // A `.claude/rules` file carries its scope in `paths:`, and that is exactly what a user
   // edits. Merging the body alone reported success and left `check` failing on the one
-  // line the user changed, for the next `sync` to revert (T110).
+  // line the user changed, for the next `sync` to revert (T103).
   it('recovers an edited `paths:` scope along with the body', async () => {
     await writeFile(
       path.join(repo, '.rulegate/rules/30-frontend.md'),
@@ -172,7 +172,7 @@ describe('rulegate sync --import (T051)', () => {
   });
 
   // A render need not read back to the body it came from, so an edit is measured against
-  // the ancestor read back through the adapter, not against canonical (T110).
+  // the ancestor read back through the adapter, not against canonical (T103).
   it('keeps a heading of the rule body when the scoped rule has no description', async () => {
     await writeFile(
       path.join(repo, '.rulegate/rules/30-server.md'),
@@ -373,7 +373,7 @@ describe('rulegate sync --import (T051)', () => {
   });
 });
 
-describe('sync --force covers hand-edited files (T075)', () => {
+describe('sync --force covers hand-edited files (T070)', () => {
   it('overwrites the edit, but only after copying it to .rulegate/backup/', async () => {
     await handEdit('CLAUDE.md', 'about to be discarded.');
     const edited = await read('CLAUDE.md');

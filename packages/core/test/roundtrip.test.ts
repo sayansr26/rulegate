@@ -100,7 +100,7 @@ describe('canonical round trip', () => {
     // The three-rule fixture uses `DEFAULT_MANIFEST_OPTIONS` and `DEFAULT_LINT_CONFIG`
     // throughout, so the round trip above holds whether or not `serializeManifest` emits
     // these at all. That is not hypothetical: `options.ignore` was silently dropped for
-    // exactly that reason until T086, while `marker` and `backup` beside it were fine.
+    // exactly that reason until T079, while `marker` and `backup` beside it were fine.
     //
     // So this asserts on the **whole manifest**, not on the key that happened to be
     // broken. A test naming one key only guards that key, and the next field added to
@@ -148,7 +148,7 @@ describe('canonical round trip', () => {
   });
 
   it('keeps a body that opens with `---` a body, even with every key at its default', async () => {
-    // T123. With nothing but defaults the file is written bare, and a Markdown rule opening
+    // T116. With nothing but defaults the file is written bare, and a Markdown rule opening
     // with a horizontal rule was then read back as unterminated frontmatter: the tenth rule
     // `init` imports lands on `order: 100`, the default, so a Cursor-only repository hit it.
     const bare: Canonical = {

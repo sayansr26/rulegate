@@ -10,7 +10,7 @@
  * launch-day failure, and it is invisible until somebody installs it.
  *
  * `npx rulegate` proper cannot be smoked before the package exists on the registry
- * (T037): the CLI depends on six workspace packages that nobody can download yet. What
+ * (T035): the CLI depends on six workspace packages that nobody can download yet. What
  * this does instead is the same install through npm — tarballs, `overrides` pinning each
  * `@rulegate/*` to its tarball, `node_modules/.bin/rulegate` — which is the identical
  * resolution path with the registry swapped out.

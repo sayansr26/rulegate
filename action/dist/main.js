@@ -12826,7 +12826,7 @@ var NodeFileSystem = class {
    * **Symlinks used to be skipped entirely** (`entry.kind === 'dir'` is false for one), so
    * a repository whose `.cursor/rules` was a link — an ordinary way to share one rule set
    * between checkouts — detected as using Cursor and imported **zero rules**, silently
-   * (T069).
+   * (T064).
    *
    * Following them needs a containment check of its own, and this is the part that must not
    * be simplified away: `escapesRoot` is purely *lexical*, so `.cursor/rules -> ~/shared`
@@ -12886,7 +12886,7 @@ var NodeFileSystem = class {
    * `fs.writeFile` and `fs.copyFile` both **follow** a symlink at the destination, so a
    * repository where `CLAUDE.md` links to `AGENTS.md` had its `AGENTS.md` silently rewritten
    * by a render aimed at `CLAUDE.md` — and `runInit` passes `force: true`, so `init --yes`
-   * did it on a first run (T069).
+   * did it on a first run (T064).
    *
    * Replacing the link is the right product behaviour: Rulegate exists to own that path.
    * `restore` will put the bytes back as a regular file rather than as a link, which is
@@ -14020,7 +14020,7 @@ var docs3 = {
       managed: true,
       // Nested `.claude/rules/` directories load on demand, like nested CLAUDE.md files, and
       // alongside the root ones rather than instead of them. The vendor page does not say
-      // what a nested rule's `paths` are relative to; T117 is the first real check.
+      // what a nested rule's `paths` are relative to; T110 is the first real check.
       nesting: "all-merged",
       description: "Project rules, discovered recursively. A file with `paths:` frontmatter loads only when Claude reads a file matching one of its globs; a file without it loads at launch with the same priority as `.claude/CLAUDE.md`. Rulegate generates one per glob-scoped canonical rule, and keeps repo-wide rules in CLAUDE.md.",
       source: CLAUDE_MEMORY_DOCS
@@ -14914,7 +14914,7 @@ var docs5 = {
   notes: [
     {
       level: "warn",
-      message: "A server Codex cannot express is omitted from .codex/config.toml and named in it as a `# omitted:` comment, rather than failing the run (T083). The remaining case is `env`: Codex forwards variables through `env_vars`, which names one string that is both the key and the variable, so a renamed reference such as `API_KEY: env:MY_TOKEN` has nowhere to go. Headers no longer hit this \u2014 they are written as `env_http_headers`, which takes any header name (T096). Check the top of the generated file if a server you configured is missing.",
+      message: "A server Codex cannot express is omitted from .codex/config.toml and named in it as a `# omitted:` comment, rather than failing the run (T042). The remaining case is `env`: Codex forwards variables through `env_vars`, which names one string that is both the key and the variable, so a renamed reference such as `API_KEY: env:MY_TOKEN` has nowhere to go. Headers no longer hit this \u2014 they are written as `env_http_headers`, which takes any header name (T089). Check the top of the generated file if a server you configured is missing.",
       source: CODEX_MCP_DOCS
     },
     {
@@ -14924,7 +14924,7 @@ var docs5 = {
     },
     {
       level: "warn",
-      message: 'Codex has no variable substitution anywhere in config.toml, so an `env:NAME` reference cannot be written as a value the way `${NAME}` and `${env:NAME}` are elsewhere \u2014 it has to become a different key. `env: { NAME: env:NAME }` becomes `env_vars = ["NAME"]`, and `headers: { Name: env:X }` becomes `env_http_headers = { Name = "X" }`. Rulegate does not write `bearer_token_env_var`: Codex supplies the `Bearer ` scheme for it, so that variable holds a bare token while every other tool needs the whole header value, and one canonical entry cannot mean both (T096). A reference `env_vars` cannot express \u2014 a renamed variable \u2014 is refused rather than dropped: a credential that never arrives is a server that starts and fails to authenticate.',
+      message: 'Codex has no variable substitution anywhere in config.toml, so an `env:NAME` reference cannot be written as a value the way `${NAME}` and `${env:NAME}` are elsewhere \u2014 it has to become a different key. `env: { NAME: env:NAME }` becomes `env_vars = ["NAME"]`, and `headers: { Name: env:X }` becomes `env_http_headers = { Name = "X" }`. Rulegate does not write `bearer_token_env_var`: Codex supplies the `Bearer ` scheme for it, so that variable holds a bare token while every other tool needs the whole header value, and one canonical entry cannot mean both (T089). A reference `env_vars` cannot express \u2014 a renamed variable \u2014 is refused rather than dropped: a credential that never arrives is a server that starts and fails to authenticate.',
       source: CODEX_MCP_DOCS
     },
     {

@@ -90,7 +90,7 @@ export default tseslint.config(
   {
     // No tool-specific logic in core, and no filesystem access outside the io boundary.
     files: ['packages/core/src/**/*.ts'],
-    // `src/git/` is the one directory allowed to spawn a process (T052), and it is the
+    // `src/git/` is the one directory allowed to spawn a process (T047), and it is the
     // *only* exemption — `invariants.test.ts` pins that allowlist to a single entry, so
     // this ignore and that list have to be changed together to grow a second one.
     ignores: [
@@ -113,7 +113,7 @@ export default tseslint.config(
             },
             {
               // Only `core/src/git/` spawns anything, and only three read-only git
-              // subcommands (T052). `invariants.test.ts` scans everywhere else.
+              // subcommands (T047). `invariants.test.ts` scans everywhere else.
               name: 'node:child_process',
               message: 'Only core/src/git may spawn a process, and only read-only git.',
             },

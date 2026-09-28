@@ -46,7 +46,7 @@ afterEach(async () => {
  * Without this, `git add` normalizes CRLF to LF in the blob itself, so *git* satisfies the
  * assertion and our own normalization can be deleted with every test still green — the
  * environment answering for the code, which is the same shape as T027's `--no-color` and
- * T055's real home directory. `-text` is not a contrivance either: this repository ships
+ * T050's real home directory. `-text` is not a contrivance either: this repository ships
  * exactly that attribute for `fixtures/**`, so a CRLF blob is a real thing to meet.
  */
 async function keepCrlfInBlobs(): Promise<void> {
@@ -58,7 +58,7 @@ async function keepCrlfInBlobs(): Promise<void> {
 const rule = (name: string) => path.join(repo, '.rulegate/rules', name);
 
 /**
- * T052. The two commands must be able to disagree, and each direction has to be reachable
+ * T047. The two commands must be able to disagree, and each direction has to be reachable
  * on its own — a test where the index and the working tree always agree passes against a
  * `--staged` that silently reads the working tree, which is the whole failure mode.
  */

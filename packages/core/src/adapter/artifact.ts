@@ -19,6 +19,6 @@ export interface Artifact {
   readonly contents: string;
   readonly adapter: ToolId;
   readonly kind: ArtifactKind;
-  /** Which canonical rules contributed. Powers `doctor` (T026) and merge (T051). */
+  /** Which canonical rules contributed. Powers `doctor` (T026) and merge (T046). */
   readonly provenance?: { readonly ruleIds: readonly RuleId[] };
 }

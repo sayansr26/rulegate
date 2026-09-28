@@ -12,7 +12,7 @@ export { runAdapterNew } from './commands/adapter/index.js';
 export { ADAPTERS, ADAPTER_NAMES } from './registry.js';
 
 /**
- * What the GitHub Action (T053) needs to turn a `CheckResult` into inline annotations,
+ * What the GitHub Action (T048) needs to turn a `CheckResult` into inline annotations,
  * re-exported here rather than depended on directly.
  *
  * `action/` declares exactly one dependency, `rulegate`, so that the set of packages

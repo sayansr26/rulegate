@@ -13,7 +13,7 @@ function importJson(body: string) {
   return importMcpJson(body, { serversKey: 'mcpServers', parseReference, file: '.mcp.json' });
 }
 
-describe('importMcpJson — T048', () => {
+describe('importMcpJson — T041', () => {
   it('inverts a stdio server and a remote one', () => {
     const { servers, warnings } = importJson(
       JSON.stringify({
@@ -45,7 +45,7 @@ describe('importMcpJson — T048', () => {
     expect(servers[0]!.env['GITHUB_TOKEN']).toEqual({ kind: 'env', name: 'GITHUB_TOKEN' });
     expect(warnings).toHaveLength(1);
     // The message names the key and the variable, never the credential. A scanner that
-    // prints what it found commits the secret to a different file (T044).
+    // prints what it found commits the secret to a different file (T037).
     expect(warnings[0]).not.toContain('ghp_');
   });
 
@@ -128,7 +128,7 @@ describe('importMcpJson — T048', () => {
   });
 });
 
-describe('stripJsonc — T048', () => {
+describe('stripJsonc — T041', () => {
   it('removes line and block comments and trailing commas', () => {
     const text = `{
       // a line comment

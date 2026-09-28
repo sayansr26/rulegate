@@ -56,7 +56,7 @@ Rulegate imports **rules**. Anything else is reported by name and left alone:
 before you delete the old directory — being told now is the point of the warning, rather
 than finding out when an MCP server stops working.
 
-Skills and subagents are canonical models Rulegate has not built yet (T057–T060). When they
+Skills and subagents are canonical models Rulegate has not built yet (T052–T055). When they
 land, these importers gain them.
 
 ## After importing

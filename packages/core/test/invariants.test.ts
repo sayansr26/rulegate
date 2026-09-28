@@ -47,12 +47,12 @@ async function packageManifests(): Promise<{ name: string; dir: string; json: Pa
   // Adapters are *discovered*, not listed. A hardcoded list would silently stop covering
   // the next adapter someone scaffolds (T028), and an invariant that quietly narrows its
   // own scope while staying green is worse than not having it.
-  // `packages/interop` is listed explicitly (T054): it is not an adapter and does not live
+  // `packages/interop` is listed explicitly (T049): it is not an adapter and does not live
   // under `packages/adapters/`, but it ships, so the dependency allowlist and the engines
   // pin must cover it. A package that escapes this list is a package where a third-party
   // dependency can arrive unnoticed. `plugins/rulegate` is listed for the same reason
-  // (T104): its bundle ships inside the Claude Code plugin, and whatever it depends on
-  // ships with it. `packages/claude` (T115) ships twice, published and bundled.
+  // (T097): its bundle ships inside the Claude Code plugin, and whatever it depends on
+  // ships with it. `packages/claude` (T108) ships twice, published and bundled.
   const dirs = [
     'packages/core',
     'packages/cli',
@@ -101,8 +101,8 @@ describe('dependency surface', () => {
 
 /**
  * The only directories in shipped source that may spawn a process: two running only
- * read-only git — the CLI's `check --staged` (T052) and the Claude Code plugin's hooks
- * (T104) — and the CLI's `claude` module (T115, D3), running only the pinned
+ * read-only git — the CLI's `check --staged` (T047) and the Claude Code plugin's hooks
+ * (T097) — and the CLI's `claude` module (T108, D3), running only the pinned
  * `claude plugin …` commands and only on `init --plugin --yes`. The test below pins the length.
  */
 const SPAWN_ALLOWLIST = [
@@ -144,8 +144,8 @@ describe('zero network calls', () => {
 
   it('spawns no process outside the allowlisted directories', async () => {
     // T023 banned `child_process` outright and said the ban would be narrowed when
-    // `check --staged` arrived, because reading the git index means a subprocess. T052 is
-    // that narrowing, and T104 the second: the plugin's hooks need `git log` and
+    // `check --staged` arrived, because reading the git index means a subprocess. T047 is
+    // that narrowing, and T097 the second: the plugin's hooks need `git log` and
     // `ls-files`. The assertion below pins the length, so every entry is a decision
     // recorded here rather than an accretion: a ban that grows an entry per feature is not
     // a ban, and `curl` is one `execFile` away from "zero network calls" being false.
@@ -354,18 +354,18 @@ describe('the shared rendering path', () => {
   /**
    * Async and sync forms alike. The first version matched only `writeFile(`, `copyFile(`,
    * `unlink(`, `rmSync(` and `deleteFile(`, so `writeFileSync`, `mkdirSync` or `renameSync`
-   * — the forms the plugin's scripts naturally reach for — passed unseen (T106 audit).
+   * — the forms the plugin's scripts naturally reach for — passed unseen (T099 audit).
    * `cp` and `link` count only as `cpSync`/`linkSync`: bare, they are ordinary helper names
    * (Zed's `docs.ts` has a `link()`).
    */
   /**
-   * The plugin's writers (P3, amended for T109–T117). Each is its own directory, imported by
+   * The plugin's writers (P3, amended for T102–T110). Each is its own directory, imported by
    * one entry, and each is shape-pinned below:
-   *   - `session/` — once-per-session markers under `os.tmpdir()` (T108);
-   *   - `settings-writer/` — the settings pass's `--apply` (T109, D2): the two
+   *   - `session/` — once-per-session markers under `os.tmpdir()` (T101);
+   *   - `settings-writer/` — the settings pass's `--apply` (T102, D2): the two
    *     `settings.json` files, the user's `CLAUDE.md` with a `.rulegate.bak` first, and a
    *     new canonical task rule;
-   *   - `migrate/` — agent-os's agent memory moved to `rulegate-*` (T114): copies made
+   *   - `migrate/` — agent-os's agent memory moved to `rulegate-*` (T107): copies made
    *     exclusively, verified, and only then the sources unlinked, never recursively.
    */
   const PLUGIN_MARKER = 'plugins/rulegate/src/session/marker.ts';
@@ -380,7 +380,7 @@ describe('the shared rendering path', () => {
   const WRITE_PRIMITIVE = WRITE_PRIMITIVE_ANY;
 
   /**
-   * The CLI's one writer outside core (T115, D2): `rulegate claude settings --apply`, a copy
+   * The CLI's one writer outside core (T108, D2): `rulegate claude settings --apply`, a copy
    * of the plugin's settings writer held to the same shape pin below. It writes outside the
    * repository only at user scope, and only when `--apply` is passed.
    */
@@ -470,7 +470,7 @@ describe('the shared rendering path', () => {
   it.each([PLUGIN_SETTINGS_WRITER, CLI_SETTINGS_WRITER])(
     'confines the settings writer %s to its planned targets, backups first, never overwriting a rule',
     async (writer) => {
-      // T109 (D2). It is allowed above only because of what this pins. Every target comes
+      // T102 (D2). It is allowed above only because of what this pins. Every target comes
       // from the planner's paths or a fixed join under the root or the Claude dir it is given
       // — never `homedir()` or the environment, which is the entry's job and what the tests
       // point into a sandbox. The user-scope backup is the literal `.rulegate.bak`, copied
@@ -521,7 +521,7 @@ describe('the shared rendering path', () => {
   );
 
   it('confines the memory migrator to verified copies, never a recursive delete', async () => {
-    // T114. It deletes files Rulegate never generated, which the CLI never does, so what it
+    // T107. It deletes files Rulegate never generated, which the CLI never does, so what it
     // may delete is pinned tighter than any other writer: `unlink` of a file the plan
     // copied and verified, and `rmdir` of a directory, which fails on anything left in it.
     // Nothing recursive, no `rm`, and every path from the planner — none built here.
@@ -752,7 +752,7 @@ async function adapterFiles(): Promise<string[]> {
 }
 
 /**
- * `@rulegate/claude` (T115) is what the CLI and the plugin both know about a Claude Code
+ * `@rulegate/claude` (T108) is what the CLI and the plugin both know about a Claude Code
  * setup: the planners, the setup state and what a writer refuses. The writers stay in the
  * plugin (P3), and the write scan above already covers this package as shipped source — a
  * write here is an offender, not an allowlist entry. What it pins below is direction: the

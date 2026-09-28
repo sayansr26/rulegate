@@ -1,6 +1,6 @@
 # Rulegate
 
-<!-- hero GIF (T035): edit one canonical rule → five tool configs update → a hand-edit fails CI with a diff -->
+<!-- hero GIF (T155): edit one canonical rule → five tool configs update → a hand-edit fails CI with a diff -->
 
 **One source of truth for your AI coding agents — and proof it stayed true.**
 

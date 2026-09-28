@@ -6,7 +6,7 @@ import { parseToml } from '../src/toml-read.js';
 
 const FILE = '.codex/config.toml';
 
-describe('parseToml — T048', () => {
+describe('parseToml — T041', () => {
   it('reads tables, strings, arrays, numbers and booleans', () => {
     const tables = parseToml(
       [
@@ -48,7 +48,7 @@ describe('parseToml — T048', () => {
   });
 });
 
-describe('importConfigToml — T048', () => {
+describe('importConfigToml — T041', () => {
   it('inverts env_vars and env_http_headers back into references', () => {
     const { servers } = importConfigToml(
       [
@@ -70,7 +70,7 @@ describe('importConfigToml — T048', () => {
   });
 
   /**
-   * T096. `bearer_token_env_var` names a variable holding a *bare* token, because Codex
+   * T089. `bearer_token_env_var` names a variable holding a *bare* token, because Codex
    * supplies the `Bearer ` scheme itself. Canonical headers hold a whole value, so importing
    * it as `Authorization: env:X` would hand every other tool a token with no scheme — a
    * server that starts and fails to authenticate. That is the silent-wrong-answer case this
@@ -121,9 +121,9 @@ describe('importConfigToml — T048', () => {
   });
 });
 
-describe('codex read() — the AGENTS.md guard is for rules only (T048)', () => {
+describe('codex read() — the AGENTS.md guard is for rules only (T041)', () => {
   it('imports MCP servers even when AGENTS.md is the canonical source', async () => {
-    // The mirror of the write-side bug T046 found. `read()` returned early whenever
+    // The mirror of the write-side bug T039 found. `read()` returned early whenever
     // AGENTS.md was canonical — correct for rules, and it would have silently suppressed
     // MCP import on every repository that adopts Rulegate through a bare AGENTS.md,
     // which is this tool's most common first contact.

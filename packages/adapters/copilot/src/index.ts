@@ -107,7 +107,7 @@ async function read(ctx: AdapterContext): Promise<Partial<Canonical>> {
  * The MCP half, guarded separately from the rules half.
  *
  * A repository can hold `.vscode/mcp.json` and no rules at all, so folding this into the rules
- * return would import no servers there — the mirror of the bug T046 found on the write
+ * return would import no servers there — the mirror of the bug T039 found on the write
  * side, where one early return covered the whole adapter.
  */
 async function readMcp(ctx: AdapterContext): Promise<ImportResult> {
@@ -152,7 +152,7 @@ async function write(ctx: AdapterContext): Promise<readonly Artifact[]> {
 
   // Each artifact carries its own guards. This used to be one `rules.length === 0` early
   // return covering the whole adapter, which was right while rules were the only output
-  // and became wrong the moment MCP arrived (T046 found the same hole in the other two):
+  // and became wrong the moment MCP arrived (T039 found the same hole in the other two):
   // a repository whose only canonical content is `.rulegate/mcp/servers.yaml` still has
   // a `.vscode/mcp.json` to generate.
   const repoWide = rules.filter((r) => appliesRepoWide(r));
@@ -203,7 +203,7 @@ async function write(ctx: AdapterContext): Promise<readonly Artifact[]> {
   }
 
   // No `provenance`: no canonical rule contributed to this file, and claiming one would
-  // mislead `doctor` and T051's merge, both of which read `ruleIds` as a real mapping.
+  // mislead `doctor` and T046's merge, both of which read `ruleIds` as a real mapping.
   const mcp = renderMcpJson(canonical.mcpServers, marker);
   if (mcp !== '' && !isCanonicalSource(canonical.manifest, MCP_FILE)) {
     artifacts.push(

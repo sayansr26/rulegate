@@ -7,7 +7,7 @@ It exists for one branch. `read()`'s rules half returns early when `AGENTS.md` i
 canonical source — the parser has already read it, and importing it again would duplicate
 every rule. The MCP half must **not** share that guard: a repository adopting Rulegate
 through a bare `AGENTS.md` is this tool's most common first contact, and suppressing MCP
-import there is the exact mirror of the write-side bug T046 found, where one early return
+import there is the exact mirror of the write-side bug T039 found, where one early return
 covered the whole adapter.
 
 There is no `expected/` directory: the assertion is about which halves of `read()` ran, not

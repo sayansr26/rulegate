@@ -59,7 +59,7 @@ export function stripMarker(text: string): string {
  * Returns a mask the same length in lines as the input, never the content itself — the
  * caller slices the original. A `## Usage` inside a fenced example is a code sample, and
  * splitting a rule there would silently cut somebody's snippet in half. The same trap
- * bit T076's RFC section extractor, which read one path and passed.
+ * bit T071's RFC section extractor, which read one path and passed.
  */
 function maskFences(lines: readonly string[]): readonly string[] {
   const masked: string[] = [];

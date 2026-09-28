@@ -86,7 +86,7 @@ export interface ImportedMcpResult {
   /**
    * Human-readable, one per dropped or converted server. **Never quotes a value** — a
    * message naming the secret would print it into a CI log, which is the failure the rule
-   * exists to prevent, committed to a different file (T044).
+   * exists to prevent, committed to a different file (T037).
    */
   readonly warnings: readonly string[];
 }
@@ -138,7 +138,7 @@ function importSecrets(
 
     // A literal. Two cases, and only one of them is safe to rewrite.
     if (isLiteralSecret(key, value)) {
-      // T044's stated conversion: the credential becomes a reference named after the key
+      // T037's stated conversion: the credential becomes a reference named after the key
       // it was found under, so nothing is written back into a git-committed file.
       map[key] = literalToEnvRef(key);
       warnings.push(

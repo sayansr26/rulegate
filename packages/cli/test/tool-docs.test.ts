@@ -25,7 +25,7 @@ async function page(tool: string): Promise<string> {
  * prove nothing: those appear in the precedence table *and* the per-file sections *and* the
  * Sources list, so a mutation removing any one section would still find them somewhere.
  */
-describe('generated tool docs — T065', () => {
+describe('generated tool docs — T060', () => {
   it('is byte-identical to what the current adapters render', async () => {
     // The gate CI runs. `--check` never writes and is safe under CI, unlike `--yes`.
     await run('node', ['scripts/generate-docs.mjs', '--check'], { cwd: repoRoot });
@@ -102,7 +102,7 @@ describe('generated tool docs — T065', () => {
   });
 });
 
-describe('generated adapter registry — T066', () => {
+describe('generated adapter registry — T061', () => {
   it('lists every registered adapter', async () => {
     const rendered = await readFile(path.join(repoRoot, 'docs/adapters.md'), 'utf8');
     for (const adapter of ADAPTERS) expect(rendered).toContain(`\`${adapter.name}\``);

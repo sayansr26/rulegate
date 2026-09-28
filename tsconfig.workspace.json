@@ -5,7 +5,7 @@
     "allowJs": true,
     // Two consumers, which is why this file is named for the workspace rather than for
     // either of them: eslint's type-aware rules (`eslint.config.js`) and the second half
-    // of `pnpm typecheck`. It was `tsconfig.eslint.json` until 2026-09-09, when T087
+    // of `pnpm typecheck`. It was `tsconfig.eslint.json` until 2026-09-09, when T080
     // discovered that **no test file was typechecked anywhere** — the per-package
     // tsconfigs are `"include": ["src/**/*"]` and the tests live in `test/`. This project
     // already included them, so the fix was to run it, not to write a fourth copy of the
