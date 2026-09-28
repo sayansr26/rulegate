@@ -36,14 +36,14 @@ export function buildProgram(): Command {
 
   // Registered before `sync` because it is the first command a new repository needs, and
   // because two error messages and RFC §8 have been telling users to run it since M0
-  // while it did not exist — following our own advice exited 2 (T077).
+  // while it did not exist — following our own advice exited 2 (T072).
   program
     .command('init')
     .description(
       'Import existing tool configs into .rulegate/ (prints a plan; writes nothing without --yes)',
     )
     .option('--yes', 'apply the plan instead of only printing it')
-    // Opt-in (T115): `claude plugin marketplace add|update` fetch from GitHub, and plain
+    // Opt-in (T108): `claude plugin marketplace add|update` fetch from GitHub, and plain
     // `init` makes no network call. Without either flag the commands are printed.
     .option('--plugin', 'with --yes, install or update the Claude Code plugin via `claude plugin`')
     .option('--no-plugin', 'hide the Claude Code section')
@@ -71,7 +71,7 @@ export function buildProgram(): Command {
     )
     // `--import` is the non-destructive half of the same problem: `--force` discards the
     // edit (after a backup), this recovers it. Both exist so that meeting a hand-edited
-    // file is a choice rather than a dead end (T051, T075).
+    // file is a choice rather than a dead end (T046, T070).
     .option('--import', 'merge hand-edits on generated files back into .rulegate/')
     .option('--yes', 'apply the merge --import printed')
     .option('--recursive', 'plan every nested .rulegate/ (the default when more than one exists)')
@@ -99,7 +99,7 @@ export function buildProgram(): Command {
     );
 
   // Directly after `sync` because it is `sync`'s read-only twin: same plan, same
-  // vocabulary, and --help should show the pair together. `--staged` arrived with T052:
+  // vocabulary, and --help should show the pair together. `--staged` arrived with T047:
   // it reads the git index, which is the one place in shipped source that spawns a
   // process, and the pre-commit hook is its only consumer.
   program

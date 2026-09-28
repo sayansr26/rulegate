@@ -69,7 +69,7 @@ pin<Exact<keyof AdapterContext, 'repoRoot' | 'canonical' | 'fs' | 'options' | 'a
 
 pin<Exact<ArtifactKind, 'rules' | 'mcp' | 'skill' | 'command' | 'subagent' | 'other'>>();
 
-// MCP (T043/T045). `McpServer` came off the forbidden list once T043 settled its shape,
+// MCP (T036/T038). `McpServer` came off the forbidden list once T036 settled its shape,
 // so from here it is frozen like everything else and its fields are pinned key-for-key.
 //
 // `SecretValue` is the load-bearing one: it is `EnvRef` and never `string`, which is what

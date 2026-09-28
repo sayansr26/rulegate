@@ -1,6 +1,6 @@
 # `agent-os-import-claude`
 
-An agent-os project shaped like the one T117 migrates (T149): `config.json` targets Claude
+An agent-os project shaped like the one T110 migrates (T142): `config.json` targets Claude
 Code alone, so agent-os 0.6.0 wrote `AGENTS.md` and `.claude/rules/` — byte for byte its
 own `compile()` output — and never a `CLAUDE.md`. The `CLAUDE.md` here has no banner
 because a person wrote it.

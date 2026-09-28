@@ -44,7 +44,7 @@ async function detect(ctx: AdapterContext): Promise<DetectResult> {
 /**
  * Read the way `write` writes: repo-wide rules from `CLAUDE.md`, glob-scoped rules one per
  * `.claude/rules/*.md`. The `**Applies to:**` parsing on `CLAUDE.md` stays even though
- * `write` no longer emits it for this file, because a `CLAUDE.md` written before T110
+ * `write` no longer emits it for this file, because a `CLAUDE.md` written before T103
  * carries its scoped rules that way and still has to import.
  */
 async function read(ctx: AdapterContext): Promise<Partial<Canonical>> {
@@ -96,7 +96,7 @@ async function read(ctx: AdapterContext): Promise<Partial<Canonical>> {
  * The MCP half, guarded separately from the rules half.
  *
  * A repository can have `.mcp.json` and no `CLAUDE.md`, so returning early when the
- * instruction file is missing would import no servers at all — the mirror of the bug T046
+ * instruction file is missing would import no servers at all — the mirror of the bug T039
  * found on the write side, where one early return covered the whole adapter.
  */
 async function readMcp(ctx: AdapterContext): Promise<ImportResult> {
@@ -186,7 +186,7 @@ async function write(ctx: AdapterContext): Promise<readonly Artifact[]> {
   }
 
   // No `provenance`: no canonical rule contributed to this file, and claiming one would
-  // mislead `doctor` and T051's merge, both of which read `ruleIds` as a real mapping.
+  // mislead `doctor` and T046's merge, both of which read `ruleIds` as a real mapping.
   const mcp = renderMcpJson(canonical.mcpServers, marker);
   if (mcp !== '' && !isCanonicalSource(canonical.manifest, MCP_FILE)) {
     artifacts.push(

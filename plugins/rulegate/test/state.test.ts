@@ -30,7 +30,7 @@ async function healthy(version = '0.3.0'): Promise<void> {
   });
 }
 
-describe('setupState (T106)', () => {
+describe('setupState (T099)', () => {
   it('is FRESH on a project with nothing of the plugin in it', async () => {
     expect((await setupState(sb.root, sb.claudeDir)).status).toBe('fresh');
   });

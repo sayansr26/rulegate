@@ -20,7 +20,7 @@ export const MODEL_FIELDS: readonly string[] = [
   'description',
   'globs',
   'order',
-  // MCP servers (T043, RFC §11)
+  // MCP servers (T036, RFC §11)
   'servers',
   'command',
   'args',

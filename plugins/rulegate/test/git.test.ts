@@ -7,7 +7,7 @@ import { runGit } from '../src/git/index.js';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-describe('runGit (T104)', () => {
+describe('runGit (T097)', () => {
   it('runs an allowlisted read in a git working tree', async () => {
     // The positive control: every refusal below would pass against a runGit that
     // returned undefined unconditionally.

@@ -30,7 +30,7 @@ export interface ResolveContext {
   /**
    * `verifyPlan`'s verdict per planned path: disk against the *render*. `comparison`
    * answers a different question — disk against the *record* — and only the two together
-   * can tell a stale artifact from a clean one (T079).
+   * can tell a stale artifact from a clean one (T074).
    */
   readonly verdicts: ReadonlyMap<string, VerifyStatus>;
   readonly managedBy: ReadonlyMap<string, ToolId>;
@@ -178,7 +178,7 @@ async function measureEntry(
  * generated artifact instead describes an artifact *and* a backup, which makes its
  * aggregate status `unmanaged` and bills the user for tokens twice. The backup is a real
  * file and a recursively scanning tool would really read it; that is a genuine problem and
- * it is **not this row's** to state (T097, and T098 owns the problem itself).
+ * it is **not this row's** to state (T090, and T091 owns the problem itself).
  */
 function outsideRulegateDir(path: string): boolean {
   return path !== RULEGATE_DIR && !path.startsWith(`${RULEGATE_DIR}/`);
@@ -190,7 +190,7 @@ function outsideRulegateDir(path: string): boolean {
  * A repo-wide walk is authorized by `nesting`, and by nothing else. Without this, a
  * pattern like `.cursorrules` would be searched for at every depth, and a nested copy
  * that Cursor genuinely does not read would be reported as read. Exported so `init`'s
- * size-cap check (T150) asks which tool reads a file by the same answer `doctor` gives.
+ * size-cap check (T143) asks which tool reads a file by the same answer `doctor` gives.
  */
 export function repoPattern(entry: PrecedenceEntry): string {
   return entry.scope === 'nested' || (entry.nesting !== undefined && entry.nesting !== 'root-only')
@@ -262,7 +262,7 @@ function decideShadowed(
     // An entry whose own copies merge rather than replace one another is additive by
     // nature, and joins a chain instead of contesting it: Claude Code loads
     // `.claude/rules/` beside `CLAUDE.md`, never instead of it, and a scoped rule Rulegate
-    // moved there has no counterpart in `CLAUDE.md` to lose a conflict to (T110).
+    // moved there has no counterpart in `CLAUDE.md` to lose a conflict to (T103).
     if (entry.nesting === 'all-merged') return false;
     // `override` and `first-match` share this shape — the first present entry in a chain
     // wins — and differ only in whether the losers are still read. That is decided by

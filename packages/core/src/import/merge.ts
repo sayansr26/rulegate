@@ -15,11 +15,11 @@ import type { ToolId } from '../model/ids.js';
 import type { ImportSource } from './dedupe.js';
 
 /**
- * T051 — merge a hand-edit on a generated file back into `.rulegate/`.
+ * T046 — merge a hand-edit on a generated file back into `.rulegate/`.
  *
  * Hand-editing generated files is a habit users will not break, and today the only way out
  * is to delete your own edit. That is the one outcome worse than doing nothing, so this is
- * the escape hatch T075 has been waiting on.
+ * the escape hatch T070 has been waiting on.
  *
  * **`state.json` records a hash, not the ancestor text**, and a three-way merge needs the
  * ancestor's *content*. That gives two situations that must not be blurred:
@@ -140,7 +140,7 @@ export async function computeMergePlan(input: MergeInput): Promise<MergePlan> {
   // back unscoped, and a render need not read back to the body it came from (see
   // `recoverBody`), so the comparison would "merge" an edit nobody made. Only a
   // difference between the edited file and the render it started as is an edit — for
-  // `.claude/rules/`, a changed `paths:` list or body (T110).
+  // `.claude/rules/`, a changed `paths:` list or body (T103).
   const ancestors = await collectImports({
     repoRoot,
     fs: withRendered(fs, new Map(eligible.map((p) => [p, rendered.get(p) ?? '']))),

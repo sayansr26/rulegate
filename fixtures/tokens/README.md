@@ -30,7 +30,7 @@ meant to be inconvenient to change.
 | `05-adversarial.md` | long paths and globs, fenced TS and JSON, dense CJK/Hangul/Kana, Cyrillic, Greek, many ZWJ emoji sequences, a punctuation run, a very long line, and a CRLF section |
 
 `AGENTS.md` and `.github/copilot-instructions.md` are deliberately **absent**: in this
-repository all three are byte-identical to `CLAUDE.md` (T078 — the same 6,516 characters
+repository all three are byte-identical to `CLAUDE.md` (T073 — the same 6,516 characters
 and 1,637 tokens), so a fourth copy would have added a fixture that tests nothing.
 
 ### How adversarial `05` has to be

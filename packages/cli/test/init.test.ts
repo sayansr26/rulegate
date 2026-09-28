@@ -18,7 +18,7 @@ let sandbox: string;
 
 beforeEach(async () => {
   repo = await mkdtemp(path.join(tmpdir(), 'rulegate-init-'));
-  // Hermetic against Claude Code (T115): `init` reads the Claude config dir for its Claude
+  // Hermetic against Claude Code (T108): `init` reads the Claude config dir for its Claude
   // Code section, so it gets an empty one, and a PATH with no `claude` on it, so nothing
   // here can reach the real `~/.claude` or the real binary.
   sandbox = await mkdtemp(path.join(tmpdir(), 'rulegate-init-home-'));
@@ -136,7 +136,7 @@ describe('rulegate init', () => {
     // The other half, and the more interesting one: a file whose re-render is
     // byte-identical is adopted rather than rewritten, so it is not backed up and not
     // touched. This scoped rule file carries our marker, so import and render round-trip
-    // it. (`CLAUDE.md` used to be the example; since T110 its scoped `Frontend` section
+    // it. (`CLAUDE.md` used to be the example; since T103 its scoped `Frontend` section
     // moves to `.claude/rules/`, so it is rewritten and backed up like AGENTS.md.)
     const scoped = '.claude/rules/30-components.md';
     expect(await read(scoped)).toBe(
@@ -147,7 +147,7 @@ describe('rulegate init', () => {
 
   // Taking ownership is what retires an original. A file imported and then left alone is
   // still loaded beside the generated copy of its rules, and nothing after `init` can see
-  // it: `check` compares only what Rulegate owns (T110).
+  // it: `check` compares only what Rulegate owns (T103).
   it('warns about every imported file that no generated file replaces', async () => {
     await cp(path.join(fixtures, 'claude-code-import/input'), repo, { recursive: true });
     await cp(path.join(fixtures, 'cursor-import/input'), repo, { recursive: true });
@@ -173,8 +173,8 @@ describe('rulegate init', () => {
 
   // `init` applies with `force` on the premise that it imported from everything it
   // replaces. A file an adapter renders to but never read breaks that premise, so it is named
-  // in the dry run and backed up before it is replaced — never overwritten silently (T132).
-  describe('a rendered path nothing was imported from (T132)', () => {
+  // in the dry run and backed up before it is replaced — never overwritten silently (T125).
+  describe('a rendered path nothing was imported from (T125)', () => {
     const SETTINGS = `{
   "$schema": "https://opencode.ai/config.json",
   "model": "anthropic/claude-sonnet-4-5",
@@ -331,7 +331,7 @@ describe('rulegate init', () => {
 
   describe('refuses a hand-written .rulegate/ with no manifest', () => {
     // Reachable the same way, and init's own no-tools hint tells people to write it. The
-    // parse-back T123 plans from sees only the files init writes, so a rule already there
+    // parse-back T116 plans from sees only the files init writes, so a rule already there
     // was rendered by the first `check` and not by init — drift — and one init would
     // rewrite was overwritten with no backup anywhere.
     const refused = async (file: string, contents: string): Promise<void> => {
@@ -385,7 +385,7 @@ describe('rulegate init', () => {
     expect(quiet.warnings.map((w) => w.code)).not.toContain('E_FORMATTER_CONFLICT');
   });
 
-  // T072: Prettier was the only formatter the warning knew about, so a repository
+  // T067: Prettier was the only formatter the warning knew about, so a repository
   // formatted by anything else walked into the same deadlock with nothing said.
   it.each([
     ['Biome', 'biome.json', 'files.includes'],
@@ -403,7 +403,7 @@ describe('rulegate init', () => {
   });
 
   /**
-   * T092, and the shape of the repository it was found on: a Next.js app with a flat ESLint
+   * T085, and the shape of the repository it was found on: a Next.js app with a flat ESLint
    * config and no Markdown plugin. ESLint lints JavaScript until a plugin says otherwise,
    * and Rulegate never generates a `.js` file, so the old warning fired on the first run
    * about files ESLint would never open.
@@ -535,7 +535,7 @@ describe('rulegate init', () => {
   });
 
   /**
-   * T095. Taking ownership copies the original to `.rulegate/backup/` verbatim, which is what
+   * T088. Taking ownership copies the original to `.rulegate/backup/` verbatim, which is what
    * makes `restore` faithful — and for an `.mcp.json` holding a token, that faithful copy is a
    * plaintext credential inside the directory users are told to commit. Found in the T032
    * rehearsal on a repository whose `.gitignore` held `.mcp.json` precisely to keep the token
@@ -573,7 +573,7 @@ describe('rulegate init', () => {
     await writeFile(path.join(repo, '.mcp.json'), `${MCP_WITH_LITERAL}\n`);
     // A bare name matches at every depth under gitignore's rules, so this one line covers
     // `.rulegate/backup/.mcp.json` too. Warning here would be a warning on a repository that
-    // is already correct, which is the T072 lesson.
+    // is already correct, which is the T067 lesson.
     await writeFile(path.join(repo, '.gitignore'), '.mcp.json\n');
 
     expect((await plan()).warnings.map((w) => w.code)).not.toContain('W_BACKUP_SECRET');
@@ -605,12 +605,12 @@ describe('rulegate init', () => {
 });
 
 /**
- * T113's validation: an agent-os project migrates in one `init`. The dry run prints a plan
+ * T106's validation: an agent-os project migrates in one `init`. The dry run prints a plan
  * that takes over agent-os's outputs and writes nothing; `--yes` backs every one of them up
  * before overwriting it, leaves the files it only warned about alone, and hands over a
  * repository `check` calls clean.
  */
-describe('rulegate init — from agent-os (T113)', () => {
+describe('rulegate init — from agent-os (T106)', () => {
   /** agent-os's bannered outputs plus the hand-written files; every one is taken over. */
   const TAKEN_OVER = [
     '.agents/rules/api.md',
@@ -688,7 +688,7 @@ describe('rulegate init — from agent-os (T113)', () => {
     expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
   });
 
-  it('refuses a .agent-os/ built from Rulegate output, and writes nothing (T120)', async () => {
+  it('refuses a .agent-os/ built from Rulegate output, and writes nothing (T113)', async () => {
     await cp(path.join(fixtures, 'agent-os-import-adopted/input'), repo, { recursive: true });
     const before = await tree();
     const err = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
@@ -704,12 +704,12 @@ describe('rulegate init — from agent-os (T113)', () => {
 });
 
 /**
- * T123: `init --yes` applies the plan rendered from the `.rulegate/` it writes, so the first
+ * T116: `init --yes` applies the plan rendered from the `.rulegate/` it writes, so the first
  * `check` after it is clean. It used to render the in-memory import model instead, and
  * every way that model failed to survive serialization showed up as drift on a repository
  * the user had just adopted — or as a rule silently moved between tools.
  */
-describe('rulegate init — then check is clean (T123)', () => {
+describe('rulegate init — then check is clean (T116)', () => {
   const mdc = (frontmatter: string, body: string) => `---\n${frontmatter}---\n${body}`;
 
   async function seed(files: Readonly<Record<string, string>>): Promise<void> {
@@ -725,7 +725,7 @@ describe('rulegate init — then check is clean (T123)', () => {
   }
 
   it('keeps both rules when AGENTS.md and .ruler/AGENTS.md would claim one id', async () => {
-    // The shape T111's review found: the ruler source and a hand-written AGENTS.md both
+    // The shape T104's review found: the ruler source and a hand-written AGENTS.md both
     // import as `agents`, and one canonical file overwrote the other.
     await seed({ '.ruler/AGENTS.md': 'From ruler.\n', 'AGENTS.md': 'By hand.\n' });
     await initThenCheck();

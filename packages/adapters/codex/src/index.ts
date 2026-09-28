@@ -61,7 +61,7 @@ async function readRules(ctx: AdapterContext): Promise<Partial<Canonical>> {
  * `AGENTS.md` was the canonical source — correct for rules, and it would have silently
  * suppressed MCP import on every repository that adopts Rulegate through a bare
  * `AGENTS.md`, which is the most common first contact this tool has. Exactly the mirror of
- * the write-side bug T046 found, arriving from the other direction.
+ * the write-side bug T039 found, arriving from the other direction.
  */
 async function readMcp(ctx: AdapterContext): Promise<ImportResult> {
   if (isCanonicalSource(ctx.canonical.manifest, MCP_FILE)) return {};
@@ -81,7 +81,7 @@ async function write(ctx: AdapterContext): Promise<readonly Artifact[]> {
 
   // Each artifact carries its own guards. Both of these used to be early returns covering
   // the whole adapter, which was right while `AGENTS.md` was the only output and became
-  // wrong the moment MCP arrived — this adapter has the sharper version of the hole T046
+  // wrong the moment MCP arrived — this adapter has the sharper version of the hole T039
   // found in the other two, because a repository whose `AGENTS.md` *is* the canonical
   // source is the ordinary way to use Codex, and it still has MCP servers to generate.
   //
@@ -110,7 +110,7 @@ async function write(ctx: AdapterContext): Promise<readonly Artifact[]> {
   }
 
   // No `provenance`: no canonical rule contributed to this file, and claiming one would
-  // mislead `doctor` and T051's merge, both of which read `ruleIds` as a real mapping.
+  // mislead `doctor` and T046's merge, both of which read `ruleIds` as a real mapping.
   const config = renderConfigToml(canonical.mcpServers, marker);
   if (config !== '' && !isCanonicalSource(canonical.manifest, MCP_FILE)) {
     artifacts.push(

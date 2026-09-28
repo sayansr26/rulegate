@@ -60,7 +60,7 @@ describe('encoded precedence rules', () => {
     // `E_ARTIFACT_PATH_CONFLICT` restated at the docs layer. `computePlan` catches this at
     // runtime; catching it in the data means it never ships. Note this is about *managed*
     // claims only — `AGENTS.md` and `CLAUDE.md` are legitimately listed as unmanaged
-    // context by copilot while another adapter generates them, which is T078's whole point.
+    // context by copilot while another adapter generates them, which is T073's whole point.
     const contested = [...owners.entries()].filter(([, list]) => list.length > 1);
     expect(contested).toEqual([]);
   });

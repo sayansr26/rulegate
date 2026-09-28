@@ -29,7 +29,7 @@ const servers = path.join('.rulegate', 'mcp', 'servers.yaml');
 /** Not a real credential. Shaped like one so the scan has something to find. */
 const FAKE_TOKEN = 'ghp_0123456789abcdefghijklmnopqrstuvwxyz';
 
-describe('rulegate sync — MCP (T046)', () => {
+describe('rulegate sync — MCP (T039)', () => {
   it('generates every enabled tool’s MCP config from one canonical file', async () => {
     expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
 
@@ -64,7 +64,7 @@ describe('rulegate sync — MCP (T046)', () => {
     await rm(path.join(repo, servers));
 
     expect(await runSync({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
-    // The T073 guarantee, now covering a second artifact kind: a generated file whose
+    // The T068 guarantee, now covering a second artifact kind: a generated file whose
     // source is gone is removed rather than left on disk for the tool to keep loading.
     await expect(read('.mcp.json')).rejects.toThrow();
     await expect(read('.cursor/mcp.json')).rejects.toThrow();

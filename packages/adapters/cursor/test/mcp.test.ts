@@ -16,7 +16,7 @@ async function render(mutate: (c: Canonical) => Canonical = (c) => c): Promise<s
   return artifacts.find((a) => a.path === MCP_FILE)?.contents;
 }
 
-describe('cursor MCP output (T046)', () => {
+describe('cursor MCP output (T039)', () => {
   it('matches the hand-written golden byte for byte', async () => {
     await expectFixtureMatch(FIXTURE, cursor);
   });

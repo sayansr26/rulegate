@@ -15,7 +15,7 @@ const audit = async (): Promise<string> =>
     await runAudit({ root: sb.root, claudeDir: sb.claudeDir, today: '2026-09-26', expect: '0.3.0' })
   ).join('\n');
 
-describe('runAudit (T106)', () => {
+describe('runAudit (T099)', () => {
   it('says TOO-EARLY on an empty project, and reads no clock of its own', async () => {
     const text = await audit();
     expect(text).toContain('2026-09-26');

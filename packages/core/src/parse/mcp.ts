@@ -180,7 +180,7 @@ function parseTransport(v: Validator, node: YAMLMap, field: string) {
 }
 
 /**
- * `env` and `headers` accept **`env:NAME` references and nothing else** (T044).
+ * `env` and `headers` accept **`env:NAME` references and nothing else** (T037).
  *
  * The refusal is here, at the parser, rather than at the writer, because by the time a
  * literal reaches an adapter it has already been through the model — and the model's type
@@ -252,7 +252,7 @@ function parseScope(v: Validator, node: Node | undefined, field: string): McpSco
 
 /**
  * Keys Rulegate does not interpret, kept verbatim — and checked for secrets on the way
- * through (T044).
+ * through (T037).
  *
  * This is the hole the `SecretValue` type cannot close. `unknown` is what makes import
  * lossless, and it carries plain strings that are re-emitted into generated, git-committed

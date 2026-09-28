@@ -13,7 +13,7 @@ import {
 } from '@rulegate/claude';
 import { sandbox, type Sandbox } from './helpers.js';
 
-describe('planSettings (T106, pure half of T109)', () => {
+describe('planSettings (T099, pure half of T102)', () => {
   it('plans every deny rule and the env flag for an absent file', () => {
     const p = planSettings(undefined);
     expect(p.status).toBe('changed');
@@ -59,7 +59,7 @@ describe('planSettings (T106, pure half of T109)', () => {
   });
 });
 
-describe("retiring agent-os's marketplace (T114)", () => {
+describe("retiring agent-os's marketplace (T107)", () => {
   const protectedText = (extra: object): string =>
     JSON.stringify({ ...(JSON.parse(planSettings(undefined).next!) as object), ...extra });
   const markets = {

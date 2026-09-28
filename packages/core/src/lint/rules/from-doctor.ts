@@ -7,7 +7,7 @@ import type { LintContext, LintFindingInit, LintRule } from '../types.js';
  * The condition is *not* recomputed here. Both commands answer from the one
  * `DoctorReport` the engine built, so a user who runs `doctor` and `lint` may see the
  * same condition twice — they asked two questions — but the two can never disagree
- * about whether it holds. Recomputing would reintroduce exactly the divergence T079
+ * about whether it holds. Recomputing would reintroduce exactly the divergence T074
  * found between `doctor` and `check`.
  */
 function fromDoctor(
@@ -51,7 +51,7 @@ export const oversizedFile: LintRule = {
  * policy was written around: enabling `copilot`, `codex` and `claude-code` together
  * sends Copilot the same rules three times, and that is a **correct** configuration
  * somebody may want. A gate that fails on it is a gate people mute, and a muted linter
- * reports nothing at all (T027, T047, T072).
+ * reports nothing at all (T027, T040, T067).
  */
 export const conflictingRules: LintRule = {
   id: 'conflicting-rules',

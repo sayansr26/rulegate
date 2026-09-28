@@ -21,7 +21,7 @@ import { createOutput, type Output } from '../ui/report.js';
 import { ExitCode, type ExitCodeValue } from '../ui/exit.js';
 
 /**
- * Where the CLI meets Claude Code (T115): the setup-state section `init` prints, the plugin
+ * Where the CLI meets Claude Code (T108): the setup-state section `init` prints, the plugin
  * install `init --plugin --yes` runs, and `rulegate claude settings` (D2). What any of them
  * knows about a Claude Code setup comes from `@rulegate/claude`, the same read-only modules
  * the plugin runs, so the CLI and `/rulegate:init` cannot disagree about what is missing.

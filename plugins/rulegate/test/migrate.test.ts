@@ -17,7 +17,7 @@ import type * as Migrate from '../../../packages/claude/src/migrate.js';
 import { sandbox, type Sandbox } from './helpers.js';
 
 /**
- * The memory migration (T114): the planner, the writer, and the bundled entry. Every case
+ * The memory migration (T107): the planner, the writer, and the bundled entry. Every case
  * runs in a sandbox whose project root and Claude config dir are separate temp directories;
  * the spawned cases point HOME and CLAUDE_CONFIG_DIR into it as well.
  */

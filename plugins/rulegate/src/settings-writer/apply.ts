@@ -21,7 +21,7 @@ import {
 } from '@rulegate/claude';
 
 /**
- * The settings pass's writer (T109) — the plugin's second writer under the amended P3,
+ * The settings pass's writer (T102) — the plugin's second writer under the amended P3,
  * pinned in `invariants.test.ts` by shape. It lives in its own directory for the same reason
  * `session/` does: only `src/settings.ts` imports it, so no hook bundle and neither the audit
  * nor the state script can carry a write call, and the per-bundle pin proves that.

@@ -146,7 +146,7 @@ All notable changes to this project are recorded here. This project follows
 
 - **The Rulegate plugin for Claude Code, as a preview.** agent-os's Claude Code plugin now
   lives in this repository: its agents, skills and hooks are below. It ships in this release
-  but is not announced yet — the end-to-end migration of a real agent-os project (T117) has
+  but is not announced yet — the end-to-end migration of a real agent-os project (T110) has
   not run — so install it (`/plugin install rulegate@rulegate`) knowing that.
   The groundwork: a `rulegate` marketplace at the repository root, `plugins/rulegate/`, a
   validator CI runs on every push (agent frontmatter, hook paths, and

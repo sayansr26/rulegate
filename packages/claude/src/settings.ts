@@ -4,7 +4,7 @@ import { exists, isDir, isRecord, ls, read, readJson } from './read.js';
 /**
  * The settings pass, pure half (decision P4). Everything here computes what the pass would
  * change and never writes: the audit and the setup state need the same answers, and the
- * writer (the plugin's `src/settings-writer/`, T109) writes exactly the `next` planned here,
+ * writer (the plugin's `src/settings-writer/`, T102) writes exactly the `next` planned here,
  * so there is one merge and a preview cannot promise something the apply does differently.
  *
  * Three things, at project scope, user scope, or both:
@@ -86,7 +86,7 @@ export type Scope = 'project' | 'user';
 
 export const PLUGIN_ID = 'rulegate@rulegate';
 export const MARKETPLACE_NAME = 'rulegate';
-/** An agent-os install still enabled next to this one prints the session block twice (T114). */
+/** An agent-os install still enabled next to this one prints the session block twice (T107). */
 export const LEGACY_PLUGIN_ID = 'agent-os@sayan-plugins';
 export const LEGACY_MARKETPLACE = 'sayan-plugins';
 /** What `claude plugin marketplace add sayansr26/rulegate --scope project` declares (D4). */
@@ -169,7 +169,7 @@ export type EnvState = 'added' | 'present' | 'conflict';
 /**
  * agent-os's marketplace in `extraKnownMarketplaces`: `retire` swaps it for Rulegate's,
  * `blocked` leaves it while agent-os is still enabled here, since removing the marketplace
- * of a plugin that is still loading is how a session ends up with neither (T114).
+ * of a plugin that is still loading is how a session ends up with neither (T107).
  */
 export type MarketplaceState = 'retire' | 'blocked';
 

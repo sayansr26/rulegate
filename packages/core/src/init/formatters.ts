@@ -3,7 +3,7 @@ import { matchesGlob } from '../fs/glob.js';
 import type { ReadOnlyFileSystem } from '../fs/types.js';
 
 /**
- * T072, which is a first-run experience rather than a bug in either tool.
+ * T067, which is a first-run experience rather than a bug in either tool.
  *
  * A formatter and a generator cannot both own a file. Reformat a generated one and the
  * next `sync` correctly reports it as hand-edited and refuses to write it — a deadlock
@@ -13,7 +13,7 @@ import type { ReadOnlyFileSystem } from '../fs/types.js';
  * It warns rather than editing the ignore file itself. That file is the user's, and a
  * tool whose pitch is that it never touches what it did not generate should not open its
  * first conversation by editing something it did not generate — the decision taken at
- * T019 and reaffirmed at T072. `init.test.ts` asserts `--yes` writes no ignore file, so
+ * T019 and reaffirmed at T067. `init.test.ts` asserts `--yes` writes no ignore file, so
  * this is a guarantee rather than a comment.
  */
 
@@ -35,7 +35,7 @@ interface Formatter {
    */
   readonly bareDependencyCounts: boolean;
   /**
-   * T092. Strings that prove this tool has been pointed at something other than JavaScript.
+   * T085. Strings that prove this tool has been pointed at something other than JavaScript.
    * When present, the tool is only a threat to a generated file if one of them appears in
    * its config or in `package.json` — see the comment above `ESLINT_NON_JS_SIGNALS`.
    */
@@ -43,7 +43,7 @@ interface Formatter {
 }
 
 /**
- * T092: the opt-in ESLint needs before it can touch anything Rulegate generates.
+ * T085: the opt-in ESLint needs before it can touch anything Rulegate generates.
  *
  * Rulegate never emits a `.js` or `.ts` file — every artifact is Markdown, `.mdc`, JSON,
  * TOML, YAML or an extensionless dotfile — and ESLint lints JavaScript and nothing else

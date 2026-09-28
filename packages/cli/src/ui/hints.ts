@@ -14,8 +14,8 @@ export const HINT_SYNC = 'hint: run: rulegate sync';
  * Clobbering someone's edit is the one outcome worse than doing nothing.
  *
  * This names only what exists today. It used to advertise the in-place merge flag, which
- * is T051 and unimplemented, so following our own advice produced usage help and exit 2 —
- * the code that means the *user* made a mistake (T075). `test/hints.test.ts` reads every
+ * is T046 and unimplemented, so following our own advice produced usage help and exit 2 —
+ * the code that means the *user* made a mistake (T070). `test/hints.test.ts` reads every
  * word after a `hint:` to the end of this file, so the flag is not spelled here either.
  */
 export const HINT_HAND_EDITED =
@@ -23,7 +23,7 @@ export const HINT_HAND_EDITED =
   ' can rewrite it.';
 
 /**
- * The escape hatch T075 spent four tasks without. It is a *second* line rather than part
+ * The escape hatch T070 spent four tasks without. It is a *second* line rather than part
  * of `HINT_HAND_EDITED`, because the two say different things: the first is what to do
  * with no further tooling, and this one is the shortcut, which not every user wants —
  * importing rewrites their canonical source.

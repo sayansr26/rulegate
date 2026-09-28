@@ -15,10 +15,10 @@ import { read } from './read.js';
 import { inline } from './text.js';
 
 /**
- * The generated-file guard (T108): the PreToolUse hook's blocking job, and the ownership
+ * The generated-file guard (T101): the PreToolUse hook's blocking job, and the ownership
  * question the settings writer's refusals ask too. An edit to a path `.rulegate/state.json`
  * records is denied. `state.json` is Rulegate's only ownership record, so the guard asks it
- * exactly as `sync` does — `parseState`, `findArtifact`, and T085's case-folded identity
+ * exactly as `sync` does — `parseState`, `findArtifact`, and T078's case-folded identity
  * where the filesystem folds case — from `@rulegate/core`, bundled into the plugin (decision
  * P2). A second ownership model in a hook is the thing that would eventually disagree. The
  * hook's advisory half, the cartographer reminder, stays in the plugin with its marker.

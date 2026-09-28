@@ -11,7 +11,7 @@ const codeOf = (fn: () => unknown): string | undefined => {
   }
 };
 
-describe('the TOML emitter (T047)', () => {
+describe('the TOML emitter (T040)', () => {
   it('escapes only what TOML requires, and writes the rest through', () => {
     // A URL keeps its slashes and colons; a Windows-shaped command keeps its bytes.
     expect(tomlString('https://mcp.example.com/mcp')).toBe('"https://mcp.example.com/mcp"');
@@ -78,7 +78,7 @@ describe('the TOML emitter (T047)', () => {
   });
 
   it('names the key path and never the value it refused', () => {
-    // The T044 rule, applied to a code path that did not exist when it was written: an
+    // The T037 rule, applied to a code path that did not exist when it was written: an
     // unknown key can hold a credential, and this error is raised while rendering one.
     // A message that echoed the offending value would print it into CI logs — the exact
     // failure the rule exists to prevent, committed to a different file.

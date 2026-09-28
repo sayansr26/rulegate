@@ -136,7 +136,7 @@ export function parseMdc(contents: string): ParsedMdc {
 
 /**
  * Cursor's own documentation shows `globs` three ways, and a repository in the wild carries
- * whichever one its author copied (T099).
+ * whichever one its author copied (T092).
  *
  * The bare comma-joined string is Cursor's native spelling and the one this adapter writes.
  * A **flow sequence** — `globs: ["**` + `/*.py"]` — is what the docs show for multiple

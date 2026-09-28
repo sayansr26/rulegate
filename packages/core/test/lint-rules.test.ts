@@ -88,7 +88,7 @@ const rule = (id: string, body: string): readonly [string, string] => [
 ];
 
 describe('the shipped rule set', () => {
-  it('registers exactly the four T064 rules', () => {
+  it('registers exactly the four T059 rules', () => {
     expect(RULES.map((r) => r.id)).toEqual([
       'oversized-file',
       'conflicting-rules',
@@ -98,7 +98,7 @@ describe('the shipped rule set', () => {
   });
 
   it('never defaults a rule to error unless no correct repository can trip it', () => {
-    // The T027/T047/T072 policy, asserted rather than left to reviewers. `oversized-file`
+    // The T027/T040/T067 policy, asserted rather than left to reviewers. `oversized-file`
     // is the only rule whose condition is a published cap that content is silently
     // dropped past; the rest describe states a repository may legitimately be in.
     const byId = new Map(RULES.map((r) => [r.id, r.defaultSeverity]));

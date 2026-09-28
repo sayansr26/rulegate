@@ -29,7 +29,7 @@ function files(packages: number = PACKAGES): [string, string][] {
   return out;
 }
 
-describe(`rulegate on a ${String(PACKAGES)}-package monorepo (T062, NFR6)`, () => {
+describe(`rulegate on a ${String(PACKAGES)}-package monorepo (T057, NFR6)`, () => {
   let repo: string;
 
   beforeEach(async () => {
