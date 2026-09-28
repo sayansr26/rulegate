@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { runGit } from '../git/index.js';
 import { pluginConfig } from './config.js';
-import { isDir, isTopicFile, ls, read } from './read.js';
+import { isDir, isTopicFile, ls, read } from '@rulegate/claude';
 
 /**
  * What counts as a feature, and which features the cartographer has mapped.

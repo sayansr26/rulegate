@@ -8,9 +8,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname } from 'node:path';
-import { exists } from '../lib/read.js';
-import { refusals } from '../lib/refusals.js';
 import {
+  exists,
+  refusals,
   TASK_RULE_FILE,
   planScope,
   ruleTarget,
@@ -18,7 +18,7 @@ import {
   type Refusal,
   type Scope,
   type ScopePlan,
-} from '../lib/settings.js';
+} from '@rulegate/claude';
 
 /**
  * The settings pass's writer (T109) — the plugin's second writer under the amended P3,
@@ -30,8 +30,8 @@ import {
  * earlier preview, since the files may have changed since. Its targets are fixed: the two
  * `settings.json` files and `ruleTarget` — the user's `CLAUDE.md`, a project `CLAUDE.md`
  * that already exists outside a Rulegate project, or `.rulegate/rules/working-agreement.md`
- * inside one. What it refuses is `lib/refusals.ts`, which the preview and the setup state
- * ask too, so neither promises a write this then declines.
+ * inside one. What it refuses is `@rulegate/claude`'s `refusals.ts`, which the preview and the
+ * setup state ask too, so neither promises a write this then declines.
  *
  * Every file it replaces is copied to `<file>.rulegate.bak` first (D2), project files too:
  * a `.git` above the root says nothing about whether *this* file is tracked or committed,

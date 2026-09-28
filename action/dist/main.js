@@ -17270,6 +17270,72 @@ function formatSkippedLevels(plan) {
 // ../packages/cli/dist/ui/exit.js
 var ExitCode = { Ok: 0, Failure: 1, Usage: 2 };
 
+// ../packages/claude/dist/settings.js
+var GIT_DENY = Object.freeze([
+  "Bash(git -C*)",
+  "Bash(git -c*)",
+  "Bash(git --git-dir*)",
+  "Bash(git --work-tree*)",
+  "Bash(git --exec-path*)",
+  "Bash(git add *)",
+  "Bash(git am *)",
+  "Bash(git apply *)",
+  "Bash(git bisect *)",
+  "Bash(git branch *)",
+  "Bash(git checkout *)",
+  "Bash(git cherry-pick *)",
+  "Bash(git clean *)",
+  "Bash(git clone *)",
+  "Bash(git commit *)",
+  "Bash(git config *)",
+  "Bash(git fast-import *)",
+  "Bash(git filter-branch *)",
+  "Bash(git gc *)",
+  "Bash(git init *)",
+  "Bash(git merge *)",
+  "Bash(git mv *)",
+  "Bash(git notes *)",
+  "Bash(git prune *)",
+  "Bash(git pull *)",
+  "Bash(git push *)",
+  "Bash(git rebase *)",
+  "Bash(git reflog *)",
+  "Bash(git remote *)",
+  "Bash(git repack *)",
+  "Bash(git replace *)",
+  "Bash(git reset *)",
+  "Bash(git restore *)",
+  "Bash(git revert *)",
+  "Bash(git rm *)",
+  "Bash(git stash *)",
+  "Bash(git submodule *)",
+  "Bash(git switch *)",
+  "Bash(git symbolic-ref *)",
+  "Bash(git tag *)",
+  "Bash(git update-ref *)",
+  "Bash(git worktree *)"
+]);
+var PLUGIN_ID = "rulegate@rulegate";
+var MARKETPLACE_NAME = "rulegate";
+var MARKETPLACE_ENTRY = {
+  source: { source: "github", repo: "sayansr26/rulegate" }
+};
+
+// ../packages/cli/dist/claude/index.js
+var MARKETPLACE_SOURCE = MARKETPLACE_ENTRY.source.repo;
+var SCOPE = "<scope>";
+var SCOPES = Object.freeze(["user", "project", "local"]);
+var CLAUDE_COMMANDS = Object.freeze([
+  ["--version"],
+  ["plugin", "list", "--json"],
+  ["plugin", "marketplace", "list", "--json"],
+  ["plugin", "marketplace", "add", MARKETPLACE_SOURCE, "--scope", "project"],
+  ["plugin", "marketplace", "update", MARKETPLACE_NAME],
+  ["plugin", "install", PLUGIN_ID, "--scope", "project"],
+  ["plugin", "enable", PLUGIN_ID, "--scope", SCOPE],
+  ["plugin", "update", PLUGIN_ID, "--scope", SCOPE]
+]);
+
 // ../packages/cli/dist/ui/diff.js
 function renderDiff(lines, c) {
   return lines.map((line) => {
@@ -17434,16 +17500,16 @@ ${RECOVERY[entry.status]}`;
 }
 function renderAnnotations(report) {
   const all = report.entries.flatMap(annotationsFor);
-  const shown = all.slice(0, MAX_ANNOTATIONS).map(format);
-  if (all.length > shown.length) {
-    const hidden = all.length - shown.length;
-    shown.push(
+  const shown2 = all.slice(0, MAX_ANNOTATIONS).map(format);
+  if (all.length > shown2.length) {
+    const hidden = all.length - shown2.length;
+    shown2.push(
       `::notice::${escapeData(
         `${String(hidden)} more drifted ${hidden === 1 ? "region" : "regions"} not annotated (github shows at most ${String(MAX_ANNOTATIONS)} per step); the full diff is in the log above.`
       )}`
     );
   }
-  return shown;
+  return shown2;
 }
 
 // src/inputs.ts

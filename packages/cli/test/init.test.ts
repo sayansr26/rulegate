@@ -13,13 +13,24 @@ import { ExitCode } from '../src/ui/exit.js';
 const fixtures = fileURLToPath(new URL('../../../fixtures/', import.meta.url));
 
 let repo: string;
+let sandbox: string;
 
 beforeEach(async () => {
   repo = await mkdtemp(path.join(tmpdir(), 'rulegate-init-'));
+  // Hermetic against Claude Code (T115): `init` reads the Claude config dir for its Claude
+  // Code section, so it gets an empty one, and a PATH with no `claude` on it, so nothing
+  // here can reach the real `~/.claude` or the real binary.
+  sandbox = await mkdtemp(path.join(tmpdir(), 'rulegate-init-home-'));
+  await mkdir(path.join(sandbox, 'bin'));
+  vi.stubEnv('HOME', sandbox);
+  vi.stubEnv('CLAUDE_CONFIG_DIR', path.join(sandbox, '.claude'));
+  vi.stubEnv('PATH', path.join(sandbox, 'bin'));
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await rm(repo, { recursive: true, force: true });
+  await rm(sandbox, { recursive: true, force: true });
 });
 
 /** Every file in the repo, repo-relative and sorted — the shape a filesystem spy compares. */

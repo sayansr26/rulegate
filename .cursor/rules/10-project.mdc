@@ -14,5 +14,5 @@ Rulegate differentiates on **verify** (`check` — render in memory, compare to 
 fail CI on drift) and **inspect** (`doctor` — which tools are configured, which file
 wins, roughly what it costs). Build those before broadening coverage.
 
-This repository is a pnpm workspace. `cli → core`, `cli → adapters/* → adapter-kit →
-core`, and `action/` depends on `cli` for `check` only.
+This repository is a pnpm workspace. `cli → core`, `cli → claude → core`, `cli → adapters/*
+→ adapter-kit → core`, and `action/` depends on `cli` for `check` only.

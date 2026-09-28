@@ -29,6 +29,7 @@ export default defineConfig({
       '@rulegate/adapter-windsurf': src('./packages/adapters/windsurf/src/index.ts'),
       '@rulegate/adapter-zed': src('./packages/adapters/zed/src/index.ts'),
       '@rulegate/interop': src('./packages/interop/src/index.ts'),
+      '@rulegate/claude': src('./packages/claude/src/index.ts'),
       // `action/` imports the CLI by its published name. Without this the Action's tests
       // would be the only ones running against `dist/`, so they would pass or fail on
       // whatever was last built rather than on the source in the diff.

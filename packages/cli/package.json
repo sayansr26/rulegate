@@ -44,6 +44,7 @@
     "@rulegate/adapter-roo-code": "workspace:*",
     "@rulegate/adapter-windsurf": "workspace:*",
     "@rulegate/adapter-zed": "workspace:*",
+    "@rulegate/claude": "workspace:*",
     "@rulegate/interop": "workspace:*",
     "@rulegate/core": "workspace:*",
     "commander": "^12.1.0",

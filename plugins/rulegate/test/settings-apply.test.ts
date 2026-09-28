@@ -4,7 +4,7 @@ import { mkdir, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { GIT_DENY, TASK_RULE_FILE, TODO_ENV } from '../src/lib/settings.js';
+import { GIT_DENY, TASK_RULE_FILE, TODO_ENV } from '@rulegate/claude';
 import { applyScope, BACKUP_SUFFIX } from '../src/settings-writer/apply.js';
 import { sandbox, type Sandbox } from './helpers.js';
 

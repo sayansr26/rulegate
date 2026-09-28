@@ -1,5 +1,5 @@
 import { bundledVersion, claudeDirFromEnv, print, rootArg } from './lib/entry.js';
-import { describeState, setupState } from './lib/state.js';
+import { describeState, setupState } from '@rulegate/claude';
 
 // `node dist/state.js [projectDir]` — FRESH, REPAIR with the items to fix, or HEALTHY.
 print(

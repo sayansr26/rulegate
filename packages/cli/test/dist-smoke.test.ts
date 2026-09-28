@@ -94,8 +94,14 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
       const sub = path.join(repo, 'packages/core');
       await mkdir(sub, { recursive: true });
       const before = await stat(path.join(repo, 'CLAUDE.md'));
+      // The user-level probe and the plugin line read Claude Code's config dir: a sandbox.
+      const home = path.join(repo, '.home');
+      const env = { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: home };
 
-      const { stdout, stderr } = await run(process.execPath, [binPath, 'doctor'], { cwd: sub });
+      const { stdout, stderr } = await run(process.execPath, [binPath, 'doctor'], {
+        cwd: sub,
+        env,
+      });
 
       expect(stdout).toContain('repo  ');
       expect(stdout).toContain('GitHub Copilot');
@@ -126,7 +132,11 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
     const repo = await mkdtemp(path.join(tmpdir(), 'rulegate-init-smoke-'));
     try {
       await cp(path.join(fixtures, 'claude-code-import/input'), repo, { recursive: true });
-      const { stdout } = await run(process.execPath, [binPath, 'init'], { cwd: repo });
+      // The fixture has a CLAUDE.md, so init prints its Claude Code section, which reads
+      // Claude Code's config dir: a sandbox here, never the machine's `~/.claude`.
+      const home = path.join(repo, '.home');
+      const env = { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: home };
+      const { stdout } = await run(process.execPath, [binPath, 'init'], { cwd: repo, env });
       expect(stdout).toContain('nothing was written');
 
       // And it really wrote nothing: the walk finds no `.rulegate/`.

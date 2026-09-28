@@ -4,8 +4,8 @@
 
 Verify these still hold whenever `packages/core` changes:
 
-- **Zero network calls** in any code path — including every adapter and every
-  dependency.
+- **Zero network calls** in any code path — every adapter and dependency included — save
+  `init --plugin --yes`, which asks the `claude` CLI to fetch the plugin by name.
 - **Never write over a file Rulegate did not generate.** `state.json` is the only
   record of ownership; a path absent from it is somebody else's. `--force` may take
   ownership, but only after copying the original to `.rulegate/backup/`.

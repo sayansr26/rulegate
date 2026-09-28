@@ -10,7 +10,7 @@ import {
   planScope,
   planSettings,
   planTaskRule,
-} from '../src/lib/settings.js';
+} from '@rulegate/claude';
 import { sandbox, type Sandbox } from './helpers.js';
 
 describe('planSettings (T106, pure half of T109)', () => {

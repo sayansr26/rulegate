@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "adapter": "cline",
-      "hash": "sha256:f759459b8b18e41194e8c1699f122c74c9c2e35bc1e039f3bece803f9f8bfe87",
+      "hash": "sha256:f04e7db6d9209987d8d13496497bd8764342d850ed687a26f4f340b17b3b8b52",
       "kind": "rules",
       "path": ".clinerules/10-project.md"
     },
@@ -14,13 +14,13 @@
     },
     {
       "adapter": "cline",
-      "hash": "sha256:0321dc8a377faf001da79cb339ae67f95f53a0232e400982655b100b4b4b1adc",
+      "hash": "sha256:42b0adbe26b6bc27190833affdad3c921846798ab5f10c4b4167e0bc890ac34a",
       "kind": "rules",
       "path": ".clinerules/30-invariants.md"
     },
     {
       "adapter": "cline",
-      "hash": "sha256:aa44360c7acf235a27478e0eca956cfa76d6a8eab31c44f12367be156828e402",
+      "hash": "sha256:16ab34b9be7b565bbd9c5a7bff4deb72efda9e2efa42e2f157767aa2372d39dd",
       "kind": "rules",
       "path": ".clinerules/40-commands.md"
     },
@@ -32,7 +32,7 @@
     },
     {
       "adapter": "cursor",
-      "hash": "sha256:00f82d0ec7d7dd921b6d65de383c698efa49591c655a7a85fbc2488ebd63cdc5",
+      "hash": "sha256:2db81b928b0a96d068314b47bed53e540af8c0b804e62bc50dd1184a71ec1842",
       "kind": "rules",
       "path": ".cursor/rules/10-project.mdc"
     },
@@ -44,13 +44,13 @@
     },
     {
       "adapter": "cursor",
-      "hash": "sha256:64d6903ad07927b10705597bb2e951a956929ada3c253e06339ad64bea700a13",
+      "hash": "sha256:d29966590051affe8ccc5e814b7429a798f7bc25aa36552cf88fa67804d0de84",
       "kind": "rules",
       "path": ".cursor/rules/30-invariants.mdc"
     },
     {
       "adapter": "cursor",
-      "hash": "sha256:d5c5620adfdbbea39cf4b93bbea1072ba3c4576e0afd7cc7e5da0a4efde453a7",
+      "hash": "sha256:c6a67827aa801fb11b277f90e0bf80c8867ce6a5df63c3c82bf6dbbfb9c7d797",
       "kind": "rules",
       "path": ".cursor/rules/40-commands.mdc"
     },
@@ -62,13 +62,13 @@
     },
     {
       "adapter": "copilot",
-      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
+      "hash": "sha256:7f0132b0541221251157fd1326410f2c69b1568a599a600ab75ac6571583f3d1",
       "kind": "rules",
       "path": ".github/copilot-instructions.md"
     },
     {
       "adapter": "roo-code",
-      "hash": "sha256:f759459b8b18e41194e8c1699f122c74c9c2e35bc1e039f3bece803f9f8bfe87",
+      "hash": "sha256:f04e7db6d9209987d8d13496497bd8764342d850ed687a26f4f340b17b3b8b52",
       "kind": "rules",
       "path": ".roo/rules/001-10-project.md"
     },
@@ -80,13 +80,13 @@
     },
     {
       "adapter": "roo-code",
-      "hash": "sha256:0321dc8a377faf001da79cb339ae67f95f53a0232e400982655b100b4b4b1adc",
+      "hash": "sha256:42b0adbe26b6bc27190833affdad3c921846798ab5f10c4b4167e0bc890ac34a",
       "kind": "rules",
       "path": ".roo/rules/003-30-invariants.md"
     },
     {
       "adapter": "roo-code",
-      "hash": "sha256:aa44360c7acf235a27478e0eca956cfa76d6a8eab31c44f12367be156828e402",
+      "hash": "sha256:16ab34b9be7b565bbd9c5a7bff4deb72efda9e2efa42e2f157767aa2372d39dd",
       "kind": "rules",
       "path": ".roo/rules/004-40-commands.md"
     },
@@ -98,13 +98,13 @@
     },
     {
       "adapter": "zed",
-      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
+      "hash": "sha256:7f0132b0541221251157fd1326410f2c69b1568a599a600ab75ac6571583f3d1",
       "kind": "rules",
       "path": ".rules"
     },
     {
       "adapter": "windsurf",
-      "hash": "sha256:91ed1600691495814eb26238b576fa2ea43ad980274044b92bd3b82aea118623",
+      "hash": "sha256:cad1d3f860294bc1ab40ab8945cfd44463711bdea7922682c4fbdb845dcc710b",
       "kind": "rules",
       "path": ".windsurf/rules/10-project.md"
     },
@@ -116,13 +116,13 @@
     },
     {
       "adapter": "windsurf",
-      "hash": "sha256:42bf0a1ddbc55c72b1c9766ebab035dab624a688a959af0a146deb061e57fad7",
+      "hash": "sha256:03b16b188a835da7ec47af4fd68aca51ab587360d9f31b295002db6eb921f0c8",
       "kind": "rules",
       "path": ".windsurf/rules/30-invariants.md"
     },
     {
       "adapter": "windsurf",
-      "hash": "sha256:b176181ea45fca38fb9bb90584e509860dc35f0f00128dc00ff8354372171857",
+      "hash": "sha256:b22c8ce16739f63e8160479a30af8ec70ad8bc23243fcd3da76015e030599831",
       "kind": "rules",
       "path": ".windsurf/rules/40-commands.md"
     },
@@ -134,25 +134,25 @@
     },
     {
       "adapter": "codex",
-      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
+      "hash": "sha256:7f0132b0541221251157fd1326410f2c69b1568a599a600ab75ac6571583f3d1",
       "kind": "rules",
       "path": "AGENTS.md"
     },
     {
       "adapter": "claude-code",
-      "hash": "sha256:39d9d9029e68ba7f28b907c07aa0ab3b4609cbd967ad333863478589e34cf54d",
+      "hash": "sha256:495de78fcc00701b1fbd3b03011b344d9163a51f62da8f934c5221d825785d0e",
       "kind": "rules",
       "path": "CLAUDE.md"
     },
     {
       "adapter": "aider",
-      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
+      "hash": "sha256:7f0132b0541221251157fd1326410f2c69b1568a599a600ab75ac6571583f3d1",
       "kind": "rules",
       "path": "CONVENTIONS.md"
     },
     {
       "adapter": "gemini",
-      "hash": "sha256:53c4777f5f241a02fc5969f87f2537958913df3ecbf661c968e81864bde82562",
+      "hash": "sha256:7f0132b0541221251157fd1326410f2c69b1568a599a600ab75ac6571583f3d1",
       "kind": "rules",
       "path": "GEMINI.md"
     }

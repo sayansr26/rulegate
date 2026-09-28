@@ -16,7 +16,7 @@ import { resolve as resolve3 } from "node:path";
 // src/lib/entry.ts
 import { homedir } from "node:os";
 
-// src/lib/read.ts
+// ../../packages/claude/src/read.ts
 import { isUtf8 } from "node:buffer";
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 var MAX_READ_BYTES = 4 * 1024 * 1024;
@@ -72,7 +72,15 @@ function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-// src/lib/settings.ts
+// ../../packages/claude/src/text.ts
+var isControl = (c) => {
+  const n = c.charCodeAt(0);
+  return n < 32 || n === 127;
+};
+var stripControl = (s) => Array.from(s, (c) => isControl(c) ? " " : c).join("");
+var inline = (s) => stripControl(s).replace(/`/g, "");
+
+// ../../packages/claude/src/settings.ts
 import { join, resolve } from "node:path";
 var GIT_DENY = Object.freeze([
   "Bash(git -C*)",
@@ -143,21 +151,7 @@ function claudeHome(env, home) {
   return resolve(env.CLAUDE_CONFIG_DIR || join(home, ".claude"));
 }
 
-// src/lib/entry.ts
-function claudeDirFromEnv() {
-  return claudeHome(process.env, homedir());
-}
-function print(lines) {
-  process.stdout.write(`${lines.join("\n")}
-`);
-}
-
-// src/lib/migrate.ts
-import { createHash } from "node:crypto";
-import { lstatSync as lstatSync3, readFileSync as readFileSync2 } from "node:fs";
-import { join as join5 } from "node:path";
-
-// src/lib/legacy.ts
+// ../../packages/claude/src/legacy.ts
 import { join as join2 } from "node:path";
 var MEMORY_BASES = [".claude/agent-memory", ".claude/agent-memory-local"];
 var LEGACY_PREFIX = "agent-os-";
@@ -192,9 +186,9 @@ function agentOsInstall(root2, claudeDir2) {
   };
 }
 
-// src/lib/refusals.ts
-import { lstatSync as lstatSync2, realpathSync as realpathSync3 } from "node:fs";
-import { basename as basename2, dirname as dirname2, isAbsolute as isAbsolute2, join as join4, relative as relative2, sep as sep2 } from "node:path";
+// ../../packages/claude/src/guard.ts
+import { existsSync as existsSync2, readdirSync as readdirSync2, realpathSync as realpathSync2 } from "node:fs";
+import { basename, dirname, isAbsolute, join as join3, relative, resolve as resolve2, sep } from "node:path";
 
 // ../../packages/core/src/model/paths.ts
 var RULEGATE_DIR = ".rulegate";
@@ -301,50 +295,7 @@ function probe(absPath) {
   }
 }
 
-// src/lib/guard.ts
-import { existsSync as existsSync2, readdirSync as readdirSync2, realpathSync as realpathSync2 } from "node:fs";
-import { basename, dirname, isAbsolute, join as join3, relative, resolve as resolve2, sep } from "node:path";
-
-// src/lib/text.ts
-var isControl = (c) => {
-  const n = c.charCodeAt(0);
-  return n < 32 || n === 127;
-};
-var stripControl = (s) => Array.from(s, (c) => isControl(c) ? " " : c).join("");
-
-// src/git/index.ts
-var GIT_SUBCOMMANDS = Object.freeze([
-  "log",
-  "ls-files",
-  "rev-parse",
-  "status"
-]);
-var GIT_OPTIONS = Object.freeze([
-  "-z",
-  "--abbrev-ref",
-  "--branch",
-  "--cached",
-  "--exclude-standard",
-  "--format=",
-  "--is-inside-work-tree",
-  "--max-count=",
-  "--others",
-  "--porcelain",
-  "--show-toplevel"
-]);
-var GIT_SAFETY_ARGS = Object.freeze([
-  "--no-lazy-fetch",
-  "--no-optional-locks",
-  "-c",
-  "core.fsmonitor=false",
-  "-c",
-  "log.showSignature=false"
-]);
-
-// src/lib/session.ts
-var inline = (s) => stripControl(s).replace(/`/g, "");
-
-// src/lib/guard.ts
+// ../../packages/claude/src/guard.ts
 function realish(p) {
   const rest = [];
   let dir = p;
@@ -409,7 +360,9 @@ async function guard(targetAbs) {
   return void 0;
 }
 
-// src/lib/refusals.ts
+// ../../packages/claude/src/refusals.ts
+import { lstatSync as lstatSync2, realpathSync as realpathSync3 } from "node:fs";
+import { basename as basename2, dirname as dirname2, isAbsolute as isAbsolute2, join as join4, relative as relative2, sep as sep2 } from "node:path";
 function real(p) {
   const rest = [];
   let at = p;
@@ -469,7 +422,10 @@ async function blocked(scope, root2, claudeDir2, abs, { bytes = false } = {}) {
   return void 0;
 }
 
-// src/lib/migrate.ts
+// ../../packages/claude/src/migrate.ts
+import { createHash } from "node:crypto";
+import { lstatSync as lstatSync3, readFileSync as readFileSync2 } from "node:fs";
+import { join as join5 } from "node:path";
 var AGENT_NAME = /^agent-os-[a-z0-9][a-z0-9_-]*$/i;
 var KEPT_INDEX = "MEMORY.agent-os.md";
 var MAX_KEPT = 100;
@@ -719,6 +675,15 @@ function describeMigration(plan, { dry, moved = [], failed = [] }) {
     );
   }
   return lines;
+}
+
+// src/lib/entry.ts
+function claudeDirFromEnv() {
+  return claudeHome(process.env, homedir());
+}
+function print(lines) {
+  process.stdout.write(`${lines.join("\n")}
+`);
 }
 
 // src/migrate/memory.ts

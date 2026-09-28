@@ -10,6 +10,8 @@ import { ADAPTERS } from '../registry.js';
 import { INTEROP } from '@rulegate/interop';
 import { createOutput, formatErrors, pluralize } from '../ui/report.js';
 import { ExitCode, type ExitCodeValue } from '../ui/exit.js';
+import { readVersion } from '../version.js';
+import { claudeDirFromEnv, claudeSection } from './claude.js';
 
 export interface InitOptions {
   readonly cwd: string;
@@ -18,6 +20,14 @@ export interface InitOptions {
   readonly announceRoot?: boolean;
   readonly quiet?: boolean;
   readonly color?: boolean;
+  /**
+   * The Claude Code section (T115). Unset: shown when claude-code is enabled, commands
+   * printed. `true`: shown, and with `yes` the `claude plugin …` commands run. `false`
+   * (`--no-plugin`): hidden.
+   */
+  readonly plugin?: boolean;
+  /** Claude Code's config dir; defaults to `CLAUDE_CONFIG_DIR` or `~/.claude`. */
+  readonly claudeDir?: string;
 }
 
 /**
@@ -40,10 +50,31 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
 
   const init = await computeInitPlan({ repoRoot, fs, adapters: ADAPTERS, interop: INTEROP });
 
+  // Shown after the plan, and run only once the plan applied cleanly: the rules are the
+  // part that must not depend on Claude Code.
+  const claude = async (): Promise<ExitCodeValue> => {
+    if (options.plugin === false) return ExitCode.Ok;
+    // Under --quiet the section would print nothing, so nothing is read for it either — a
+    // quiet `init` looks at no file outside the repository.
+    if (out.quiet && !(options.plugin === true && options.yes === true)) return ExitCode.Ok;
+    if (options.plugin !== true && !init.plan.enabledAdapters.includes('claude-code')) {
+      return ExitCode.Ok;
+    }
+    return claudeSection(out, {
+      root: repoRoot,
+      claudeDir: options.claudeDir ?? claudeDirFromEnv(),
+      plugin: options.plugin === true,
+      run: options.yes === true,
+      want: readVersion(),
+    });
+  };
+
   if (init.adopted) {
     out.log('.rulegate/ already exists; nothing to import.');
     out.log(`run: rulegate sync  (${pluralize(init.plan.artifacts.length, 'artifact')})`);
-    return ExitCode.Ok;
+    // Still nothing written to the repository by init itself. The Claude Code section is
+    // read-only here too, unless `--plugin --yes` asked for the plugin by name.
+    return claude();
   }
 
   if (init.errors.length > 0) {
@@ -55,7 +86,9 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
   if (init.detected.length === 0) {
     out.log('no AI tool configuration found in this repository.');
     out.log('hint: create .rulegate/rules/*.md by hand, then run: rulegate sync');
-    return ExitCode.Ok;
+    // Nothing to import is no reason to drop a `--plugin` the user named: the plugin does
+    // not need rules to install, and ignoring the flag at exit 0 would say it had run.
+    return claude();
   }
 
   out.log(`detected  ${init.detected.join(', ')}`);
@@ -127,7 +160,7 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
   if (options.yes !== true) {
     out.log('');
     out.log('nothing was written. re-run with --yes to apply.');
-    return ExitCode.Ok;
+    return claude();
   }
 
   const canonicalWritten = await applyCanonicalFiles(init.canonicalFiles, fs, { dryRun: false });
@@ -151,7 +184,7 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
 
   out.log('');
   out.log('done. edit .rulegate/rules/ and run: rulegate sync');
-  return ExitCode.Ok;
+  return claude();
 }
 
 function verb(kind: 'create' | 'modify' | 'leave-alone', options: InitOptions): string {

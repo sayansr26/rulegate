@@ -1,7 +1,6 @@
 import { resolve } from 'node:path';
 import { claudeDirFromEnv, print } from './lib/entry.js';
-import { describeMigration, planMemoryMigration } from './lib/migrate.js';
-import { isDir } from './lib/read.js';
+import { describeMigration, planMemoryMigration, isDir } from '@rulegate/claude';
 import { applyMemoryMigration } from './migrate/memory.js';
 
 /**

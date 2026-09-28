@@ -44,6 +44,7 @@ const PACKAGES = [
   '@rulegate/adapter-roo-code',
   '@rulegate/adapter-zed',
   '@rulegate/interop',
+  '@rulegate/claude',
   '@rulegate/adapter-windsurf',
   '@rulegate/adapter-gemini',
   '@rulegate/adapter-antigravity',
@@ -137,7 +138,12 @@ try {
   check(install.code === 0, 'npm install from tarballs', install.stderr.trim().slice(0, 600));
 
   const rulegate = path.join(project, 'node_modules', '.bin', bin('rulegate'));
-  const dg = (args, cwd = repo) => run(rulegate, args, { cwd });
+  // A sandboxed home: `init` on a repository with a CLAUDE.md reads Claude Code's config dir
+  // for its Claude Code section, and a smoke run must not depend on the machine's.
+  const home = path.join(work, 'home');
+  mkdirSync(home);
+  const env = { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: home };
+  const dg = (args, cwd = repo) => run(rulegate, args, { cwd, env });
 
   // 3. A cold run of the installed binary. NFR2 asks for under 10 seconds; the install
   //    itself is reported rather than asserted, since it is npm's clock, not ours.

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { agentOsInstall, disableCommand } from '../src/lib/legacy.js';
+import { agentOsInstall, disableCommand } from '@rulegate/claude';
 import { sandbox, type Sandbox } from './helpers.js';
 
 let sb: Sandbox;

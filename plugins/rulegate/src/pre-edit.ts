@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { guard, reminder, type Decision } from './lib/guard.js';
-import { isRecord } from './lib/read.js';
+import { isRecord } from '@rulegate/claude';
 
 // PreToolUse hook on Edit|MultiEdit|Write. Reads Claude Code's JSON payload from stdin and
 // answers with at most one JSON object on stdout: a deny for a generated file, or advisory

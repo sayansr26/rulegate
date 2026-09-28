@@ -11,9 +11,9 @@ import {
   indexEntries,
   planMemoryMigration,
   unionIndex,
-} from '../src/lib/migrate.js';
+} from '@rulegate/claude';
 import { applyMemoryMigration } from '../src/migrate/memory.js';
-import type * as Migrate from '../src/lib/migrate.js';
+import type * as Migrate from '../../../packages/claude/src/migrate.js';
 import { sandbox, type Sandbox } from './helpers.js';
 
 /**
@@ -32,10 +32,11 @@ afterEach(async () => {
 
 /**
  * The writer plans every agent before it moves any, so a write can land between the two —
- * a subagent's new entry, a pull. `afterPlan` stands in for it.
+ * a subagent's new entry, a pull. `afterPlan` stands in for it. The planner is mocked by its
+ * source path rather than as `@rulegate/claude`, so every importer of the module sees it.
  */
 const hooks = vi.hoisted(() => ({ afterPlan: undefined as (() => void) | undefined }));
-vi.mock('../src/lib/migrate.js', async (importOriginal) => {
+vi.mock('../../../packages/claude/src/migrate.js', async (importOriginal) => {
   const real = await importOriginal<typeof Migrate>();
   return {
     ...real,

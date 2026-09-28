@@ -1,8 +1,6 @@
 import { resolve } from 'node:path';
 import { claudeDirFromEnv, print } from './lib/entry.js';
-import { isDir } from './lib/read.js';
-import { refusals } from './lib/refusals.js';
-import { describeScope, planScope, type Scope } from './lib/settings.js';
+import { isDir, refusals, describeScope, planScope, type Scope } from '@rulegate/claude';
 import { applyScope } from './settings-writer/apply.js';
 
 /**

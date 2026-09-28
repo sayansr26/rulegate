@@ -8,6 +8,10 @@ import {
   GIT_SAFETY_ARGS as PLUGIN_GIT_SAFETY_ARGS,
   GIT_SUBCOMMANDS as PLUGIN_GIT_SUBCOMMANDS,
 } from '../../../plugins/rulegate/src/git/index.js';
+import {
+  CLAUDE_COMMANDS,
+  SCOPES as CLAUDE_SCOPES,
+} from '../../../packages/cli/src/claude/index.js';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -48,12 +52,13 @@ async function packageManifests(): Promise<{ name: string; dir: string; json: Pa
   // pin must cover it. A package that escapes this list is a package where a third-party
   // dependency can arrive unnoticed. `plugins/rulegate` is listed for the same reason
   // (T104): its bundle ships inside the Claude Code plugin, and whatever it depends on
-  // ships with it.
+  // ships with it. `packages/claude` (T115) ships twice, published and bundled.
   const dirs = [
     'packages/core',
     'packages/cli',
     'packages/adapter-kit',
     'packages/interop',
+    'packages/claude',
     'action',
     'plugins/rulegate',
   ].concat(await adapterDirs());
@@ -95,12 +100,16 @@ describe('dependency surface', () => {
 });
 
 /**
- * The only directories in shipped source that may spawn a process, each running only
- * read-only git: the CLI's `check --staged` (T052) and the Claude Code plugin's hooks
- * (T104). The test below pins the length. T115 (D3) will add `packages/cli/src/claude` for
- * the pinned `claude plugin …` subcommands, and must pin that list the same way.
+ * The only directories in shipped source that may spawn a process: two running only
+ * read-only git — the CLI's `check --staged` (T052) and the Claude Code plugin's hooks
+ * (T104) — and the CLI's `claude` module (T115, D3), running only the pinned
+ * `claude plugin …` commands and only on `init --plugin --yes`. The test below pins the length.
  */
-const SPAWN_ALLOWLIST = ['packages/core/src/git', 'plugins/rulegate/src/git'];
+const SPAWN_ALLOWLIST = [
+  'packages/core/src/git',
+  'plugins/rulegate/src/git',
+  'packages/cli/src/claude',
+];
 
 /**
  * The `node:` prefix is optional in every pattern. Third-party code imports `https`, not
@@ -114,6 +123,10 @@ const NETWORK_PRIMITIVES = [
   /\bglobalThis\.fetch\b/,
   /\bXMLHttpRequest\b/,
 ];
+
+/** `WRITE_PRIMITIVE` below, for the spawn tests that run before it is declared. */
+const WRITE_PRIMITIVE_ANY =
+  /\b(?:writeFile|appendFile|copyFile|unlink|rm|rmdir|mkdir|rename|symlink|truncate|chmod|utimes)(?:Sync)?\(|\b(?:cp|link)Sync\(|\bcreateWriteStream\(|\bdeleteFile\(/;
 
 describe('zero network calls', () => {
   it('has no network primitive anywhere in shipped source', async () => {
@@ -136,7 +149,7 @@ describe('zero network calls', () => {
     // `ls-files`. The assertion below pins the length, so every entry is a decision
     // recorded here rather than an accretion: a ban that grows an entry per feature is not
     // a ban, and `curl` is one `execFile` away from "zero network calls" being false.
-    expect(SPAWN_ALLOWLIST).toHaveLength(2);
+    expect(SPAWN_ALLOWLIST).toHaveLength(3);
 
     const FORBIDDEN_SPAWN = [
       /from\s+['"](node:)?child_process['"]/,
@@ -204,6 +217,48 @@ describe('zero network calls', () => {
       for (const [, sub] of src.matchAll(/runGit\(\s*\[\s*['"`]([a-z-]+)['"`]/g)) {
         expect(PLUGIN_GIT_SUBCOMMANDS, relPosix(file)).toContain(sub);
       }
+    }
+  });
+
+  it('runs `claude` only with the pinned argv, from one module that writes nothing', async () => {
+    // D3's hole. `marketplace add|update` do fetch from GitHub — which is why only an
+    // explicit `init --plugin --yes` reaches this, and why the argv is pinned whole: a
+    // template that took any word would put `claude -p "…"` one edit away.
+    expect(CLAUDE_COMMANDS.map((c) => c.join(' '))).toEqual([
+      '--version',
+      'plugin list --json',
+      'plugin marketplace list --json',
+      'plugin marketplace add sayansr26/rulegate --scope project',
+      'plugin marketplace update rulegate',
+      'plugin install rulegate@rulegate --scope project',
+      'plugin enable rulegate@rulegate --scope <scope>',
+      'plugin update rulegate@rulegate --scope <scope>',
+    ]);
+    expect([...CLAUDE_SCOPES]).toEqual(['user', 'project', 'local']);
+
+    const dir = SPAWN_ALLOWLIST[2]!;
+    const text = await readFile(path.join(repoRoot, dir, 'index.ts'), 'utf8');
+    // One call, argv-array only, no shell, bounded, and gated by the allowlist first.
+    expect(text).not.toMatch(
+      /\bexec(?:Sync)?\s*\(|\bexecFile(?:Sync)?\s*\(|\bfork\s*\(|shell:\s*true/,
+    );
+    expect(text.match(/\bspawnSync\(/g)).toHaveLength(1);
+    expect(text).toMatch(/spawnSync\('claude', \[\.\.\.args\], \{/);
+    expect(text).toMatch(/shell: false,/);
+    // Always bounded: the spawn takes `timeout`, which only defaults to TIMEOUT_MS so a test
+    // can shorten it, and nothing can pass it as absent.
+    expect(text).toMatch(/\n {4}timeout,\n/);
+    expect(text).toMatch(/timeout = TIMEOUT_MS,/);
+    expect(text).toMatch(/\n {2}timeout: number,\n\): RunResult/);
+    expect(text).toMatch(/if \(!allowed\(args\)\) throw/);
+    expect(text).not.toMatch(/'--yes'|'-y'/);
+    expect(text).not.toMatch(WRITE_PRIMITIVE_ANY);
+    // The directory is an allowlist entry, not a licence for everything in it: only the
+    // module above may import `child_process`.
+    for (const file of await sourceFiles()) {
+      const rel = relPosix(file);
+      if (!rel.startsWith(`${dir}/`) || rel === `${dir}/index.ts`) continue;
+      expect(await readFile(file, 'utf8'), rel).not.toMatch(/(node:)?child_process/);
     }
   });
 
@@ -322,8 +377,15 @@ describe('the shared rendering path', () => {
     PLUGIN_MEMORY_MIGRATOR,
   ]);
 
-  const WRITE_PRIMITIVE =
-    /\b(?:writeFile|appendFile|copyFile|unlink|rm|rmdir|mkdir|rename|symlink|truncate|chmod|utimes)(?:Sync)?\(|\b(?:cp|link)Sync\(|\bcreateWriteStream\(|\bdeleteFile\(/;
+  const WRITE_PRIMITIVE = WRITE_PRIMITIVE_ANY;
+
+  /**
+   * The CLI's one writer outside core (T115, D2): `rulegate claude settings --apply`, a copy
+   * of the plugin's settings writer held to the same shape pin below. It writes outside the
+   * repository only at user scope, and only when `--apply` is passed.
+   */
+  const CLI_SETTINGS_WRITER = 'packages/cli/src/claude/settings-writer.ts';
+  const CLI_WRITERS: readonly string[] = Object.freeze([CLI_SETTINGS_WRITER]);
 
   it('keeps every filesystem write inside the core io and apply layers', async () => {
     const offenders: string[] = [];
@@ -336,11 +398,13 @@ describe('the shared rendering path', () => {
         rel.startsWith('packages/core/src/io/') ||
         rel === 'packages/core/src/pipeline/apply.ts' ||
         rel === 'packages/core/src/fs/types.ts' ||
-        PLUGIN_WRITERS.includes(rel);
+        PLUGIN_WRITERS.includes(rel) ||
+        CLI_WRITERS.includes(rel);
       if (!allowed) offenders.push(rel);
     }
     expect(offenders).toEqual([]);
     expect(PLUGIN_WRITERS).toHaveLength(3);
+    expect(CLI_WRITERS).toHaveLength(1);
   });
 
   /**
@@ -403,53 +467,58 @@ describe('the shared rendering path', () => {
     expect(text.match(/writeFileSync\(/g)).toHaveLength(1);
   });
 
-  it('confines the settings writer to its planned targets, backups first, never overwriting a rule', async () => {
-    // T109 (D2). It is allowed above only because of what this pins. Every target comes
-    // from the planner's paths or a fixed join under the root or the Claude dir it is given
-    // — never `homedir()` or the environment, which is the entry's job and what the tests
-    // point into a sandbox. The user-scope backup is the literal `.rulegate.bak`, copied
-    // exclusively so the first original is the one kept. Both creations are `wx`: the
-    // canonical rule, so a rule file the user wrote is never replaced, and the temp
-    // sibling, so a planted link is never followed.
-    const text = await readFile(path.join(repoRoot, PLUGIN_SETTINGS_WRITER), 'utf8');
-    expect(text).toMatch(/export const BACKUP_SUFFIX = '\.rulegate\.bak';/);
-    expect(text).toMatch(
-      /copyFileSync\(file, `\$\{file\}\$\{BACKUP_SUFFIX\}`, constants\.COPYFILE_EXCL\)/,
-    );
-    expect(text.match(/copyFileSync\(/g)).toHaveLength(1);
-    expect(text.match(/writeFileSync\(/g)).toHaveLength(2);
-    expect(text).toMatch(/writeFileSync\(tmp, next, \{ flag: 'wx', mode \}\)/);
-    // The replaced file keeps its mode: a rename carries the sibling's, and a 0600
-    // `settings.json` holding a token must not come out world-readable.
-    expect(text).toMatch(/const mode = exists\(file\) \? lstatSync\(file\)\.mode & 0o777 : 0o666;/);
-    expect(text).toMatch(/writeFileSync\(ruleFile, r\.next, \{ flag: 'wx' \}\)/);
-    expect(text.match(/renameSync\(/g)).toHaveLength(1);
-    expect(text).toMatch(/renameSync\(tmp, file\)/);
-    // The temp sibling is removed only when this call created it: a `wx` that failed on
-    // something already at the name must not delete what it found.
-    expect(text).toMatch(/if \(created\) rmSync\(tmp, \{ force: true \}\);/);
-    expect(text.match(/rmSync\(/g)).toHaveLength(1);
-    expect(text).toMatch(/const settingsFile = settingsPath\(scope, root, claudeDir\);/);
-    expect(text).toMatch(/const ruleFile = ruleTarget\(scope, root, claudeDir\);/);
-    // No path of its own: every target is the planner's.
-    expect(text).not.toMatch(/\bjoin\(/);
-    // The rule's three possible homes, and nothing else.
-    const planner = await readFile(
-      path.join(repoRoot, 'plugins/rulegate/src/lib/settings.ts'),
-      'utf8',
-    );
-    const target = /export function ruleTarget\([^]*?\n\}/.exec(planner)?.[0] ?? '';
-    expect(
-      [...target.matchAll(/join\((root|claudeDir), ([^)]*)\)/g)].map((m) => m[0]).sort(),
-    ).toEqual(
-      [
-        "join(claudeDir, 'CLAUDE.md')",
-        'join(root, TASK_RULE_FILE)',
-        "join(root, 'CLAUDE.md')",
-      ].sort(),
-    );
-    expect(text).not.toMatch(/homedir|process\.env|tmpdir/);
-  });
+  it.each([PLUGIN_SETTINGS_WRITER, CLI_SETTINGS_WRITER])(
+    'confines the settings writer %s to its planned targets, backups first, never overwriting a rule',
+    async (writer) => {
+      // T109 (D2). It is allowed above only because of what this pins. Every target comes
+      // from the planner's paths or a fixed join under the root or the Claude dir it is given
+      // — never `homedir()` or the environment, which is the entry's job and what the tests
+      // point into a sandbox. The user-scope backup is the literal `.rulegate.bak`, copied
+      // exclusively so the first original is the one kept. Both creations are `wx`: the
+      // canonical rule, so a rule file the user wrote is never replaced, and the temp
+      // sibling, so a planted link is never followed.
+      const text = await readFile(path.join(repoRoot, writer), 'utf8');
+      expect(text).toMatch(/export const BACKUP_SUFFIX = '\.rulegate\.bak';/);
+      expect(text).toMatch(
+        /copyFileSync\(file, `\$\{file\}\$\{BACKUP_SUFFIX\}`, constants\.COPYFILE_EXCL\)/,
+      );
+      expect(text.match(/copyFileSync\(/g)).toHaveLength(1);
+      expect(text.match(/writeFileSync\(/g)).toHaveLength(2);
+      expect(text).toMatch(/writeFileSync\(tmp, next, \{ flag: 'wx', mode \}\)/);
+      // The replaced file keeps its mode: a rename carries the sibling's, and a 0600
+      // `settings.json` holding a token must not come out world-readable.
+      expect(text).toMatch(
+        /const mode = exists\(file\) \? lstatSync\(file\)\.mode & 0o777 : 0o666;/,
+      );
+      expect(text).toMatch(/writeFileSync\(ruleFile, r\.next, \{ flag: 'wx' \}\)/);
+      expect(text.match(/renameSync\(/g)).toHaveLength(1);
+      expect(text).toMatch(/renameSync\(tmp, file\)/);
+      // The temp sibling is removed only when this call created it: a `wx` that failed on
+      // something already at the name must not delete what it found.
+      expect(text).toMatch(/if \(created\) rmSync\(tmp, \{ force: true \}\);/);
+      expect(text.match(/rmSync\(/g)).toHaveLength(1);
+      expect(text).toMatch(/const settingsFile = settingsPath\(scope, root, claudeDir\);/);
+      expect(text).toMatch(/const ruleFile = ruleTarget\(scope, root, claudeDir\);/);
+      // No path of its own: every target is the planner's.
+      expect(text).not.toMatch(/\bjoin\(/);
+      // The rule's three possible homes, and nothing else.
+      const planner = await readFile(
+        path.join(repoRoot, 'packages/claude/src/settings.ts'),
+        'utf8',
+      );
+      const target = /export function ruleTarget\([^]*?\n\}/.exec(planner)?.[0] ?? '';
+      expect(
+        [...target.matchAll(/join\((root|claudeDir), ([^)]*)\)/g)].map((m) => m[0]).sort(),
+      ).toEqual(
+        [
+          "join(claudeDir, 'CLAUDE.md')",
+          'join(root, TASK_RULE_FILE)',
+          "join(root, 'CLAUDE.md')",
+        ].sort(),
+      );
+      expect(text).not.toMatch(/homedir|process\.env|tmpdir/);
+    },
+  );
 
   it('confines the memory migrator to verified copies, never a recursive delete', async () => {
     // T114. It deletes files Rulegate never generated, which the CLI never does, so what it
@@ -495,16 +564,10 @@ describe('the shared rendering path', () => {
     expect(text.indexOf('rmdirSync(d.src)')).toBeGreaterThan(unlinkAt);
     // Only the planner decides what moves, and it is read-only.
     expect(text).toMatch(/const plan = await planMemoryMigration\(root, claudeDir\);/);
-    const planner = await readFile(
-      path.join(repoRoot, 'plugins/rulegate/src/lib/migrate.ts'),
-      'utf8',
-    );
+    const planner = await readFile(path.join(repoRoot, 'packages/claude/src/migrate.ts'), 'utf8');
     expect(planner).not.toMatch(WRITE_PRIMITIVE);
     // Sources and targets live under the two agent-memory bases and nowhere else.
-    const legacy = await readFile(
-      path.join(repoRoot, 'plugins/rulegate/src/lib/legacy.ts'),
-      'utf8',
-    );
+    const legacy = await readFile(path.join(repoRoot, 'packages/claude/src/legacy.ts'), 'utf8');
     expect(legacy).toMatch(
       /export const MEMORY_BASES = \['\.claude\/agent-memory', '\.claude\/agent-memory-local'\] as const;/,
     );
@@ -687,6 +750,50 @@ async function adapterFiles(): Promise<string[]> {
   await Promise.all(dirs.map((d) => walk(path.join(repoRoot, d))));
   return out.sort();
 }
+
+/**
+ * `@rulegate/claude` (T115) is what the CLI and the plugin both know about a Claude Code
+ * setup: the planners, the setup state and what a writer refuses. The writers stay in the
+ * plugin (P3), and the write scan above already covers this package as shipped source — a
+ * write here is an offender, not an allowlist entry. What it pins below is direction: the
+ * package may lean on core's ownership record, and core may never lean on it, because
+ * Claude Code's settings are the tool-specific knowledge core must not hold.
+ */
+describe('the @rulegate/claude boundary', () => {
+  it('keeps core off @rulegate/claude', async () => {
+    const offenders: string[] = [];
+    for (const file of await sourceFiles()) {
+      const rel = relPosix(file);
+      if (!rel.startsWith('packages/core/src/')) continue;
+      if (/from\s+['"]@rulegate\/claude/.test(await readFile(file, 'utf8'))) offenders.push(rel);
+    }
+    expect(offenders).toEqual([]);
+    const core = JSON.parse(
+      await readFile(path.join(repoRoot, 'packages/core/package.json'), 'utf8'),
+    ) as PackageJson;
+    expect(Object.keys(core.dependencies ?? {})).not.toContain('@rulegate/claude');
+  });
+
+  it('imports only Node, core and its own modules', async () => {
+    const json = JSON.parse(
+      await readFile(path.join(repoRoot, 'packages/claude/package.json'), 'utf8'),
+    ) as PackageJson;
+    expect(Object.keys(json.dependencies ?? {})).toEqual(['@rulegate/core']);
+    const offenders: string[] = [];
+    for (const file of await sourceFiles()) {
+      const rel = relPosix(file);
+      if (!rel.startsWith('packages/claude/src/')) continue;
+      const text = await readFile(file, 'utf8');
+      for (const [, spec] of text.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)) {
+        if (spec === '@rulegate/core' || spec!.startsWith('node:')) continue;
+        // A sibling, never a parent: `../` is how a plugin writer would get pulled in.
+        if (/^\.\/[a-z-]+\.js$/.test(spec!)) continue;
+        offenders.push(`${rel} -> ${spec!}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
 
 /**
  * Two hand-maintained copies of one package -> source map: `tsconfig.workspace.json` for the

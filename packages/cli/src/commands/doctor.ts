@@ -8,6 +8,11 @@ import { ADAPTERS } from '../registry.js';
 import { createOutput, formatErrors, formatTokens, pluralize } from '../ui/report.js';
 import { formatTable } from '../ui/table.js';
 import { ExitCode, type ExitCodeValue } from '../ui/exit.js';
+import {
+  describeClaudePlugin,
+  inspectClaudePlugin,
+  type ClaudePluginReport,
+} from './doctor-claude.js';
 import type { Colors, Output } from '../ui/report.js';
 import type { DoctorReport, FileDiagnosis, ToolDiagnosis } from '@rulegate/core';
 
@@ -21,7 +26,9 @@ export interface DoctorOptions {
    * both untestable and different on Windows.
    *
    * The seam is the T016 decision restated: the global filesystem is a parameter, not
-   * something the engine builds for itself.
+   * something the engine builds for itself. The Claude Code plugin line reads
+   * `<homeRoot>/.claude` too, unless `CLAUDE_CONFIG_DIR` names another directory, as it
+   * does for Claude Code itself.
    */
   readonly homeRoot?: string;
   /** Emit the report as JSON for scripting, instead of the table. */
@@ -66,17 +73,31 @@ export async function runDoctor(options: DoctorOptions): Promise<ExitCodeValue> 
     return ExitCode.Failure;
   }
 
+  // The plugin line is the CLI's, not core's: core carries no tool-specific logic, and what
+  // Claude Code records about its plugins is as tool-specific as anything gets. `null` when
+  // Claude Code is not detected, so a script reads one key either way.
+  const claudePlugin = report.tools.some((t) => t.name === 'claude-code' && t.detected)
+    ? inspectClaudePlugin(repoRoot, {
+        noGlobal: options.noGlobal === true,
+        ...(options.homeRoot === undefined ? {} : { homeRoot: options.homeRoot }),
+      })
+    : null;
+
   if (options.json === true) {
-    out.log(JSON.stringify(report, null, 2));
+    out.log(JSON.stringify({ ...report, claudePlugin }, null, 2));
     return ExitCode.Ok;
   }
 
   if (options.announceRoot === true) out.log(`repo  ${repoRoot}`);
-  printReport(out, report);
+  printReport(out, report, claudePlugin);
   return ExitCode.Ok;
 }
 
-function printReport(out: Output, report: DoctorReport): void {
+function printReport(
+  out: Output,
+  report: DoctorReport,
+  claudePlugin: ClaudePluginReport | null,
+): void {
   const width = Math.max(MIN_WIDTH, process.stdout.columns ?? MIN_WIDTH);
   const c = out.c;
 
@@ -98,6 +119,14 @@ function printReport(out: Output, report: DoctorReport): void {
     for (const line of fileLines(tool, width, c)) out.log(`  ${line}`);
   }
 
+  const plugin =
+    claudePlugin === null ? undefined : describeClaudePlugin(claudePlugin, c, report.adopted);
+  if (plugin !== undefined) {
+    out.log('');
+    out.log(`${c.bold('Claude Code plugin')}  ${c.dim(plugin.header)}`);
+    for (const row of plugin.rows) out.log(`  ${row}`);
+  }
+
   const undetected = report.tools.filter((t) => !t.detected).map((t) => t.name);
   if (undetected.length > 0) {
     out.log('');
@@ -116,6 +145,11 @@ function printReport(out: Output, report: DoctorReport): void {
     out.error(`${c.yellow('!')} ${w.tool === undefined ? '' : `${w.tool}: `}${w.message}`);
     for (const line of listPaths(w.paths)) out.error(`  ${c.dim(line)}`);
     if (w.source !== undefined) out.error(`  ${c.dim(`${w.source.title} — ${w.source.url}`)}`);
+  }
+  for (const w of plugin?.warnings ?? []) {
+    out.error('');
+    out.error(`${c.yellow('!')} claude-code: ${w.message}`);
+    out.error(`  ${c.dim(w.hint)}`);
   }
 }
 

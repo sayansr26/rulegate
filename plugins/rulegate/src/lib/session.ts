@@ -2,11 +2,18 @@ import { join } from 'node:path';
 import { runGit } from '../git/index.js';
 import { pluginConfig } from './config.js';
 import { coverage } from './features.js';
-import { isDir, ls, mtimeMs, read, readInRepo } from './read.js';
-import { stripControl } from './text.js';
-import { disableCommand } from './legacy.js';
-import { LEGACY_PLUGIN_ID, enabledAt } from './settings.js';
-import { AGENTS_SECTION } from './state.js';
+import {
+  isDir,
+  ls,
+  mtimeMs,
+  read,
+  readInRepo,
+  inline,
+  disableCommand,
+  LEGACY_PLUGIN_ID,
+  enabledAt,
+  AGENTS_SECTION,
+} from '@rulegate/claude';
 
 /**
  * The SessionStart block (T107): "where you left off", then "how this project works".
@@ -62,13 +69,6 @@ export interface SessionOptions {
   /** Milliseconds since the epoch, passed in so the builder reads no clock. */
   readonly now: number;
 }
-
-/**
- * Repo-derived text printed inside a line: control characters become spaces and backticks
- * are dropped, so a branch, path or directory name can neither break the line nor close the
- * inline code span around it.
- */
-export const inline = (s: string): string => stripControl(s).replace(/`/g, '');
 
 const firstLines = (text: string, n: number): string =>
   text.split('\n').slice(0, n).join('\n').trim();
