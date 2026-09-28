@@ -5,6 +5,8 @@ All notable changes to this project are recorded here. This project follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-28
+
 ### Added
 
 - **`rulegate init` knows Claude Code.** When the claude-code adapter is enabled, `init` prints
@@ -142,8 +144,10 @@ All notable changes to this project are recorded here. This project follows
 
 ### Internal
 
-- **The Claude Code plugin has a home; its hooks and skills are still to come.** agent-os's
-  Claude Code plugin is moving into this repository as the Rulegate plugin for Claude Code.
+- **The Rulegate plugin for Claude Code, as a preview.** agent-os's Claude Code plugin now
+  lives in this repository: its agents, skills and hooks are below. It ships in this release
+  but is not announced yet — the end-to-end migration of a real agent-os project (T117) has
+  not run — so install it (`/plugin install rulegate@rulegate`) knowing that.
   The groundwork: a `rulegate` marketplace at the repository root, `plugins/rulegate/`, a
   validator CI runs on every push (agent frontmatter, hook paths, and
   one version shared by the plugin, the marketplace and the CLI), and a committed hook bundle
@@ -202,7 +206,7 @@ All notable changes to this project are recorded here. This project follows
   in place. A cross-check test holds the migration fixture to the real `rulegate init --yes`
   output.
 
-## [0.3.0] — unreleased
+## [0.3.0] — 2026-09-20
 
 ### Breaking
 
@@ -313,6 +317,7 @@ never will be.
 - `AGENTS.md` sits at Windsurf's per-file cap with no headroom; the lint rule reports it, the
   adapter does not yet do anything about it.
 
-[unreleased]: https://github.com/sayansr26/rulegate/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/sayansr26/rulegate/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sayansr26/rulegate/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sayansr26/rulegate/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sayansr26/rulegate/compare/v0.0.0...v0.2.0
