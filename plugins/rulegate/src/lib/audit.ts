@@ -2,6 +2,7 @@ import { basename, join } from 'node:path';
 import { coverage } from './features.js';
 import {
   agentOsInstall,
+  agentOsMentions,
   disableCommand,
   planMemoryMigration,
   isDir,
@@ -154,6 +155,16 @@ export async function runAudit({
       '  drift: run `npx --no rulegate check` — exit 1 means a generated file is stale or hand-edited',
     );
     say('  cost:  `npx --no rulegate doctor` reports what each tool loads and its token estimate');
+    // An import copies a hand-written CLAUDE.md as it is, including the lines that tell the
+    // agent to edit `.agent-os/rules/` and run agent-os's `sync` — an edit that now changes
+    // nothing (T153). Named by file and line; the lines themselves stay out of the output.
+    for (const m of agentOsMentions(root)) {
+      const one = m.lines.length === 1;
+      flag(
+        'WARN',
+        `${m.file} ${one ? 'line' : 'lines'} ${m.lines.join(', ')} still ${one ? 'sends' : 'send'} the agent to agent-os (\`.agent-os/\`, \`@sayansr26/agent-os\`), where an edit changes nothing after the migration. Change ${one ? 'it' : 'them'} to name .rulegate/rules/ and \`rulegate sync\`, then run \`npx --no rulegate sync\`.`,
+      );
+    }
   } else {
     say('RULEGATE  no .rulegate/ — rules are not generated here');
     flag(

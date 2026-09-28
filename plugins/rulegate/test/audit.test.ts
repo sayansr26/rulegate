@@ -98,6 +98,20 @@ describe('runAudit (T106)', () => {
     expect(text).not.toContain('FOUND .agent-os');
   });
 
+  it('names a canonical rule that still sends the agent to agent-os, by file and line', async () => {
+    await sb.put('.rulegate/rulegate.yaml', 'schemaVersion: 1\n');
+    await sb.put('.rulegate/rules/ok.md', 'The agent-os plugin is retired.\n');
+    await sb.put(
+      '.rulegate/rules/team/notes.md',
+      '---\ndescription: x\n---\n\nRun `npx @sayansr26/agent-os sync` after an edit.\n',
+    );
+    const text = await audit();
+    expect(text).toContain(
+      'WARN  .rulegate/rules/team/notes.md line 5 still sends the agent to agent-os',
+    );
+    expect(text).not.toContain('.rulegate/rules/ok.md');
+  });
+
   it('fails a hook whose target is missing', async () => {
     await sb.put('.claude/settings.json', {
       hooks: {

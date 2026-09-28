@@ -436,6 +436,24 @@ function agentOsInstall(root, claudeDir) {
 function disableCommand(scope) {
   return `claude plugin disable ${LEGACY_PLUGIN_ID} --scope ${scope === "project" ? "project" : "local"}`;
 }
+var AGENT_OS_MENTION = /\.agent-os\/|@sayansr26\/agent-os\b/;
+function agentOsMentions(root) {
+  const out = [];
+  const walk2 = (rel) => {
+    for (const name of ls(join3(root, rel))) {
+      const file = `${rel}/${name}`;
+      if (isRealDir(join3(root, file))) {
+        walk2(file);
+        continue;
+      }
+      if (!name.endsWith(".md")) continue;
+      const lines = (read(join3(root, file)) ?? "").split(/\r?\n/).flatMap((l, i) => AGENT_OS_MENTION.test(l) ? [i + 1] : []);
+      if (lines.length > 0) out.push({ file, lines });
+    }
+  };
+  walk2(".rulegate/rules");
+  return out;
+}
 
 // ../../packages/claude/src/guard.ts
 import { existsSync as existsSync2, readdirSync as readdirSync2, realpathSync as realpathSync2 } from "node:fs";
@@ -1282,6 +1300,13 @@ async function runAudit({
       "  drift: run `npx --no rulegate check` \u2014 exit 1 means a generated file is stale or hand-edited"
     );
     say("  cost:  `npx --no rulegate doctor` reports what each tool loads and its token estimate");
+    for (const m of agentOsMentions(root)) {
+      const one = m.lines.length === 1;
+      flag(
+        "WARN",
+        `${m.file} ${one ? "line" : "lines"} ${m.lines.join(", ")} still ${one ? "sends" : "send"} the agent to agent-os (\`.agent-os/\`, \`@sayansr26/agent-os\`), where an edit changes nothing after the migration. Change ${one ? "it" : "them"} to name .rulegate/rules/ and \`rulegate sync\`, then run \`npx --no rulegate sync\`.`
+      );
+    }
   } else {
     say("RULEGATE  no .rulegate/ \u2014 rules are not generated here");
     flag(

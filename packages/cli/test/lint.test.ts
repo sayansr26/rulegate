@@ -56,13 +56,17 @@ describe('rulegate lint — the shipped registry', () => {
       findings: { rule: string; severity: string }[];
       errorCount: number;
       warnCount: number;
+      infoCount: number;
       unknownRules: unknown[];
       disabledRules: unknown[];
     };
     expect(report.errors).toEqual([]);
     expect(report.errorCount).toBe(0);
-    expect(report.warnCount).toBe(report.findings.length);
-    expect(report.findings.every((f) => f.severity === 'warn')).toBe(true);
+    // The fixture enables five tools; the others that read its `AGENTS.md` are `info`
+    // (T150), so both counts are non-zero and together account for every finding.
+    expect(report.warnCount).toBeGreaterThan(0);
+    expect(report.infoCount).toBeGreaterThan(0);
+    expect(report.warnCount + report.infoCount).toBe(report.findings.length);
     expect(report.unknownRules).toEqual([]);
     expect(report.disabledRules).toEqual([]);
   });

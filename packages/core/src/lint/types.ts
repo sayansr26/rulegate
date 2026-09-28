@@ -52,9 +52,19 @@ export interface LintFindingInit {
   readonly source?: SourceLink;
 }
 
+/**
+ * How loud a reported finding is.
+ *
+ * `info` is not a severity the manifest can set: it is what the engine gives a finding
+ * about a tool the repository neither enables nor has configured (T150). The condition is
+ * real — Windsurf would drop the tail of an oversized `AGENTS.md` — but nobody here runs
+ * Windsurf, so it is reported and never changes the exit code.
+ */
+export type LintFindingSeverity = Exclude<LintSeverity, 'off'> | 'info';
+
 export interface LintFinding extends LintFindingInit {
   readonly rule: LintRuleId;
-  readonly severity: Exclude<LintSeverity, 'off'>;
+  readonly severity: LintFindingSeverity;
 }
 
 /**
@@ -98,6 +108,8 @@ export interface LintReport {
   readonly findings: readonly LintFinding[];
   readonly errorCount: number;
   readonly warnCount: number;
+  /** Findings about tools that are neither enabled nor detected. Never an exit code. */
+  readonly infoCount: number;
   /** Rule ids the manifest configured that no rule in the registry answers to. */
   readonly unknownRules: readonly string[];
   /** Rule ids the manifest turned off, so a silent report can say why it is silent. */

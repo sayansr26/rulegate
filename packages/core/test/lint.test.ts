@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ADAPTER_API_VERSION } from '../src/adapter/context.js';
 import { MemoryFileSystem } from '../src/io/memory.js';
 import { RULES } from '../src/lint/rules/index.js';
-import { detected } from '../src/adapter/adapter.js';
+import { NOT_DETECTED, detected } from '../src/adapter/adapter.js';
 import { runLint } from '../src/lint/engine.js';
 import type { Adapter, DetectResult } from '../src/adapter/adapter.js';
 import type { AdapterDocs, PrecedenceEntry } from '../src/adapter/docs.js';
@@ -235,5 +235,51 @@ describe('runLint — contract', () => {
     const rules = [firing('stale-path', [finding('b.md'), finding('a.md')])];
     const build = (): Promise<LintReport> => lint(BARE, rules);
     expect(JSON.stringify(await build())).toBe(JSON.stringify(await build()));
+  });
+});
+
+describe('runLint — findings about tools nobody uses (T150)', () => {
+  /** `alpha` is detected; `beta` never is, so only the manifest can put it in use. */
+  const unseen = (): Adapter => ({
+    ...stub('beta'),
+    detect: (): Promise<DetectResult> => Promise.resolve(NOT_DETECTED),
+  });
+  const run = (manifest: string, tool: ToolId, severity: LintRule['defaultSeverity']) =>
+    runLint({
+      repoRoot: '/repo',
+      fs: new MemoryFileSystem([
+        ['.rulegate/rulegate.yaml', manifest],
+        ['A.md', 'a'],
+      ]),
+      adapters: [stub('alpha'), unseen()],
+      rules: [firing('oversized-file', [{ ...finding('A.md'), tool }], severity)],
+    });
+
+  it('reports a finding about a tool neither enabled nor detected as info, uncounted', async () => {
+    const r = await run(BARE, 'beta', 'error');
+    expect(r.findings.map((f) => f.severity)).toEqual(['info']);
+    expect(r.infoCount).toBe(1);
+    expect(r.errorCount).toBe(0);
+    expect(r.warnCount).toBe(0);
+  });
+
+  it('keeps the severity for a tool that is detected, or enabled though not detected', async () => {
+    // The positive controls: an engine that demoted every tool-keyed finding passes the
+    // test above. Detected alone and enabled alone must each keep a tool in use.
+    expect((await run(BARE, 'alpha', 'error')).errorCount).toBe(1);
+    const enabled = await run('schemaVersion: 1\ntools:\n  - beta\n', 'beta', 'error');
+    expect(enabled.findings.map((f) => f.severity)).toEqual(['error']);
+  });
+
+  it('demotes whatever the manifest raised the rule to', async () => {
+    // Applicability, not loudness: `oversized-file: error` asks to fail on the tools this
+    // repository uses, and says nothing about one it does not.
+    const r = await run(`${BARE}lint:\n  rules:\n    oversized-file: error\n`, 'beta', 'warn');
+    expect(r.findings[0]?.severity).toBe('info');
+  });
+
+  it('leaves a finding about a tool the report does not know as loud as it was', async () => {
+    const r = await run(BARE, 'gamma', 'error');
+    expect(r.errorCount).toBe(1);
   });
 });

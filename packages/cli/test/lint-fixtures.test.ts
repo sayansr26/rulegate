@@ -86,6 +86,7 @@ describe('T064 — zero false positives on repositories that are fine', () => {
       adapters: ADAPTERS,
     });
     expect(report.findings.length).toBeGreaterThan(0);
-    expect(report.findings.every((f) => f.severity === 'warn')).toBe(true);
+    expect(report.findings.some((f) => f.severity === 'warn')).toBe(true);
+    expect(report.errorCount).toBe(0);
   });
 });

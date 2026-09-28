@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { isDir, isRecord, ls, readJson } from './read.js';
+import { isDir, isRealDir, isRecord, ls, read, readJson } from './read.js';
 import {
   LEGACY_MARKETPLACE,
   LEGACY_PLUGIN_ID,
@@ -98,4 +98,44 @@ export function agentOsInstall(root: string, claudeDir: string): AgentOsInstall 
  */
 export function disableCommand(scope: PluginScope): string {
   return `claude plugin disable ${LEGACY_PLUGIN_ID} --scope ${scope === 'project' ? 'project' : 'local'}`;
+}
+
+/**
+ * What names agent-os as the place to edit rules: its source directory and its package.
+ * `rulegate init` copies a hand-written CLAUDE.md into a canonical rule as it is, so a line
+ * telling the agent to edit `.agent-os/rules/` and run agent-os's `sync` survives the
+ * migration and sends it to a directory nothing reads any more (T153). The importer's
+ * twin of this pattern is `AGENT_OS_MENTION` in `@rulegate/interop`.
+ */
+export const AGENT_OS_MENTION = /\.agent-os\/|@sayansr26\/agent-os\b/;
+
+export interface AgentOsMention {
+  /** Relative to the project root: `.rulegate/rules/<file>.md`. */
+  readonly file: string;
+  /** 1-based, ascending. */
+  readonly lines: readonly number[];
+}
+
+/**
+ * Canonical rules that still name agent-os's source or package, walked as `RULES_GLOB`
+ * (`.rulegate/rules/**\/*.md`) reads them; symlinked directories are not followed.
+ */
+export function agentOsMentions(root: string): AgentOsMention[] {
+  const out: AgentOsMention[] = [];
+  const walk = (rel: string): void => {
+    for (const name of ls(join(root, rel))) {
+      const file = `${rel}/${name}`;
+      if (isRealDir(join(root, file))) {
+        walk(file);
+        continue;
+      }
+      if (!name.endsWith('.md')) continue;
+      const lines = (read(join(root, file)) ?? '')
+        .split(/\r?\n/)
+        .flatMap((l, i) => (AGENT_OS_MENTION.test(l) ? [i + 1] : []));
+      if (lines.length > 0) out.push({ file, lines });
+    }
+  };
+  walk('.rulegate/rules');
+  return out;
 }

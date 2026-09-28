@@ -7,6 +7,9 @@ agent-os's own `compile()` in `src/targets.mjs`, with all eight targets enabled.
 - `.agent-os/AGENTS.md` and `.agent-os/rules/{api,style,tests}.md` are the sources. `api`
   has a block-list `paths:`, `tests` a scalar one, and `style` has `always: true`, so the
   `paths` → `globs` mapping is falsifiable in both shapes and against the repo-wide case.
+- `.agent-os/AGENTS.md` becomes the `agents` rule scoped `tools: [codex, gemini]` (T149):
+  agent-os wrote it to `AGENTS.md` alone, and Gemini CLI read that file only through the
+  `context.fileName` entry agent-os added, which `init` asks to remove.
 - `.agent-os/config.json` carries a `claude` block, which belongs to the Rulegate plugin's
   `.claude/rulegate.json` and is printed, never written, by `init`.
 - The bannered outputs — `AGENTS.md`, `.claude/rules/`, `.clinerules/`, `.cursor/rules/`,
@@ -27,5 +30,6 @@ file per rule. `pnpm fixtures:update` skips this directory by name, because inte
 importers are not adapters and it cannot drive them. The assertions live in
 `packages/cli/test/interop-import.test.ts` and `packages/cli/test/init.test.ts`.
 
-The T120 seed — a `.agent-os/` built from Rulegate's own output — is
+[`agent-os-import-claude`](../agent-os-import-claude/README.md) and
+[`agent-os-import-scaffold`](../agent-os-import-scaffold/README.md) are T149's variants. The T120 seed — a `.agent-os/` built from Rulegate's own output — is
 [`agent-os-import-adopted`](../agent-os-import-adopted/README.md).

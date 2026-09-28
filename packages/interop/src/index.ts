@@ -1,7 +1,15 @@
 export type { InteropImporter, InteropResult } from './types.js';
 export { ruler, splitRulerOutput } from './ruler.js';
 export { rulesync, parseFrontmatter } from './rulesync.js';
-export { agentOs, derivedFrom, AGENT_OS_BANNER, TARGET_TO_TOOL } from './agent-os.js';
+export {
+  agentOs,
+  derivedFrom,
+  isAgentOsScaffold,
+  AGENT_OS_BANNER,
+  AGENT_OS_MENTION,
+  TARGET_TO_TOOL,
+  type AgentOsCompiled,
+} from './agent-os.js';
 
 import { agentOs } from './agent-os.js';
 import { ruler } from './ruler.js';

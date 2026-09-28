@@ -1,4 +1,6 @@
 ---
+tools:
+  - codex
 order: 10
 ---
 

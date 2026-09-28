@@ -1,5 +1,6 @@
 import { formatterWarnings } from './formatters.js';
 import { backupSecretWarnings } from './backup-secrets.js';
+import { sizeCapWarnings } from './size-caps.js';
 import { RulegateError } from '../model/errors.js';
 import {
   CANONICAL_SCHEMA_VERSION,
@@ -227,6 +228,9 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   const generatedPaths = plan.artifacts.map((a) => a.path);
   warnings.push(...(await formatterWarnings({ fs, generated: generatedPaths })));
   warnings.push(...(await backupSecretWarnings({ fs, taking: generatedPaths })));
+  warnings.push(
+    ...(await sizeCapWarnings({ fs, artifacts: plan.artifacts, adapters, enabled: detected })),
+  );
   warnings.push(...leftBehindWarnings(collected.sources, generatedPaths));
   // Only for a plan that will be applied: the hint is "delete it once init has run", and
   // when init refuses, the file it names may be the only copy of the output left.

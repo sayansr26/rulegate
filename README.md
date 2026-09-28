@@ -171,7 +171,8 @@ lint:
 correct repository can be permanently in: content past a cap the tool itself publishes is
 silently dropped. Everything else defaults to `warn`, so `lint` exits 0 on a repository
 that is deliberately configured the way it is. A gate that fails on a correct permanent
-condition is a gate people mute.
+condition is a gate people mute. For the same reason, a finding about a tool the repository
+neither enables nor has configured is reported as `info` and never fails the run.
 
 The `lint` block renders nothing — no adapter reads it — so tuning the linter never
 changes a generated file and never makes `check` fail.

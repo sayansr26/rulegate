@@ -30,7 +30,8 @@ export interface LintOptions {
  * write methods on it at all, and `invariants.test.ts` scans this file for the name of
  * the one function that writes.
  *
- * **Exit 1 only on an `error`-severity finding**, never on a warning. This is not the
+ * **Exit 1 only on an `error`-severity finding**, never on a warning or an `info` (a
+ * finding about a tool that is neither enabled nor detected, T150). This is not the
  * same call `doctor` makes, and the difference is that lint's severities are
  * configurable: a repository that disagrees with a default can say so in its manifest,
  * so failing on what it did not silence is a gate it chose. `doctor`'s warnings cannot
@@ -137,11 +138,20 @@ function printReport(out: Output, report: LintReport): void {
   });
 
   out.error('');
-  out.error(`${pluralize(report.errorCount, 'error')}, ${pluralize(report.warnCount, 'warning')}.`);
-  // One hint per distinct rule, not per finding: twenty oversized files share one fix.
+  const info = report.infoCount === 0 ? '' : `, ${String(report.infoCount)} info`;
+  out.error(
+    `${pluralize(report.errorCount, 'error')}, ${pluralize(report.warnCount, 'warning')}${info}.`,
+  );
+  if (report.infoCount > 0) {
+    out.error(
+      'info: about tools this repository neither enables nor has configured; never an exit code',
+    );
+  }
+  // One hint per distinct rule, not per finding: twenty oversized files share one fix. None
+  // for a rule whose findings are all `info` — the fix for a tool nobody runs is nothing.
   const seen = new Set<string>();
   for (const f of report.findings) {
-    if (seen.has(f.rule)) continue;
+    if (f.severity === 'info' || seen.has(f.rule)) continue;
     seen.add(f.rule);
     out.error(`hint: ${f.rule} — ${f.hint}`);
   }
