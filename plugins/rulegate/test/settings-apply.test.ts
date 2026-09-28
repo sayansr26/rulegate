@@ -243,7 +243,11 @@ describe('applyScope', () => {
       chmodSync(projectSettings(), 0o000);
       try {
         const r = await applyScope('project', sb.root, sb.claudeDir);
-        expect(r.refused.find((x) => x.item === 'settings')?.reason).toMatch(/could not be read/);
+        // Windows has no unreadable mode: chmod 0 only sets the read-only attribute, so the
+        // file is read fine and the write is what fails. Either way it is refused, intact.
+        expect(r.refused.find((x) => x.item === 'settings')?.reason).toMatch(
+          process.platform === 'win32' ? /could not write \(EPERM\)/ : /could not be read/,
+        );
       } finally {
         chmodSync(projectSettings(), 0o644);
       }
@@ -293,7 +297,9 @@ describe('applyScope', () => {
     expect(text(projectSettings())).toBe('{}\n');
   });
 
-  it('keeps a 0600 user settings.json at 0600', async () => {
+  // POSIX permission bits do not exist on Windows (every file reads back 0666), so there is
+  // no mode there to keep.
+  it.skipIf(process.platform === 'win32')('keeps a 0600 user settings.json at 0600', async () => {
     await sb.putHome('settings.json', { env: { ANTHROPIC_API_KEY: 'x' } });
     chmodSync(userSettings(), 0o600);
     await applyScope('user', sb.root, sb.claudeDir);
@@ -382,7 +388,9 @@ describe('dist/settings.js --apply', () => {
     const home = path.dirname(sb.claudeDir);
     await mkdir(path.join(home, '.claude'));
     await writeFile(path.join(home, '.claude/settings.json'), '{"theme":"dark"}\n');
-    const env: NodeJS.ProcessEnv = { ...process.env, HOME: home };
+    // USERPROFILE too: Windows' os.homedir() ignores HOME, and without it this test would
+    // read and write the runner's real ~/.claude.
+    const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home };
     delete env.CLAUDE_CONFIG_DIR;
     let code = 0;
     try {

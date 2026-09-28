@@ -137,7 +137,8 @@ All notable changes to this project are recorded here. This project follows
   imports, with the Cline rules once. When an enabled tool would generate a file where a
   directory stands (Zed's `.rules` beside a `.rules/` directory), or beneath a file (Cline's
   `.clinerules/<id>.md` beside a legacy `.clinerules` file), `init` refuses with
-  `E_INIT_NOT_A_FILE`, naming the path and the tool, and writes nothing.
+  `E_INIT_NOT_A_FILE`, naming the path and the tool, and writes nothing — on Windows too,
+  where the file beneath is found by walking the parents rather than from the error code.
 
 ### Internal
 

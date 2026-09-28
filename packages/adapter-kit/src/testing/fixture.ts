@@ -122,7 +122,10 @@ export function importFixture(tool: string): { readonly input: string; readonly 
  * still protects the case it was written for, a manifest that declares the file canonical.
  */
 export function importContextFor(fixtureDir: string): AdapterContext {
-  const repoRoot = path.join(fixturesRoot, fixtureDir);
+  // `resolve`, not `join`: a test's scratch repository lives under the OS temp dir, and on a
+  // Windows runner that is another drive, where `path.relative` can only answer with an
+  // absolute path — which `join` would glue onto `fixturesRoot`, reading an empty repo.
+  const repoRoot = path.resolve(fixturesRoot, fixtureDir);
   return {
     repoRoot,
     canonical: emptyCanonical({ file: fixtureDir }),
