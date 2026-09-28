@@ -26,9 +26,9 @@ network primitive appears anywhere in shipped source, including every dependency
 exception is one you type by name: `init --plugin --yes` asks your `claude` CLI to fetch the
 Claude Code plugin.
 
-> **Status: pre-release.** The adapter API is frozen (`docs/adapter-api-v1.md`), ten
+> **Status: pre-release.** The adapter API is frozen (`docs/adapter-api-v1.md`), thirteen
 > adapters ship, and this repository generates its own agent config with them. `rulegate` is
-> on npm and the commands below work — but `0.3.0` is an early release, not an announced one:
+> on npm and the commands below work — but `0.4.0` is an early release, not an announced one:
 > it has not yet been through an unaided first run on somebody else's repository. Expect the
 > docs and the CLI's rough edges to move before `1.0.0`.
 

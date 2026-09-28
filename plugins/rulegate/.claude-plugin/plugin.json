@@ -1,7 +1,7 @@
 {
   "name": "rulegate",
   "description": "Enforces a Rulegate project inside Claude Code: a session contract naming the project's agents, a guard that blocks edits to generated files, and a codebase cartographer with per-project memory.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": {
     "name": "Sayan Choudhury"
   },
