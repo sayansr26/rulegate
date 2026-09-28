@@ -14,7 +14,7 @@
     },
     {
       "adapter": "claude-code",
-      "hash": "sha256:bb0d7887ab8e5d7fe06af3148364f633eec75a10f8dc58c09a662c04c57aa3c1",
+      "hash": "sha256:89adf47472f0384c95dc27bf8014f48fcd0cec0cdb4b66ed3104cd0686ef74ab",
       "kind": "rules",
       "path": "CLAUDE.md"
     }

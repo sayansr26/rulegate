@@ -57,6 +57,7 @@ export async function runLint(input: LintInput): Promise<LintReport> {
       findings: [],
       errorCount: 0,
       warnCount: 0,
+      infoCount: 0,
       unknownRules: [],
       disabledRules: [],
       errors: plan.errors,
@@ -75,6 +76,7 @@ export async function runLint(input: LintInput): Promise<LintReport> {
 
   const findings: LintFinding[] = [];
   const disabledRules: LintRuleId[] = [];
+  const inUse = new Set(report.tools.filter((t) => t.enabled || t.detected).map((t) => t.name));
 
   // Sequentially and in registry order, never `Promise.all`. The reason is the one
   // `detect/engine.ts` records: a loop that appends in settle order produces a
@@ -87,7 +89,16 @@ export async function runLint(input: LintInput): Promise<LintReport> {
     }
     for (const found of await rule.check(ctx)) {
       if (isSuppressed(found, config)) continue;
-      findings.push({ ...found, rule: rule.id, severity });
+      // Applicability, not loudness, so it holds whatever severity the manifest set: a
+      // repository that raised `oversized-file` to error asked to fail on the tools it
+      // uses. A tool it neither enables nor has configured still gets the line — the
+      // condition is true, and the user may be about to adopt it — at a level no exit code
+      // reads. Only a tool the report knows is judged: an unknown id stays as loud as set.
+      const unused =
+        found.tool !== undefined &&
+        report.tools.some((t) => t.name === found.tool) &&
+        !inUse.has(found.tool);
+      findings.push({ ...found, rule: rule.id, severity: unused ? 'info' : severity });
     }
   }
 
@@ -96,6 +107,7 @@ export async function runLint(input: LintInput): Promise<LintReport> {
     findings: sorted,
     errorCount: sorted.filter((f) => f.severity === 'error').length,
     warnCount: sorted.filter((f) => f.severity === 'warn').length,
+    infoCount: sorted.filter((f) => f.severity === 'info').length,
     unknownRules: unknownRuleIds(config, registry),
     disabledRules,
     errors: [],

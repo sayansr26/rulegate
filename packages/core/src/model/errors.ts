@@ -90,7 +90,13 @@ export type RulegateErrorCode =
   // disk. A warning: the rules are in canonical, but the file is not in `state.json`, so
   // Rulegate can neither own nor delete it, and the tool that reads it keeps loading a copy
   // nothing updates. `init` is the only command that knows the file was derived at all.
-  | 'W_INTEROP_OUTPUT_LEFT';
+  | 'W_INTEROP_OUTPUT_LEFT'
+  // A generated file `init` would grow past a byte cap a tool that reads it documents in
+  // `AdapterDocs.limits` (T150) — codex inlining every scoped rule into an `AGENTS.md` that
+  // Windsurf caps at 12,000. A warning: the plan is correct and may be what the user wants,
+  // but the growth happens on a file they did not ask to change, and `init` is the one
+  // command that knows its size before and after.
+  | 'W_SIZE_CAP_CROSSED';
 
 export interface RulegateErrorInit {
   readonly code: RulegateErrorCode;

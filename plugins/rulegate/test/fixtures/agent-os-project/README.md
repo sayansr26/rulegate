@@ -6,7 +6,9 @@ it lives under the plugin's tests, so `fixtures:update` never sees it.
 - `repo/` — a project as agent-os 0.6 leaves it: `.agent-os/`, and the `AGENTS.md` and
   `.claude/rules/20-api.md` its `compile()` writes from it, byte for byte; a hand-written
   `CLAUDE.md` holding the `## Agents in this project (agent-os)` section agent-os's own
-  `/init` adds (agent-os never generates a `CLAUDE.md`); cartographer maps under
+  `/init` adds (agent-os never generates a `CLAUDE.md`) and the two lines lmsfront's has
+  sending the agent to `.agent-os/rules/` and `npx @sayansr26/agent-os sync`, which the
+  import carries into `claude.md` unchanged and the audit flags (T153); cartographer maps under
   `agent-os-feature-cartographer/`, a reviewer whose `rulegate-reviewer/` twin already
   exists, machine-local builder memory, and a `.claude/settings.json` that declares
   agent-os's marketplace.
@@ -16,7 +18,8 @@ it lives under the plugin's tests, so `fixtures:update` never sees it.
   directory is committed as `rulegate-source/` and copied to `.rulegate/`: a `.rulegate/`
   anywhere in this repository is a nested level of its own dogfood, and `rulegate sync`
   would render this repository's rules into it. It holds the rules the import yields —
-  ids are agent-os's basenames, the `.agent-os/AGENTS.md` body is `agents`, `CLAUDE.md` is
+  ids are agent-os's basenames, the `.agent-os/AGENTS.md` body is `agents` (scoped
+  `tools: [codex]`, because agent-os wrote it to AGENTS.md alone), `CLAUDE.md` is
   `claude` — with the agents section in `claude.md` rewritten to `rulegate:` (Step 4b of
   `references/establishing.md`) and the settings pass's `working-agreement.md`, plus the
   `AGENTS.md`, `CLAUDE.md`, `.claude/rules/20-api.md` and `.rulegate/state.json` that

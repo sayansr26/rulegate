@@ -3,7 +3,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { NodeFileSystem, computeInitPlan } from '@rulegate/core';
-import { AGENT_OS_BANNER, INTEROP, agentOs, derivedFrom, ruler, rulesync } from '@rulegate/interop';
+import {
+  AGENT_OS_BANNER,
+  INTEROP,
+  agentOs,
+  derivedFrom,
+  isAgentOsScaffold,
+  ruler,
+  rulesync,
+} from '@rulegate/interop';
 import { ADAPTERS } from '../src/registry.js';
 import { ADAPTER_NAMES } from '../src/registry.js';
 import { runInit } from '../src/commands/init.js';
@@ -553,6 +561,7 @@ describe('interop — agent-os edge cases (T113)', () => {
     await setup();
     try {
       await put('.agent-os/AGENTS.md', '# Project\n\nHello.\n');
+      await put('AGENTS.md', `<!-- ${AGENT_OS_BANNER} -->\n\n# Project\n\nHello.\n`);
       await put('.agent-os/rules/agents.md', '---\npaths:\n  - agents/**\n---\n\nScoped.\n');
       const found = await readAt(repo);
       expect(found.rules.map((r) => [r.id, r.source.file])).toEqual([
@@ -666,6 +675,42 @@ describe('interop — agent-os edge cases (T113)', () => {
     }
   });
 
+  it('notes every imported line still naming agent-os, and imports it unchanged (T153)', async () => {
+    // lmsfront's CLAUDE.md sends the agent to `.agent-os/rules/` and agent-os's `sync`. The
+    // import keeps the author's words; the note says which lines to change once it has run.
+    await setup();
+    try {
+      await put(
+        '.agent-os/rules/style.md',
+        'Tabs.\n\nEdit `.agent-os/rules/style.md` to change this.\n',
+      );
+      await put(
+        'CLAUDE.md',
+        'Run `pnpm dev`.\n\nGenerated from `.agent-os/rules/` — edit the source there\n(then `npx @sayansr26/agent-os sync`).\n',
+      );
+      // agent-os's own banner names `.agent-os/` too, and is no instruction to the agent.
+      await put('.claude/rules/style.md', `<!-- ${AGENT_OS_BANNER} -->\n\nTabs.\n`);
+      const found = await readAt(repo);
+      const mentions = (found.notes ?? []).filter((n) =>
+        n.message.includes('where rules are edited'),
+      );
+      expect(mentions.map((n) => [n.path, n.message.split(' `')[0]])).toEqual([
+        ['.agent-os/rules/style.md', 'line 3 names'],
+        ['CLAUDE.md', 'lines 3, 4 name'],
+      ]);
+      expect(mentions[0]?.message).toContain('name .rulegate/rules/ and `rulegate sync`');
+      expect(found.rules.find((r) => r.source.file === '.agent-os/rules/style.md')?.body).toContain(
+        'Edit `.agent-os/rules/style.md`',
+      );
+      const plan = await initAt(repo);
+      expect(plan.warnings.map((w) => w.message).join('\n')).toContain(
+        'agent-os: `CLAUDE.md`: lines 3, 4 name',
+      );
+    } finally {
+      await cleanup();
+    }
+  });
+
   it('does not import from a repository without .agent-os/', async () => {
     const plan = await init('claude-code-import');
     expect(plan.interop).toEqual([]);
@@ -678,5 +723,384 @@ describe('interop — agent-os edge cases (T113)', () => {
         apiVersion: 1 as const,
       }),
     ).toBe(false);
+  });
+});
+
+describe('interop — agent-os project body (T149)', () => {
+  let repo = '';
+  const cleanup = () => rm(repo, { recursive: true, force: true });
+  const seed = async (name: string) => {
+    repo = await mkdtemp(path.join(tmpdir(), 'rulegate-agent-os-body-'));
+    await cp(path.join(fixtures, name, 'input'), repo, { recursive: true });
+  };
+  const put = async (rel: string, contents: string) => {
+    await mkdir(path.dirname(path.join(repo, rel)), { recursive: true });
+    await writeFile(path.join(repo, rel), contents);
+  };
+  const readAt = async () =>
+    agentOs.read({
+      repoRoot: repo,
+      canonical: (await init('claude-code-import')).canonical,
+      fs: new NodeFileSystem(repo),
+      options: {},
+      apiVersion: 1 as const,
+    });
+  const golden = async (name: string) => {
+    const plan = await init(name);
+    expect(plan.errors).toEqual([]);
+    const expectedDir = path.join(fixtures, name, 'expected');
+    const expected = new Map<string, string>();
+    for (const rel of await files(expectedDir)) {
+      expected.set(`.rulegate/${rel}`, await readFile(path.join(expectedDir, rel), 'utf8'));
+    }
+    expect(new Map(plan.canonicalFiles.map((f) => [f.path, f.contents]))).toEqual(expected);
+    return plan;
+  };
+  const bodyNotes = (notes: readonly { path: string; message: string }[] | undefined) =>
+    (notes ?? []).filter((n) => n.path === '.agent-os/AGENTS.md').map((n) => n.message);
+
+  it('scopes the body to the tools agent-os sent it to, and leaves a hand-written CLAUDE.md as it was', async () => {
+    // lmsfront's shape: agent-os targets Claude Code, writes `.claude/rules/` and AGENTS.md,
+    // and somebody wrote CLAUDE.md. The body reached AGENTS.md alone, so it is codex's.
+    const plan = await golden('agent-os-import-claude');
+    expect(plan.warnings.map((w) => w.message)).toContainEqual(
+      expect.stringContaining('`tools: [codex]`'),
+    );
+
+    await seed('agent-os-import-claude');
+    try {
+      const original = await readFile(path.join(repo, 'CLAUDE.md'), 'utf8');
+      expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
+      const claude = await readFile(path.join(repo, 'CLAUDE.md'), 'utf8');
+      const banner = '<!-- generated by rulegate; edit .rulegate/ instead -->\n\n';
+      expect(claude).toBe(`${banner}${original}`);
+      const agents = await readFile(path.join(repo, 'AGENTS.md'), 'utf8');
+      expect(agents).toContain('A storefront: auth, billing and search');
+      expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('imports nothing from the untouched `agent-os init` placeholder, and says so', async () => {
+    // lmsfront's `.agent-os/AGENTS.md`, byte for byte: the placeholder plus the path-scoped
+    // index agent-os 0.5.0 compiled into it before 0.6.0 adopted it back as the source.
+    const plan = await golden('agent-os-import-scaffold');
+    expect(plan.warnings.map((w) => w.message)).toContainEqual(
+      expect.stringContaining('still the placeholder `agent-os init` writes'),
+    );
+    const rendered = plan.plan.artifacts.map((a) => a.contents).join('\n');
+    expect(rendered).not.toContain('Replace this with');
+    expect(rendered).not.toContain('src/api/**');
+  });
+
+  it('recognises the placeholder through line endings and trailing spaces, never through an edit', async () => {
+    const template = await readFile(
+      path.join(fixtures, 'agent-os-import-scaffold/input/.agent-os/AGENTS.md'),
+      'utf8',
+    );
+    const placeholder = template.slice(0, template.indexOf('\n\n## Path-scoped rules') + 1);
+    expect(isAgentOsScaffold(placeholder)).toBe(true);
+    expect(isAgentOsScaffold(template)).toBe(true);
+    expect(isAgentOsScaffold(`\uFEFF${template.replace(/\n/g, '  \r\n')}`)).toBe(true);
+
+    expect(isAgentOsScaffold(placeholder.replace('Keep it short.', 'Keep it brief.'))).toBe(false);
+    expect(isAgentOsScaffold(`${placeholder}\nRun \`make test\`.\n`)).toBe(false);
+    expect(isAgentOsScaffold(`${template}\n## Build\n\nmake\n`)).toBe(false);
+    expect(isAgentOsScaffold(`${placeholder}\n## Path-scoped rules\n`)).toBe(false);
+    expect(isAgentOsScaffold(template.replace('- `src/api/**`', '* `src/api/**`'))).toBe(false);
+    // agent-os writes the index only when there are scoped rules to list.
+    const index = template.slice(placeholder.length + 1, template.indexOf('- `src/api/**`'));
+    expect(
+      isAgentOsScaffold(`${placeholder}\n${index}\n${template.slice(placeholder.length + 1)}`),
+    ).toBe(false);
+    expect(isAgentOsScaffold('# Shopfront\n')).toBe(false);
+
+    // An entry is agent-os's only when a rule on disk compiles to it: the shape is typeable.
+    const own = '- `src/**` — Always run pnpm lint before committing';
+    expect(isAgentOsScaffold(`${template}${own}\n`)).toBe(false);
+    expect(isAgentOsScaffold(`${template}${own}\n`, { entries: new Set([own]) })).toBe(true);
+
+    // So is a section only when a universal rule on disk compiles to it.
+    const section = '## conv\n\nUse pnpm.';
+    expect(isAgentOsScaffold(`${placeholder}\n${section}\n`)).toBe(false);
+    expect(
+      isAgentOsScaffold(`${placeholder}\n${section}\n`, { sections: new Set([section]) }),
+    ).toBe(true);
+    expect(
+      isAgentOsScaffold(`${placeholder}\n${section}\n\nMore.\n`, { sections: new Set([section]) }),
+    ).toBe(false);
+  });
+
+  it('tells the index agent-os compiled from a line somebody added in its shape', async () => {
+    await seed('agent-os-import-scaffold');
+    try {
+      const source = path.join(repo, '.agent-os/AGENTS.md');
+      const template = await readFile(source, 'utf8');
+      const body = async () =>
+        (await readAt()).rules.find((r) => r.source.file === '.agent-os/AGENTS.md');
+      // What `agentsMd` writes for `rules/routing.md`: its paths, and its name for want of a
+      // description.
+      await writeFile(
+        source,
+        `${template}- \`src/routes.tsx\`, \`src/pages/**/*.tsx\` — routing\n`,
+      );
+      expect(await body()).toBeUndefined();
+      await writeFile(source, `${template}- \`src/**\` — Always run pnpm lint before committing\n`);
+      expect((await body())?.body).toContain('Always run pnpm lint before committing');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('imports nothing when no generated file carries the body, and says so', async () => {
+    await seed('agent-os-import-claude');
+    try {
+      // AGENTS.md replaced by hand: agent-os's output is gone, and nothing read the body.
+      await put('AGENTS.md', '# Written by hand\n');
+      const found = await readAt();
+      expect(found.rules.map((r) => r.source.file)).not.toContain('.agent-os/AGENTS.md');
+      expect(bodyNotes(found.notes)).toEqual([
+        expect.stringContaining('no file agent-os generated from it is on disk'),
+      ]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('imports the body when agent-os never synced in this tree, as though AGENTS.md were there', async () => {
+    // `agent-os sync` writes AGENTS.md every time; a missing one is a gitignored output or an
+    // unsynced clone, and the scoped rules beside it are imported just the same.
+    await seed('agent-os-import-claude');
+    try {
+      await rm(path.join(repo, 'AGENTS.md'));
+      await rm(path.join(repo, '.claude/rules'), { recursive: true });
+      const found = await readAt();
+      const body = found.rules.find((r) => r.source.file === '.agent-os/AGENTS.md');
+      expect(body?.frontmatter.tools).toEqual({ kind: 'include', tools: ['codex'] });
+      expect(bodyNotes(found.notes)).toEqual([
+        expect.stringContaining('is not on disk'),
+        expect.stringContaining('`tools: [codex]`'),
+      ]);
+
+      expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
+      const agents = await readFile(path.join(repo, 'AGENTS.md'), 'utf8');
+      expect(agents).toContain('A storefront: auth, billing and search');
+      expect(await readFile(path.join(repo, 'CLAUDE.md'), 'utf8')).not.toContain(
+        'A storefront: auth, billing and search',
+      );
+      expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('sends the body to Claude Code when Claude Code was reading AGENTS.md for want of a CLAUDE.md', async () => {
+    await seed('agent-os-import-claude');
+    try {
+      await rm(path.join(repo, 'CLAUDE.md'));
+      const tools = async () => {
+        const body = (await readAt()).rules.find((r) => r.source.file === '.agent-os/AGENTS.md');
+        return body?.frontmatter.tools;
+      };
+      expect(await tools()).toEqual({ kind: 'include', tools: ['claude-code', 'codex'] });
+      // Any of Claude Code's own memory files ends the fallback.
+      await put('CLAUDE.local.md', 'mine\n');
+      expect(await tools()).toEqual({ kind: 'include', tools: ['codex'] });
+      await rm(path.join(repo, 'CLAUDE.local.md'));
+
+      // A CLAUDE.md that is what agent-os compiles, banner and all, is agent-os's output:
+      // masked, and a carrier.
+      await put('CLAUDE.md', await readFile(path.join(repo, 'AGENTS.md'), 'utf8'));
+      const found = await readAt();
+      expect(found.generated).toContain('CLAUDE.md');
+      expect(await tools()).toEqual({ kind: 'include', tools: ['claude-code', 'codex'] });
+      expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
+      expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('takes a bannered CLAUDE.md as agent-os output only when it is what agent-os compiles', async () => {
+    // agent-os never writes CLAUDE.md, so a bannered one was copied by hand, and whatever was
+    // added below the banner would have lasted under agent-os. Masked, it would be lost.
+    await seed('agent-os-import-claude');
+    try {
+      const compiled = await readFile(path.join(repo, 'AGENTS.md'), 'utf8');
+      await put(
+        'CLAUDE.md',
+        `${compiled}\n## Claude only\n\nUse the Explore agent before touching billing.\n`,
+      );
+      const found = await readAt();
+      expect(found.generated).not.toContain('CLAUDE.md');
+      const claudeNotes = (found.notes ?? []).filter((n) => n.path === 'CLAUDE.md');
+      expect(claudeNotes.map((n) => n.message)).toEqual([
+        expect.stringContaining('not what agent-os compiles'),
+      ]);
+      expect(
+        found.rules.find((r) => r.source.file === '.agent-os/AGENTS.md')?.frontmatter.tools,
+      ).toEqual({ kind: 'include', tools: ['codex'] });
+
+      const plan = await computeInitPlan({
+        repoRoot: repo,
+        fs: new NodeFileSystem(repo),
+        adapters: ADAPTERS,
+        interop: INTEROP,
+      });
+      expect(plan.canonical.rules.map((r) => r.body).join('\n')).toContain('Explore agent');
+      expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
+      expect(await readFile(path.join(repo, 'CLAUDE.md'), 'utf8')).toContain('Explore agent');
+      expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('recognises a verbatim copy of AGENTS.md whose body opens with a comment of its own', async () => {
+    // agent-os writes its banner, then the body as it is: a comment at the top of the body
+    // stays below the banner, and only the banner is agent-os's.
+    await seed('agent-os-import-claude');
+    try {
+      const lint = '<!-- markdownlint-disable MD041 -->';
+      const source = path.join(repo, '.agent-os/AGENTS.md');
+      await writeFile(source, `${lint}\n\n${await readFile(source, 'utf8')}`);
+      const synced = (await readFile(path.join(repo, 'AGENTS.md'), 'utf8')).replace(
+        '-->\n\n',
+        `-->\n\n${lint}\n\n`,
+      );
+      await put('AGENTS.md', synced);
+      await put('CLAUDE.md', synced);
+      const found = await readAt();
+      expect(found.generated).toContain('CLAUDE.md');
+      expect((found.notes ?? []).filter((n) => n.path === 'CLAUDE.md')).toEqual([]);
+      expect(
+        found.rules.find((r) => r.source.file === '.agent-os/AGENTS.md')?.frontmatter.tools,
+      ).toEqual({ kind: 'include', tools: ['claude-code', 'codex'] });
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('takes an unbannered AGENTS.md that is exactly what agent-os compiles as its output', async () => {
+    // agent-os 0.5.0 wrote AGENTS.md without a banner, and 0.5.1 on refuses to overwrite a
+    // file without one, so a project last synced on 0.5.0 still has it. Codex read the body.
+    await seed('agent-os-import-claude');
+    try {
+      const bannered = await readFile(path.join(repo, 'AGENTS.md'), 'utf8');
+      const unbannered = bannered.slice(bannered.indexOf('-->\n\n') + '-->\n\n'.length);
+      await put('AGENTS.md', unbannered);
+      const found = await readAt();
+      expect(found.generated).toContain('AGENTS.md');
+      expect(
+        found.rules.find((r) => r.source.file === '.agent-os/AGENTS.md')?.frontmatter.tools,
+      ).toEqual({ kind: 'include', tools: ['codex'] });
+      expect(bodyNotes(found.notes)).toEqual([expect.stringContaining('`tools: [codex]`')]);
+
+      const plan = await computeInitPlan({
+        repoRoot: repo,
+        fs: new NodeFileSystem(repo),
+        adapters: ADAPTERS,
+        interop: INTEROP,
+      });
+      // The compiled index stays agent-os's rendering, not a second copy of the scoped rules.
+      expect(plan.canonical.rules.map((r) => r.body).join('\n')).not.toContain('## Path-scoped');
+      expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
+      expect(await runCheck({ cwd: repo, quiet: true })).toBe(ExitCode.Ok);
+
+      // One line more and it is somebody's file again.
+      await cleanup();
+      await seed('agent-os-import-claude');
+      await put('AGENTS.md', `${unbannered}\nAlso: never push to main.\n`);
+      const edited = await readAt();
+      expect(edited.generated).not.toContain('AGENTS.md');
+      expect(bodyNotes(edited.notes)).toEqual([
+        expect.stringContaining('no file agent-os generated from it is on disk'),
+      ]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('rebuilds the index the way agent-os read each rule, quotes and inline lists included', async () => {
+    // agent-os keeps a scalar as written, quotes and all, and takes a scalar or inline
+    // `paths:` as one literal path; only block-list items lose their quotes.
+    await seed('agent-os-import-scaffold');
+    try {
+      const source = path.join(repo, '.agent-os/AGENTS.md');
+      const template = await readFile(source, 'utf8');
+      const body = async () =>
+        (await readAt()).rules.find((r) => r.source.file === '.agent-os/AGENTS.md');
+      const cases: (readonly [fence: string, entry: string])[] = [
+        [
+          'description: "Routing conventions"\npaths:\n  - "src/routes.tsx"',
+          '- `src/routes.tsx` — "Routing conventions"',
+        ],
+        ["description: 'Routing conventions'\npaths: src/**", "- `src/**` — 'Routing conventions'"],
+        ['paths: "src/**"', '- `"src/**"` — routing'],
+        ['paths: [src/a.ts, src/b.ts]', '- `[src/a.ts, src/b.ts]` — routing'],
+      ];
+      for (const [fence, entry] of cases) {
+        await put('.agent-os/rules/routing.md', `---\n${fence}\n---\n\nRoutes.\n`);
+        await writeFile(source, `${template}${entry}\n`);
+        expect(await body(), entry).toBeUndefined();
+      }
+      // The unquoted line is not what agent-os wrote for that rule, so somebody typed it.
+      await put(
+        '.agent-os/rules/routing.md',
+        '---\ndescription: "Routing conventions"\npaths:\n  - "src/routes.tsx"\n---\n\nRoutes.\n',
+      );
+      await writeFile(source, `${template}- \`src/routes.tsx\` — Routing conventions\n`);
+      expect((await body())?.body).toContain('— Routing conventions');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('recognises the always-rule sections agent-os compiled between the placeholder and the index', async () => {
+    // A project synced on 0.5.0 with an `always` rule: `agentsMd` wrote `## <name>` and its
+    // body ahead of the index, and 0.6.0 adopted all of it as the source.
+    await seed('agent-os-import-scaffold');
+    try {
+      await put('.agent-os/rules/conv.md', '---\nalways: true\n---\n\nUse pnpm.\n');
+      const source = path.join(repo, '.agent-os/AGENTS.md');
+      const template = await readFile(source, 'utf8');
+      const at = template.indexOf('## Path-scoped rules');
+      const adopted = (section: string) =>
+        `${template.slice(0, at)}${section}\n\n${template.slice(at)}`;
+      await writeFile(source, adopted('## conv\n\nUse pnpm.'));
+      const found = await readAt();
+      expect(found.rules.map((r) => r.source.file)).not.toContain('.agent-os/AGENTS.md');
+      expect(found.rules.filter((r) => r.body.includes('Use pnpm.')).length).toBe(1);
+
+      // A section no rule on disk compiles to is somebody's.
+      await writeFile(source, adopted('## conv\n\nUse yarn.'));
+      const edited = (await readAt()).rules.find((r) => r.source.file === '.agent-os/AGENTS.md');
+      expect(edited?.body).toContain('Use yarn.');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('keeps Gemini CLI on the body only when agent-os is why it read AGENTS.md', async () => {
+    await seed('agent-os-import-claude');
+    try {
+      await put(
+        '.gemini/settings.json',
+        '{ "context": { "fileName": ["GEMINI.md", "AGENTS.md"] } }\n',
+      );
+      const tools = async () =>
+        (await readAt()).rules.find((r) => r.source.file === '.agent-os/AGENTS.md')?.frontmatter
+          .tools;
+      // The user's own alias: Gemini keeps reading AGENTS.md, so GEMINI.md must not repeat it.
+      expect(await tools()).toEqual({ kind: 'include', tools: ['codex'] });
+      await put(
+        '.agent-os/config.json',
+        JSON.stringify({ targets: ['claude-code', 'gemini-cli'] }),
+      );
+      expect(await tools()).toEqual({ kind: 'include', tools: ['codex', 'gemini'] });
+    } finally {
+      await cleanup();
+    }
   });
 });

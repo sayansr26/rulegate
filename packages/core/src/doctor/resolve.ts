@@ -138,13 +138,7 @@ async function measureEntry(
     return out;
   }
 
-  // A repo-wide walk is authorized by `nesting`, and by nothing else. Without this, a
-  // pattern like `.cursorrules` would be searched for at every depth, and a nested copy
-  // that Cursor genuinely does not read would be reported as read.
-  const pattern =
-    entry.scope === 'nested' || (entry.nesting !== undefined && entry.nesting !== 'root-only')
-      ? nestedPattern(entry.pattern)
-      : entry.pattern;
+  const pattern = repoPattern(entry);
 
   const paths = pattern.includes('*')
     ? [...(await ctx.fs.glob(pattern))].filter(outsideRulegateDir).sort(compareCodepoint)
@@ -188,6 +182,20 @@ async function measureEntry(
  */
 function outsideRulegateDir(path: string): boolean {
   return path !== RULEGATE_DIR && !path.startsWith(`${RULEGATE_DIR}/`);
+}
+
+/**
+ * The repository glob a non-global entry covers.
+ *
+ * A repo-wide walk is authorized by `nesting`, and by nothing else. Without this, a
+ * pattern like `.cursorrules` would be searched for at every depth, and a nested copy
+ * that Cursor genuinely does not read would be reported as read. Exported so `init`'s
+ * size-cap check (T150) asks which tool reads a file by the same answer `doctor` gives.
+ */
+export function repoPattern(entry: PrecedenceEntry): string {
+  return entry.scope === 'nested' || (entry.nesting !== undefined && entry.nesting !== 'root-only')
+    ? nestedPattern(entry.pattern)
+    : entry.pattern;
 }
 
 /** `CLAUDE.md` -> `**` + `/CLAUDE.md`, keeping the root copy in scope too. */
@@ -360,7 +368,7 @@ function aggregateStatus(
  * byte-identical content — a platform-dependent answer, which is the determinism failure
  * this repository treats as P0.
  */
-function byteLength(text: string): number {
+export function byteLength(text: string): number {
   return new TextEncoder().encode(text).length;
 }
 

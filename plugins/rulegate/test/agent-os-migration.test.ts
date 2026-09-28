@@ -196,6 +196,12 @@ describe('migrating an agent-os project (T114)', () => {
     expect(post).not.toContain("agent-os's memory");
     expect(post).toContain('.agent-os/ is already imported into .rulegate/ — safe to delete');
     expect(post).toContain('SETUP  HEALTHY');
+    // The import kept CLAUDE.md's lines sending the agent to `.agent-os/rules/` and agent-os's
+    // `sync` (T153): named by rule and line, with what to say instead.
+    expect(post).toContain(
+      'WARN  .rulegate/rules/claude.md lines 9, 10 still send the agent to agent-os',
+    );
+    expect(post).toContain('name .rulegate/rules/ and `rulegate sync`');
 
     // A second run of the migrator has nothing to do.
     expect((await planMemoryMigration(sb.root, sb.claudeDir)).agents).toEqual([]);

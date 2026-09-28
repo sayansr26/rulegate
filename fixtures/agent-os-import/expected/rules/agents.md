@@ -1,4 +1,7 @@
 ---
+tools:
+  - codex
+  - gemini
 order: 10
 ---
 

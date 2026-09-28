@@ -71,3 +71,9 @@ re-run.
 
 `.agent-os/` itself is left in place. Once `.rulegate/` exists the audit calls it already
 imported and safe to delete; the user deletes it, once `rulegate check` is clean.
+
+Imported text is kept as written, so a rule that told the agent to edit `.agent-os/rules/`
+and run `npx @sayansr26/agent-os sync` still says so. The audit names each such file and
+line; change them to `.rulegate/rules/` and `rulegate sync`, then `npx --no rulegate sync`.
+The `.agent-os/AGENTS.md` body arrives scoped `tools:` to the tools agent-os sent it to;
+delete that line to send it everywhere.

@@ -85,10 +85,13 @@ function generate(fixture, adapter) {
  * `expected/` today; it is listed so that adding one never turns it into an adapter lookup. Left in the sweep they abort the run, and if that
  * abort were ever softened to a skip-and-delete they would be reported as stale goldens to
  * remove: the same aim-at-goldens-it-does-not-own bug T017 hit with `-import`.
+ * `agent-os-import-claude` and `agent-os-import-scaffold` are T149's variants of the first.
  */
 const NOT_ADAPTER_FIXTURES = new Set([
   'agent-os-import',
   'agent-os-import-adopted',
+  'agent-os-import-claude',
+  'agent-os-import-scaffold',
   'ruler-import',
   'rulesync-import',
 ]);

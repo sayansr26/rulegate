@@ -52,9 +52,14 @@ All notable changes to this project are recorded here. This project follows
 - **`rulegate init` migrates an agent-os project.** `.agent-os/` is an import source beside
   ruler and rulesync: `.agent-os/AGENTS.md` becomes a repo-wide rule, each `rules/*.md` a rule
   (`paths:` → `globs`, `always: true` → repo-wide), and `config.json`'s `targets` pick the
-  adapters to enable. A rule's frontmatter fence is read exactly as agent-os 0.6.0 reads it, so a
-  CRLF, BOM or unterminated fence stays unscoped, as agent-os compiled it, with a note naming the
-  file. The files agent-os generated carry its banner and are taken over rather than imported
+  adapters to enable. The `.agent-os/AGENTS.md` body is scoped `tools:` to the tools agent-os
+  actually sent it to, judged from the files it generated on disk — so a hand-written
+  `CLAUDE.md` it never touched comes across byte-identical apart from the banner — and is
+  skipped with a note when no generated file carries it. The untouched `agent-os init`
+  placeholder ("Replace this with…") is recognised and skipped with a note. Delete the
+  `tools:` line to send the body everywhere. A rule's frontmatter fence is read exactly as
+  agent-os 0.6.0 reads it, so a CRLF, BOM or unterminated fence stays unscoped, as agent-os
+  compiled it, with a note naming the file. The files agent-os generated carry its banner and are taken over rather than imported
   again, each copied to `.rulegate/backup/` first. agent-os's `claude` block is printed as the
   exact `.claude/rulegate.json` payload — `features`, `cartographerReminder`, `handoff`,
   `activeTask` — and never written. Imported frontmatter keys that Rulegate also reads (`globs`,
@@ -68,6 +73,14 @@ All notable changes to this project are recorded here. This project follows
   Cursor's `.cursorrules`): the original stays on disk and tools that read it get its rules
   twice. For a case-only difference the hint says to list the directory and delete the old name
   only if both appear, never to rename.
+- **`init` warns `W_SIZE_CAP_CROSSED`** when a generated file would grow past a byte cap that a
+  tool reading it documents, naming the file, its size before and after, and the tool — an
+  agent-os `AGENTS.md` that listed its scoped rules grows once the codex adapter inlines them.
+- **Migrated rules that still point at agent-os are flagged.** `init` notes, with file and line
+  numbers, every imported source that names `.agent-os/` or `@sayansr26/agent-os` as where rules
+  are edited, and `/rulegate:init`'s audit warns about any `.rulegate/rules/` file that still
+  does. Both say to name `.rulegate/rules/` and `rulegate sync` instead; neither rewrites the
+  text.
 
 ### Changed
 
@@ -81,6 +94,10 @@ All notable changes to this project are recorded here. This project follows
   first). The claude-code docs now record that Claude Code ≥2.1.277 reads `AGENTS.md` when no
   `CLAUDE.md` exists, and `doctor` now measures user-level `~/.claude/rules/*.md` (top level
   only). The Copilot docs list `.claude/rules/**/*.md`, which VS Code's Local agent also loads.
+- **`rulegate lint` reports findings about tools the repository neither enables nor has
+  configured as `info`**, which never changes the exit code — an oversized `AGENTS.md` no
+  longer fails lint on Windsurf's cap in a project that does not use Windsurf. The summary
+  counts them separately, no hint is printed for them, and `lint --json` gains `infoCount`.
 
 ### Fixed
 
