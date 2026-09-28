@@ -68,7 +68,9 @@ describe(`rulegate on a ${String(PACKAGES)}-package monorepo (T062, NFR6)`, () =
 
     expect(code).toBe(ExitCode.Ok);
     expect(elapsed).toBeLessThan(2000);
-  });
+    // The budget is `check`'s alone; the `sync` that sets the tree up is not timed, and on a
+    // Windows runner the two together can pass the 5s default.
+  }, 30_000);
 
   /**
    * The budget assertion above is wall-clock and therefore only as trustworthy as the

@@ -1,6 +1,19 @@
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { compareFixture, formatFixtureReport } from '../src/testing/compare.js';
 import { escapeInvisibles, firstDifference } from '../src/testing/diff.js';
+import { importContextFor } from '../src/testing/fixture.js';
+
+describe('importContextFor', () => {
+  // On a Windows runner the OS temp dir sits on another drive than the checkout, so the
+  // `path.relative(fixturesRoot, dir)` adapter tests pass in is absolute. It must be taken
+  // as it is; joined onto fixturesRoot it names a directory that does not exist.
+  it('takes an absolute directory as it is', () => {
+    const dir = path.join(tmpdir(), 'rulegate-harness-absolute');
+    expect(importContextFor(dir).repoRoot).toBe(dir);
+  });
+});
 
 /**
  * The comparison and diff layer, tested on strings alone — no adapter, no filesystem.

@@ -326,6 +326,47 @@ describe('interop — a generated path something else stands on (T156)', () => {
       await rm(repo, { recursive: true, force: true });
     }
   });
+
+  it('refuses the legacy .clinerules file where the OS answers absent beneath a file, as Windows does', async () => {
+    // Windows reports ENOENT, not ENOTDIR, for `.clinerules/x.md` under a file, so the
+    // refusal cannot rest on the error code. Simulated here so macOS and Linux prove it too.
+    repo = await mkdtemp(path.join(tmpdir(), 'rulegate-t156-win-'));
+    try {
+      await put('.ruler/AGENTS.md', 'Prefer small modules.\n');
+      await put('.clinerules', 'Not generated.\n');
+      const node = new NodeFileSystem(repo);
+      const absentBeneathAFile = <T>(call: () => Promise<T>, absent: T) =>
+        call().catch((e: unknown) => {
+          if ((e as { code?: string }).code === 'ENOTDIR') return absent;
+          throw e;
+        });
+      const windowsLike = new Proxy(node, {
+        get(target, key) {
+          if (key === 'tryReadFile') {
+            return (p: string) => absentBeneathAFile(() => target.tryReadFile(p), undefined);
+          }
+          if (key === 'exists')
+            return (p: string) => absentBeneathAFile(() => target.exists(p), false);
+          const value: unknown = Reflect.get(target, key);
+          return typeof value === 'function'
+            ? (value as (...args: unknown[]) => unknown).bind(target)
+            : value;
+        },
+      });
+      const plan = await computeInitPlan({
+        repoRoot: repo,
+        fs: windowsLike,
+        adapters: ADAPTERS,
+        interop: INTEROP,
+      });
+      const refused = plan.errors.filter((e) => e.code === 'E_INIT_NOT_A_FILE');
+      expect(refused).toHaveLength(1);
+      expect(refused[0]?.source?.file.startsWith('.clinerules/')).toBe(true);
+      expect(refused[0]?.message).toContain('parent directories');
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
 });
 
 /** An importer's context over a fixture input, as `computeInitPlan` builds one. */

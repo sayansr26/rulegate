@@ -98,10 +98,16 @@ describe('filesOnly', () => {
     // The mirror case: Cline's legacy `.clinerules` file, probed as the directory it is now.
     await writeFile(path.join(root, '.agent-os'), 'not a directory\n');
     const node = new NodeFileSystem(root);
-    await expect(node.tryReadFile('.agent-os/config.json')).rejects.toMatchObject({
-      code: 'ENOTDIR',
-    });
-    await expect(node.exists('.agent-os/config.json')).rejects.toMatchObject({ code: 'ENOTDIR' });
+    // The premise holds on POSIX only: Windows answers ENOENT there, which NodeFileSystem
+    // already reports as absent. Either way filesOnly must answer absent.
+    if (process.platform !== 'win32') {
+      await expect(node.tryReadFile('.agent-os/config.json')).rejects.toMatchObject({
+        code: 'ENOTDIR',
+      });
+      await expect(node.exists('.agent-os/config.json')).rejects.toMatchObject({
+        code: 'ENOTDIR',
+      });
+    }
     const fs = filesOnly(node);
     expect(await fs.tryReadFile('.agent-os/config.json')).toBeUndefined();
     expect(await fs.exists('.agent-os/config.json')).toBe(false);

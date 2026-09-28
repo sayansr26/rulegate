@@ -72,7 +72,9 @@ describe('T064 — zero false positives on repositories that are fine', () => {
       }
     }
     expect(offenders).toEqual([]);
-  });
+    // One full lint per golden tree, and the set grows with every adapter: on a Windows
+    // runner it already sits at the 5s default.
+  }, 30_000);
 
   it('still reports on a tree that genuinely has a problem', async () => {
     // The positive control for the sweep above. Without it, a `runLint` that returned an

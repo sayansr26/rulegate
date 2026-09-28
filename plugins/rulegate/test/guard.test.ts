@@ -221,8 +221,13 @@ describe('dist/pre-edit.js', () => {
     expect(run(JSON.stringify({ tool_input: { file_path: 'CLAUDE.md' } })).stdout).toContain(
       '"deny"',
     );
+    // `os.homedir()` reads USERPROFILE on Windows and HOME elsewhere; set both so the
+    // hook's `~` lands in the sandbox on every runner.
     expect(
-      run(JSON.stringify({ tool_input: { file_path: '~/CLAUDE.md' } }), { HOME: sb.root }).stdout,
+      run(JSON.stringify({ tool_input: { file_path: '~/CLAUDE.md' } }), {
+        HOME: sb.root,
+        USERPROFILE: sb.root,
+      }).stdout,
     ).toContain('"deny"');
   });
 

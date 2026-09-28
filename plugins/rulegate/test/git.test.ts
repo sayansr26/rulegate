@@ -12,7 +12,8 @@ describe('runGit (T104)', () => {
     // The positive control: every refusal below would pass against a runGit that
     // returned undefined unconditionally.
     const top = await runGit(['rev-parse', '--show-toplevel'], repoRoot);
-    expect(top?.trim()).toBe(path.resolve(repoRoot));
+    // Git for Windows prints `D:/a/…`; resolving it gives the native spelling to compare.
+    expect(path.resolve(top?.trim() ?? '')).toBe(path.resolve(repoRoot));
   });
 
   it('refuses a subcommand outside the four', async () => {

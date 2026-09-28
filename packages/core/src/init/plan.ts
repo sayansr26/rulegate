@@ -372,14 +372,21 @@ async function notFiles(
 ): Promise<readonly RulegateError[]> {
   const out: RulegateError[] = [];
   for (const { path: file, adapter } of artifacts) {
+    let what: string | undefined;
     try {
-      await fs.tryReadFile(file);
+      // Absent is not yet free: Windows answers ENOENT, not ENOTDIR, beneath a file, so a
+      // file standing where a parent directory goes is found by walking the parents.
+      if ((await fs.tryReadFile(file)) === undefined && (await fileAncestor(fs, file))) {
+        what = 'a file stands where one of its parent directories goes';
+      }
     } catch (e) {
       if (!notAFile(e)) throw e;
-      const what =
+      what =
         (e as { code?: string }).code === 'EISDIR'
           ? 'a directory stands there'
           : 'a file stands where one of its parent directories goes';
+    }
+    if (what !== undefined) {
       out.push(
         new RulegateError({
           code: 'E_INIT_NOT_A_FILE',
@@ -391,6 +398,24 @@ async function notFiles(
     }
   }
   return out;
+}
+
+/**
+ * Is one of `file`'s parent directories a regular file? A directory answers EISDIR to a
+ * read and an absent parent ends the walk, since nothing can stand beneath it.
+ */
+async function fileAncestor(fs: ReadOnlyFileSystem, file: string): Promise<boolean> {
+  const parts = file.split('/');
+  for (let i = 1; i < parts.length; i++) {
+    try {
+      if ((await fs.tryReadFile(parts.slice(0, i).join('/'))) === undefined) return false;
+      return true;
+    } catch (e) {
+      if (!notAFile(e)) throw e;
+      if ((e as { code?: string }).code === 'ENOTDIR') return true;
+    }
+  }
+  return false;
 }
 
 /** Is `file` the generated path `output`, or inside the directory it names? */

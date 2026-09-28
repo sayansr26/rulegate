@@ -16,9 +16,10 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // Tasks in task-breakdown.md that must be COMPLETED before the next release. Edit as
-// milestones change: T117 is M5's GO/NO-GO, and a release before it ships an unproven
-// migration to every agent-os user.
-const RELEASE_GATES = ['T117'];
+// milestones change. Empty for v0.4.0 by maintainer decision (2026-09-28): it ships
+// unannounced so T032's recruits get the T132/T123/T156 fixes, before T117 has proven the
+// agent-os migration; T117 still gates the announced launch (T037 onwards).
+const RELEASE_GATES = [];
 
 export const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
