@@ -100,8 +100,49 @@ jobs:
       # branch check rejects. It is load-bearing *only here*: reaching for it locally is
       # how a tarball gets cut from a tree matching no fetchable commit, which is the same
       # property provenance exists to assert (T034).
+      #
+      # Provenance comes from the environment, not a flag. pnpm 10 packs each package (the
+      # `workspace:*` rewrite happens there) and hands the tarball to `npm publish`, and it
+      # accepts `--provenance` without passing it on — 0.3.0 and 0.4.0 went out unsigned from
+      # a green step (T092). npm reads NPM_CONFIG_PROVENANCE from the environment it inherits.
       - name: publish
         if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
-        run: pnpm publish -r --access public --provenance --no-git-checks
+        run: pnpm publish -r --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # The registry, not the exit code, says whether the release happened and is signed.
+      - name: every package is on npm with a provenance attestation
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/verify-published.mjs "${GITHUB_REF_NAME#v}" --attestations
+
+  # A cold install of the published version on every platform, from the registry rather than
+  # from packed tarballs: the launch demo is `npx rulegate@latest init`, and smoke.mjs cannot
+  # see a registry-only failure (T156).
+  cold-install:
+    name: npx from the registry (${{ matrix.os }})
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: init, then check, in an empty repository
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          repo="$RUNNER_TEMP/cold"
+          mkdir -p "$repo" && cd "$repo"
+          git init -q
+          printf '# Project\n\nUse small modules.\n' > CLAUDE.md
+          npx -y "rulegate@$version" --version
+          npx -y "rulegate@$version" init --yes
+          npx -y "rulegate@$version" check
