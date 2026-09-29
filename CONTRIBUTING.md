@@ -34,6 +34,7 @@ Node ≥ 20 (this repository develops on 22; see `.nvmrc`) and pnpm 10.18.3, whi
 | `pnpm verify`          | lint ▸ build ▸ typecheck ▸ test — what a PR has to pass            |
 | `pnpm fixtures:update` | Regenerate golden fixtures. Needs `pnpm build` first, and `--yes`. |
 | `pnpm smoke`           | Pack every workspace package and install the CLI from the tarballs |
+| `pnpm bench`           | Time `sync` and `check` on generated repos; fails over budget      |
 
 One file: `pnpm vitest run <path>`. One case: add `-t "<name>"`.
 

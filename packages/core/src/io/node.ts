@@ -104,7 +104,11 @@ export class NodeFileSystem implements WritableFileSystem {
       return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
     };
 
-    const walk = async (dir: string): Promise<void> => {
+    // `real` is `dir`'s resolved path. A plain directory's is its parent's plus its name, so
+    // only a symlink costs a `realpath` — one syscall saved per directory walked, which is
+    // most of a large tree (T062). The order of visits, and so which of two aliased paths a
+    // file is reported under, is unchanged.
+    const walk = async (dir: string, real: string): Promise<void> => {
       for (const entry of await this.listDir(dir)) {
         const child = dir === '' ? entry.name : `${dir}/${entry.name}`;
         if (entry.name === 'node_modules' || entry.name === '.git') continue;
@@ -120,17 +124,22 @@ export class NodeFileSystem implements WritableFileSystem {
 
         if (kind === 'dir') {
           if (!mayContain(child, prefix)) continue;
-          const real = await realpathOr(path.join(this.repoRoot, fromPosix(child)));
-          if (seen.has(real)) continue;
-          seen.add(real);
-          await walk(child);
+          // NFC like `listDir`'s names, so a link and the directory it aliases compare equal
+          // even where the disk stores a name decomposed.
+          const childReal =
+            entry.kind === 'symlink'
+              ? (await realpathOr(path.join(this.repoRoot, fromPosix(child)))).normalize('NFC')
+              : path.join(real, entry.name);
+          if (seen.has(childReal)) continue;
+          seen.add(childReal);
+          await walk(child, childReal);
           continue;
         }
         if (matchesGlob(child, pattern)) out.push(child);
       }
     };
 
-    await walk('');
+    await walk('', root.normalize('NFC'));
     out.sort(compareCodepoint);
     return out;
   }

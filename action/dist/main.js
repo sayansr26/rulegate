@@ -10704,7 +10704,11 @@ function normalizeEol(s) {
 function ensureSingleTrailingNewline(s) {
   if (s === "")
     return "";
-  return s.replace(/\n*$/, "") + "\n";
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 10)
+    end -= 1;
+  return `${s.slice(0, end)}
+`;
 }
 function normalizeText(s) {
   return normalizeEol(stripBom(s));
@@ -12210,10 +12214,14 @@ async function discoverSources(fs2, knownTools, ignore = []) {
     }
     dirs.add(dir);
   };
-  for (const p of await fs2.glob(`**/${MANIFEST_PATH}`))
-    add(p, MANIFEST_PATH);
-  for (const p of await fs2.glob(`**/${RULES_GLOB}`))
-    add(p, `${RULEGATE_DIR}/rules/`);
+  const manifests = `**/${MANIFEST_PATH}`;
+  const rules = `**/${RULES_GLOB}`;
+  for (const p of await fs2.glob(`**/${RULEGATE_DIR}/**`)) {
+    if (matchesGlob(p, manifests))
+      add(p, MANIFEST_PATH);
+    else if (matchesGlob(p, rules))
+      add(p, `${RULEGATE_DIR}/rules/`);
+  }
   const out = [];
   for (const dir of [...dirs].sort(compareCodepoint)) {
     out.push({
@@ -12648,6 +12656,65 @@ function dropTrailingCommas(text) {
     out += ch;
   }
   return out;
+}
+
+// ../packages/core/dist/fs/read-cache.js
+var PREFETCH_CONCURRENCY = 32;
+var ReadCache = class {
+  inner;
+  texts = /* @__PURE__ */ new Map();
+  strict = /* @__PURE__ */ new Map();
+  raws = /* @__PURE__ */ new Map();
+  present = /* @__PURE__ */ new Map();
+  constructor(inner) {
+    this.inner = inner;
+  }
+  tryReadFile(relPath) {
+    return memo(this.texts, relPath, () => this.inner.tryReadFile(relPath));
+  }
+  readFile(relPath) {
+    return memo(this.strict, relPath, () => this.inner.readFile(relPath));
+  }
+  readFileRaw(relPath) {
+    return memo(this.raws, relPath, () => this.inner.readFileRaw(relPath));
+  }
+  exists(relPath) {
+    return memo(this.present, relPath, () => this.inner.exists(relPath));
+  }
+  listDir(relPath) {
+    return this.inner.listDir(relPath);
+  }
+  glob(pattern) {
+    return this.inner.glob(pattern);
+  }
+  /**
+   * Read these paths ahead, at most `PREFETCH_CONCURRENCY` at a time: as text, or — for a
+   * binary artifact — as existence and raw bytes, the two reads `hashOnDisk` makes. A failure
+   * is not raised here; it is cached, and surfaces where the read is actually asked for, as it
+   * would have without the prefetch.
+   */
+  async prefetch(paths) {
+    let next = 0;
+    const worker = async () => {
+      while (next < paths.length) {
+        const { path: path4, raw } = paths[next++];
+        if (!raw) {
+          await this.tryReadFile(path4).catch(() => void 0);
+        } else if (await this.exists(path4).catch(() => false)) {
+          await this.readFileRaw(path4).catch(() => void 0);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: PREFETCH_CONCURRENCY }, worker));
+  }
+};
+function memo(cache, key, read14) {
+  let hit = cache.get(key);
+  if (hit === void 0) {
+    hit = read14();
+    cache.set(key, hit);
+  }
+  return hit;
 }
 
 // ../packages/core/dist/state/state.js
@@ -13438,7 +13505,9 @@ function describe2(cause) {
 }
 
 // ../packages/core/dist/pipeline/verify.js
-async function verifyPlan(plan, fs2) {
+async function verifyPlan(plan, disk) {
+  const fs2 = new ReadCache(disk);
+  await fs2.prefetch(plan.artifacts.map((a) => ({ path: a.path, raw: isBinaryArtifact(a) })));
   const { state, warning } = await loadState(fs2);
   const comparison = await compareToDisk(state, plan.artifacts, fs2);
   const handEdited = new Set(comparison.changed);
@@ -13804,7 +13873,7 @@ var NodeFileSystem = class {
       const rel = path2.relative(root, real);
       return rel === "" || !rel.startsWith("..") && !path2.isAbsolute(rel);
     };
-    const walk2 = async (dir) => {
+    const walk2 = async (dir, real) => {
       for (const entry of await this.listDir(dir)) {
         const child = dir === "" ? entry.name : `${dir}/${entry.name}`;
         if (entry.name === "node_modules" || entry.name === ".git")
@@ -13822,18 +13891,18 @@ var NodeFileSystem = class {
         if (kind === "dir") {
           if (!mayContain(child, prefix))
             continue;
-          const real = await realpathOr(path2.join(this.repoRoot, fromPosix(child)));
-          if (seen.has(real))
+          const childReal = entry.kind === "symlink" ? (await realpathOr(path2.join(this.repoRoot, fromPosix(child)))).normalize("NFC") : path2.join(real, entry.name);
+          if (seen.has(childReal))
             continue;
-          seen.add(real);
-          await walk2(child);
+          seen.add(childReal);
+          await walk2(child, childReal);
           continue;
         }
         if (matchesGlob(child, pattern))
           out.push(child);
       }
     };
-    await walk2("");
+    await walk2("", root.normalize("NFC"));
     out.sort(compareCodepoint);
     return out;
   }
