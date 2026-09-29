@@ -135,7 +135,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # `uses: ./action` is the only thing that exercises action.yml itself — its inputs,
-      # its `node20` runtime, and the committed bundle as the runner resolves it. Nothing
+      # its `node24` runtime, and the committed bundle as the runner resolves it. Nothing
       # else in this workflow does: the dist lane spawns `node action/dist/main.js`
       # directly, which proves the code and not the packaging.
       #
