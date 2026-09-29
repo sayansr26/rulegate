@@ -1,6 +1,6 @@
 {
   "name": "@rulegate/adapter-kilo",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Rulegate adapter for kilo.",
   "type": "module",
   "license": "MIT",
