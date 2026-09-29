@@ -29,6 +29,7 @@ const canonical: Canonical = {
   rules: [],
   mcpServers: [],
   skills: [],
+  commands: [],
 };
 
 function artifact(path: string, contents: string): Artifact {

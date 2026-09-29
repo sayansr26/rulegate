@@ -24,7 +24,7 @@ describe('RFC-0001 covers the canonical format', () => {
 
   it('records what was deferred, so the minimal scope is a decision and not an omission', async () => {
     const rfc = await readFile(rfcPath, 'utf8');
-    expect(rfc).toMatch(/##\s*13\.\s*Explicitly deferred/);
+    expect(rfc).toMatch(/##\s*14\.\s*Explicitly deferred/);
     for (const deferred of ['extends', 'Templating', 'Conditional rules', 'Nested']) {
       expect(rfc).toContain(deferred);
     }
@@ -32,7 +32,7 @@ describe('RFC-0001 covers the canonical format', () => {
 
   it('carries a worked example a reader can hand-author from', async () => {
     const rfc = await readFile(rfcPath, 'utf8');
-    expect(rfc).toMatch(/##\s*14\.\s*Worked example/);
+    expect(rfc).toMatch(/##\s*15\.\s*Worked example/);
     expect(rfc).toContain('rulegate.yaml');
     expect(rfc).toContain('CLAUDE.md');
     // The filename comes from the rule id, prefix and all. The RFC said `style.mdc` for

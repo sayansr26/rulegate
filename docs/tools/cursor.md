@@ -70,9 +70,12 @@ Source: [Cursor — Agent skills](https://cursor.com/docs/context/skills) — re
   Source: [Cursor — Rules](https://docs.cursor.com/context/rules) — retrieved 2026-09-01
 - **info** — Generated .mdc filenames keep the canonical rule id, order prefix included, so each output traces back to exactly one canonical file and two rules with the same trailing name cannot collide.
 - **info** — Cursor scopes rules natively via `globs`, so glob-scoped rules do not carry the prose "Applies to:" line that single-file targets such as CLAUDE.md require.
+- **info** — Rulegate renders no commands for Cursor. `.cursor/commands/` shipped in Cursor 1.6, but current docs describe only skills and a `/migrate-to-skills` that converts commands into them; put a reusable prompt in `.rulegate/skills/` instead.
+  Source: [Cursor — Skills](https://cursor.com/help/customization/skills) — retrieved 2026-09-29
 
 ## Sources
 
 - [Cursor — Model Context Protocol](https://cursor.com/docs/context/mcp) — retrieved 2026-09-04
 - [Cursor — Agent skills](https://cursor.com/docs/context/skills) — retrieved 2026-09-29
+- [Cursor — Skills](https://cursor.com/help/customization/skills) — retrieved 2026-09-29
 - [Cursor — Rules](https://docs.cursor.com/context/rules) — retrieved 2026-09-01

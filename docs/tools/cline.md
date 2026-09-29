@@ -68,8 +68,11 @@ Source: [Cline — Skills](https://docs.cline.bot/features/skills) — retrieved
   Source: [Cline — Cline Rules](https://docs.cline.bot/features/cline-rules) — retrieved 2026-09-04
 - **info** — Cline has no project-level MCP configuration file: MCP servers live in user-level storage, outside any repository. This adapter therefore generates no MCP artifact.
   Source: [Cline — Cline Rules](https://docs.cline.bot/features/cline-rules) — retrieved 2026-09-04
+- **info** — Rulegate renders no workflows for Cline. `.clinerules/workflows/` is described only in a 2025 blog post, and the current docs have no workflows page; Cline reads skills, so put a reusable prompt in `.rulegate/skills/` instead.
+  Source: [Cline — Stop Adding Rules When You Need Workflows](https://cline.bot/blog/stop-adding-rules-when-you-need-workflows) — retrieved 2026-09-29
 
 ## Sources
 
+- [Cline — Stop Adding Rules When You Need Workflows](https://cline.bot/blog/stop-adding-rules-when-you-need-workflows) — retrieved 2026-09-29
 - [Cline — Cline Rules](https://docs.cline.bot/features/cline-rules) — retrieved 2026-09-04
 - [Cline — Skills](https://docs.cline.bot/features/skills) — retrieved 2026-09-29

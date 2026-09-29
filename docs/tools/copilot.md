@@ -74,6 +74,16 @@ Reads only the Agent Skills frontmatter fields.
 
 Source: [GitHub Copilot — About agent skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) — retrieved 2026-09-29
 
+## Commands
+
+Rulegate writes each command to `.github/prompts/<name>.prompt.md`, as Markdown with YAML frontmatter.
+
+`$ARGUMENTS` is written as `${input:args}`.
+
+Frontmatter it reads beyond `description`: `argument-hint`, `agent`, `model`.
+
+Source: [Visual Studio Code — Use prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — The MCP file’s top-level key is `servers`, not the `mcpServers` Claude Code and Cursor use. A `.mcp.json` copied to `.vscode/mcp.json` is valid JSON, loads without complaint and supplies no servers at all — a config that looks right and does nothing. Rulegate generates each from canonical rather than copying one to the other.
@@ -93,6 +103,7 @@ Source: [GitHub Copilot — About agent skills](https://docs.github.com/en/copil
 
 - [Visual Studio Code — MCP configuration reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) — retrieved 2026-09-04
 - [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-26
+- [Visual Studio Code — Use prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files) — retrieved 2026-09-29
 - [Visual Studio Code — Variables reference](https://code.visualstudio.com/docs/reference/variables-reference) — retrieved 2026-09-04
 - [GitHub Copilot — About agent skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) — retrieved 2026-09-29
 - [GitHub Docs — Adding repository custom instructions for GitHub Copilot](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions) — retrieved 2026-09-02

@@ -129,4 +129,16 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // `argument-hint` is shown to the user only; no placeholder is documented, so a command using one is not rendered here.
+  commands: {
+    dir: '.roo/commands',
+    extension: '.md',
+    format: 'markdown',
+    extensions: ['argument-hint', 'mode'],
+    source: {
+      url: 'https://roocodeinc.github.io/Roo-Code/features/slash-commands',
+      title: 'Roo Code — Slash Commands',
+      retrieved: '2026-09-29',
+    },
+  },
 };

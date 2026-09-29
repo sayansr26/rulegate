@@ -136,6 +136,38 @@ export async function expectDocsValid(
     problems.push(...checkSource(where, source));
   }
 
+  if (docs.commands !== undefined) {
+    // The folder is where core writes every command for this tool (T053), so it gets the
+    // checks a skills directory does, and the extension decides the `/name` the tool derives.
+    const where = `${adapter.name}.docs.commands`;
+    const { dir, extension, extensions, maxChars, source } = docs.commands;
+    if (
+      dir.startsWith('/') ||
+      dir.includes('\\') ||
+      dir.split('/').includes('..') ||
+      dir.endsWith('/')
+    ) {
+      problems.push(
+        `${where}.dir: \`${dir}\` must be a repo-relative POSIX path with no trailing /`,
+      );
+    }
+    if (!/^\.[a-z.]+$/.test(extension)) {
+      problems.push(`${where}.extension \`${extension}\` must start with a dot`);
+    }
+    if (new Set(extensions).size !== extensions.length) {
+      problems.push(`${where}.extensions lists a key twice`);
+    }
+    if (extensions.includes('description') || extensions.includes('tools')) {
+      problems.push(
+        `${where}.extensions must not list \`description\` or \`tools\`; core handles both`,
+      );
+    }
+    if (maxChars !== undefined && !(Number.isInteger(maxChars) && maxChars > 0)) {
+      problems.push(`${where}.maxChars must be a positive integer`);
+    }
+    problems.push(...checkSource(where, source));
+  }
+
   if (docs.resolution === undefined) {
     // The field is optional in the type so that an external adapter is not broken by its
     // addition, but every adapter *we* ship must state it: "highest precedence first"

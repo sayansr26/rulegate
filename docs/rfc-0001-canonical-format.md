@@ -546,7 +546,7 @@ resolve.
 **Cursor cannot express `transport: sse`.** It documents `url` plus optional `headers` and
 no discriminator, so an SSE endpoint and a streamable-HTTP one render identically there
 while Claude Code keeps the distinction. This is a lossy mapping of the same kind as the
-prose `**Applies to:**` line Codex and Gemini get for a glob-scoped rule (§14): recorded in
+prose `**Applies to:**` line Codex and Gemini get for a glob-scoped rule (§15): recorded in
 the adapter's `docs`, and visible in `doctor`, rather than left for a user to find.
 
 **Codex has no variable substitution at all**, and that makes it the one target where an
@@ -660,8 +660,8 @@ presented as a documented fact.
 
 ## 12. `skills/` (v1)
 
-> **Parsed and validated since T051 (2026-09-29).** Generating each tool's copy is T052; until
-> then `.rulegate/skills/` is read and checked, and nothing is rendered from it.
+> **Parsed and validated since T051, generated since T052 (2026-09-29).** Skills in a nested
+> `.rulegate/` are not rendered yet (`W_SKILL_NESTED`).
 
 Canonical skills, generated into each tool's skills directory by the skills adapters (T052).
 Every tool that supports skills reads the same thing — a directory holding a `SKILL.md` —
@@ -740,7 +740,9 @@ What the skills adapters (T052) must hold to, so that `check` stays byte-exact:
   Gemini CLI, Windsurf and Antigravity; `.claude/skills/` by Claude Code, Copilot, Cursor
   (legacy), Windsurf and Cline. A skill generated into both is loaded twice by the tools that
   read both. The adapters and `doctor` must account for this, and a shared directory has one
-  owner in `state.json` (T052 decides how).
+  owner in `state.json`: its first reader in codepoint order. Each skill goes into the fewest
+  directories that reach every enabled tool selecting it, and a double load no choice avoids
+  is named (`W_SKILL_LOAD`).
 
 ### 12.4 Import
 
@@ -774,7 +776,90 @@ parsed exactly as `.rulegate/skills/` is.
 | Windsurf          | `.devin/skills/` (preferred), `.windsurf/skills/`, `.agents/skills/`, `.claude/skills/` | https://docs.devin.ai/desktop/cascade/skills                          |
 | Cline             | `.cline/skills/`, `.clinerules/skills/`, `.claude/skills/`                              | https://docs.cline.bot/features/skills                                |
 
-## 13. Explicitly deferred
+## 13. `commands/` (v1)
+
+> **Parsed and validated, and generated, since T053 (2026-09-29).**
+
+Canonical commands: prompts a user invokes as `/<name>`, generated into each tool's command
+folder. Unlike skills there is no shared format — every tool spells the folder, the file and
+the argument placeholder its own way, and several are retiring commands in favour of skills.
+So the canonical form is the part they share, and each tool's spelling is data in its adapter
+(`AdapterDocs.commands`).
+
+```
+.rulegate/commands/
+  review.md
+  release.md
+```
+
+```markdown
+---
+description: Review the open pull request and list the risks.
+argument-hint: '[pr-number]'
+model: sonnet
+tools: [claude-code, gemini, opencode]
+---
+
+Review pull request $ARGUMENTS. List every risk with the file it is in.
+```
+
+### 13.1 The command file
+
+- **One command per `<id>.md` file directly under `commands/`.** The file name is the
+  command's id and its `/name`. It follows the skill name rules (§12.1). Folders are an
+  error, not a namespace: only Claude Code and Gemini CLI turn one into `/folder:name`.
+- **Frontmatter is required.** `description` is required and non-empty; `argument-hint` is
+  an optional string. `tools` selects adapters as in §6.1 and is **never rendered**. Any
+  other key is a tool extension (`model`, `agent`, `allowed-tools`, `mode`, …): passed to
+  the tools whose `docs.commands` lists it and dropped with `W_COMMAND_FIELD_DROPPED` for
+  the rest.
+- **One argument placeholder, `$ARGUMENTS`**: the whole argument string. Each tool gets its
+  own spelling — `{{args}}` in Gemini CLI, `${input:args}` in Copilot, unchanged elsewhere.
+  A tool with no argument syntax does not receive a command that uses it, and is named
+  (`W_COMMAND_ARGUMENTS`).
+- **Positional placeholders** (`$0`–`$9`, `$ARGUMENTS[N]`) are `E_COMMAND_INVALID` unless
+  `tools:` names exactly one tool: Claude Code counts from `$0` and OpenCode from `$1`, so
+  the same text would silently pick a different argument in each.
+
+### 13.2 Rendering contract — normative
+
+- **Render per tool, into that tool's folder**, as `<folder>/<id><extension>`. Every tool has
+  its own folder, so a command has one owner per copy and no shared-folder rule is needed.
+- **Markdown tools** get the frontmatter (minus `tools`, minus dropped keys), the marker,
+  then the body with `$ARGUMENTS` respelled. A tool that documents no frontmatter gets
+  `description` as the body's first paragraph instead.
+- **Gemini CLI** gets TOML: `description` and `prompt`, the marker as a `#` comment.
+- A command longer than a tool's documented limit is rendered and named
+  (`W_COMMAND_OVER_LIMIT`). A command whose `/name` a skill already takes in the same tool
+  is named too (`W_COMMAND_SHADOWED`): the skill wins there.
+- Commands in a nested `.rulegate/` are not rendered yet (`W_COMMAND_NESTED`).
+
+### 13.3 Import
+
+`rulegate init` imports the commands the detected tools already have, from the folders those
+tools declare, into `.rulegate/commands/<id>.md`, respelling each tool's placeholder back to
+`$ARGUMENTS`. Identical copies become one command; of copies that differ, the one in the
+first folder in codepoint order is imported and the rest named (`W_COMMAND_IMPORT`), as is a
+command that is not valid here.
+
+### 13.4 Sources, verified 2026-09-29
+
+| Tool           | Reads (project)                                                            | Source                                                                |
+| -------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Claude Code    | `.claude/commands/*.md`                                                    | https://code.claude.com/docs/en/slash-commands                        |
+| GitHub Copilot | `.github/prompts/*.prompt.md` (VS Code, Visual Studio, JetBrains)          | https://code.visualstudio.com/docs/copilot/customization/prompt-files |
+| Gemini CLI     | `.gemini/commands/*.toml`                                                  | https://geminicli.com/docs/cli/custom-commands/                       |
+| OpenCode       | `.opencode/commands/*.md`                                                  | https://opencode.ai/docs/commands/                                    |
+| Kilo Code      | `.kilo/commands/*.md`                                                      | https://kilo.ai/docs/customize/workflows                              |
+| Roo Code       | `.roo/commands/*.md`                                                       | https://roocodeinc.github.io/Roo-Code/features/slash-commands         |
+| Windsurf       | `.windsurf/workflows/*.md` (`.devin/` is never written), 12 000 characters | https://docs.devin.ai/desktop/cascade/workflows                       |
+
+Not rendered, and recorded in each adapter's `docs`: Codex (prompts are user-scope only, and
+deprecated for skills), Cursor (`.cursor/commands/` is being migrated to skills and no longer
+documented), Antigravity (no documented project folder; workflows deprecated for skills by
+November 2026), Cline (workflows documented only in a blog post), Aider and Zed (none).
+
+## 14. Explicitly deferred
 
 Resolving PRD §12 Q2 at the minimal end. Each of these was considered and left out.
 The escape hatch in every case is §6.2: unknown keys are preserved, so experimenting
@@ -790,7 +875,7 @@ costs nothing and loses nothing.
 | **Priority weights beyond one integer**                          | `order` plus an id tiebreak is total and predictable. Multi-key precedence is harder to reason about and no more expressive.                                               | A concrete case `order` cannot express.                         |
 | **Nested `.rulegate/`** (monorepos)                              | Specified in §4.3: resolution as of T055, emission and command semantics as of T056. No longer deferred.                                                                   | Shipped.                                                        |
 
-## 14. Worked example
+## 15. Worked example
 
 Given this canonical source:
 
@@ -912,7 +997,7 @@ Note Cursor's `.mdc` dialect: `globs` is a bare comma-joined string rather than 
 list, an empty `globs` is written as a bare key, and `alwaysApply` is _derived_ (true
 exactly when the rule is repo-wide) rather than stored in canonical.
 
-## 15. Compatibility and versioning
+## 16. Compatibility and versioning
 
 `schemaVersion` is an integer, currently `1`.
 

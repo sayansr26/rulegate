@@ -42,6 +42,9 @@ const FROZEN_V1 = [
   'Skill (type)',
   'SkillAsset (type)',
   'SkillsSupport (type)',
+  // Added at T053: commands are rendered by core from `AdapterDocs.commands`.
+  'Command (type)',
+  'CommandsSupport (type)',
   'withJsonMarker (value)',
   // Added 2026-09-04 (T040), MCP import. Eight exports, none removed, so no
   // `ADAPTER_API_VERSION` bump. `read()`'s return widened by one OPTIONAL field

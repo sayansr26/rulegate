@@ -136,6 +136,38 @@ function renderToolPage(adapter) {
     out.push(`Source: ${sourceLine(docs.skills.source)}`, '');
   }
 
+  // Commands (T053): the folder `sync` writes and how this tool spells a command.
+  if (docs.commands !== undefined) {
+    const c = docs.commands;
+    const format = {
+      markdown: 'Markdown with YAML frontmatter',
+      'markdown-plain': 'plain Markdown, with the description as its first paragraph',
+      toml: 'TOML with `description` and `prompt`',
+    }[c.format];
+    out.push('## Commands', '');
+    out.push(
+      `Rulegate writes each command to \`${c.dir}/<name>${c.extension}\`, as ${format}.`,
+      '',
+    );
+    out.push(
+      c.arguments === undefined
+        ? 'No argument syntax is documented, so a command using `$ARGUMENTS` is not written here.'
+        : `\`$ARGUMENTS\` is written as \`${c.arguments}\`.`,
+      '',
+    );
+    out.push(
+      c.format === 'markdown-plain'
+        ? 'Reads no frontmatter.'
+        : c.extensions.length === 0
+          ? 'Reads no key beyond `description`.'
+          : `Frontmatter it reads beyond \`description\`: ${c.extensions.map((k) => `\`${k}\``).join(', ')}.`,
+      '',
+    );
+    if (c.maxChars !== undefined)
+      out.push(`Capped at ${String(c.maxChars)} characters per command.`, '');
+    out.push(`Source: ${sourceLine(c.source)}`, '');
+  }
+
   if ((docs.notes ?? []).length > 0) {
     out.push('## Notes', '');
     for (const note of docs.notes ?? []) {
@@ -152,6 +184,7 @@ function renderToolPage(adapter) {
     if (note.source !== undefined) seen.set(note.source.url, note.source);
   }
   if (docs.skills !== undefined) seen.set(docs.skills.source.url, docs.skills.source);
+  if (docs.commands !== undefined) seen.set(docs.commands.source.url, docs.commands.source);
   for (const source of [...seen.values()].sort((a, b) => (a.url < b.url ? -1 : 1))) {
     out.push(`- ${sourceLine(source)}`);
   }
@@ -167,6 +200,7 @@ function coverageOf(adapter) {
   if (roles.has('instructions')) parts.push('rules');
   if (roles.has('mcp')) parts.push('MCP');
   if (roles.has('skills') || adapter.docs.skills !== undefined) parts.push('skills');
+  if (adapter.docs.commands !== undefined) parts.push('commands');
   return parts.length === 0 ? '—' : parts.join(', ');
 }
 

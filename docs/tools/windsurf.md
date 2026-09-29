@@ -62,6 +62,18 @@ Reads only the Agent Skills frontmatter fields.
 
 Source: [Windsurf — Cascade skills](https://docs.devin.ai/desktop/cascade/skills) — retrieved 2026-09-29
 
+## Commands
+
+Rulegate writes each command to `.windsurf/workflows/<name>.md`, as plain Markdown, with the description as its first paragraph.
+
+No argument syntax is documented, so a command using `$ARGUMENTS` is not written here.
+
+Reads no frontmatter.
+
+Capped at 12000 characters per command.
+
+Source: [Windsurf — Cascade workflows](https://docs.devin.ai/desktop/cascade/workflows) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Multiple glob patterns are undocumented. The vendor shows a single bare pattern (globs: **/*.test.ts) and does not say how several are separated; Rulegate joins them with commas, matching Cursor .mdc and community practice. A rule whose scoping matters and that carries more than one pattern is worth checking in Windsurf before relying on it.
@@ -75,3 +87,4 @@ Source: [Windsurf — Cascade skills](https://docs.devin.ai/desktop/cascade/skil
 
 - [Windsurf — Rules and memories (Cascade)](https://docs.devin.ai/desktop/cascade/memories) — retrieved 2026-09-04
 - [Windsurf — Cascade skills](https://docs.devin.ai/desktop/cascade/skills) — retrieved 2026-09-29
+- [Windsurf — Cascade workflows](https://docs.devin.ai/desktop/cascade/workflows) — retrieved 2026-09-29

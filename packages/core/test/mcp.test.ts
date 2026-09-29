@@ -74,6 +74,7 @@ const model: Canonical = {
   rules: [],
   mcpServers: fiveServers,
   skills: [],
+  commands: [],
 };
 
 function stripSources(value: unknown): unknown {

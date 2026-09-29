@@ -128,6 +128,10 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
     });
 
     const skills = docs.skills === undefined ? undefined : await skillsOnDisk(fs, docs.skills.dirs);
+    const commands =
+      docs.commands === undefined
+        ? undefined
+        : await commandsOnDisk(fs, docs.commands.dir, docs.commands.extension);
     const diagnosis: ToolDiagnosis = {
       name: detected.name,
       toolName: docs.toolName,
@@ -140,6 +144,7 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
       loadedBytes: resolved.loaded.reduce((n, m) => n + m.bytes, 0),
       loadedTokens: resolved.loaded.reduce((n, m) => n + m.tokens, 0),
       ...(skills === undefined ? {} : { skills }),
+      ...(commands === undefined ? {} : { commands }),
       ...(detected.failed === undefined ? {} : { failed: detected.failed }),
     };
     tools.push(diagnosis);
@@ -192,6 +197,19 @@ async function skillsOnDisk(
   return [...found]
     .sort(([a], [b]) => compareCodepoint(a, b))
     .map(([id, where]) => ({ id, dirs: where }));
+}
+
+/** Which commands sit in a tool's command folder on disk, by `/name` (T053). */
+async function commandsOnDisk(
+  fs: ReadOnlyFileSystem,
+  dir: string,
+  extension: string,
+): Promise<readonly string[]> {
+  if (!(await fs.exists(dir))) return [];
+  return (await fs.listDir(dir))
+    .filter((e) => e.kind === 'file' && e.name.endsWith(extension))
+    .map((e) => e.name.slice(0, -extension.length))
+    .sort(compareCodepoint);
 }
 
 /** A skill a tool finds in two of its directories is loaded twice (T052). */

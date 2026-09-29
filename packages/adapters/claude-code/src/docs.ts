@@ -190,4 +190,32 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // Commands still work from `.claude/commands/`, though Claude Code now calls them the older form of a skill: a skill of the same name wins. `$0` is the first positional argument here, which is why canonical positionals are refused.
+  commands: {
+    dir: '.claude/commands',
+    extension: '.md',
+    format: 'markdown',
+    arguments: '$ARGUMENTS',
+    extensions: [
+      'argument-hint',
+      'arguments',
+      'when_to_use',
+      'allowed-tools',
+      'disallowed-tools',
+      'disable-model-invocation',
+      'user-invocable',
+      'model',
+      'effort',
+      'context',
+      'agent',
+      'background',
+      'hooks',
+      'shell',
+    ],
+    source: {
+      url: 'https://code.claude.com/docs/en/slash-commands',
+      title: 'Claude Code — Extend Claude with skills (custom commands)',
+      retrieved: '2026-09-29',
+    },
+  },
 };

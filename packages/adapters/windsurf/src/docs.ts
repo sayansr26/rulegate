@@ -119,4 +119,17 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // Workflows. `.devin/workflows/` is preferred by the vendor and never written, like `.devin/rules/`; `.windsurf/workflows/` is still read. No frontmatter or argument syntax is documented, and a workflow is capped at 12 000 characters.
+  commands: {
+    dir: '.windsurf/workflows',
+    extension: '.md',
+    format: 'markdown-plain',
+    extensions: [],
+    maxChars: 12000,
+    source: {
+      url: 'https://docs.devin.ai/desktop/cascade/workflows',
+      title: 'Windsurf — Cascade workflows',
+      retrieved: '2026-09-29',
+    },
+  },
 };

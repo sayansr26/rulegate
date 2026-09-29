@@ -98,6 +98,16 @@ export const docs: AdapterDocs = {
       message:
         'Cursor scopes rules natively via `globs`, so glob-scoped rules do not carry the prose "Applies to:" line that single-file targets such as CLAUDE.md require.',
     },
+    {
+      level: 'info',
+      message:
+        'Rulegate renders no commands for Cursor. `.cursor/commands/` shipped in Cursor 1.6, but current docs describe only skills and a `/migrate-to-skills` that converts commands into them; put a reusable prompt in `.rulegate/skills/` instead.',
+      source: {
+        url: 'https://cursor.com/help/customization/skills',
+        title: 'Cursor — Skills',
+        retrieved: '2026-09-29',
+      },
+    },
   ],
   // Cursor prefers `.agents/skills/` and `.cursor/skills/`, and still reads `.claude/skills/` and `.codex/skills/` for compatibility. `globs` is the legacy spelling of `paths`.
   skills: {

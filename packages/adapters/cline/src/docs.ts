@@ -100,6 +100,16 @@ export const docs: AdapterDocs = {
         'Cline has no project-level MCP configuration file: MCP servers live in user-level storage, outside any repository. This adapter therefore generates no MCP artifact.',
       source: RULES_DOCS,
     },
+    {
+      level: 'info',
+      message:
+        'Rulegate renders no workflows for Cline. `.clinerules/workflows/` is described only in a 2025 blog post, and the current docs have no workflows page; Cline reads skills, so put a reusable prompt in `.rulegate/skills/` instead.',
+      source: {
+        url: 'https://cline.bot/blog/stop-adding-rules-when-you-need-workflows',
+        title: 'Cline — Stop Adding Rules When You Need Workflows',
+        retrieved: '2026-09-29',
+      },
+    },
   ],
   // `.cline/skills/` is recommended; `.clinerules/skills/` and `.claude/skills/` are also read.
   skills: {

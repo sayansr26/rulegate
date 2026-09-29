@@ -17,6 +17,7 @@ import {
 } from '../model/paths.js';
 import { serializeCanonical, serializeSkill } from '../model/serialize.js';
 import { importSkills } from './skills.js';
+import { importCommands } from './commands.js';
 import { parse } from '../parse/index.js';
 import { MemoryFileSystem } from '../io/memory.js';
 import { compareCodepoint } from '../render/order.js';
@@ -246,7 +247,10 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   const imported = await importSkills(filesOnly(importFs), adapters, detected, skillSources);
   warnings.push(...imported.warnings);
   for (const file of imported.importedFrom) importedFrom.add(file);
-  const canonical = canonicalFrom(rules, mcpServers, detected, imported.skills);
+  const commands = await importCommands(filesOnly(importFs), adapters, detected);
+  warnings.push(...commands.warnings);
+  for (const file of commands.importedFrom) importedFrom.add(file);
+  const canonical = canonicalFrom(rules, mcpServers, detected, imported.skills, commands.commands);
 
   // Import warnings are warnings and never errors. `runInit` returns without writing while
   // `errors` is non-empty, so one odd server in somebody's `.mcp.json` would otherwise make
@@ -553,6 +557,7 @@ function canonicalFrom(
   mcpServers: Canonical['mcpServers'],
   detected: readonly ToolId[],
   skills: Canonical['skills'],
+  commands: Canonical['commands'],
 ): Canonical {
   const source = { file: MANIFEST_PATH };
   const tools: ToolConfig[] = [...detected]
@@ -576,6 +581,7 @@ function canonicalFrom(
     rules,
     mcpServers,
     skills,
+    commands,
   };
 }
 

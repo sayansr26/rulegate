@@ -80,6 +80,7 @@ var RULES_GLOB = `${RULES_DIR}/**/*.md`;
 var MCP_DIR = `${RULEGATE_DIR}/mcp`;
 var MCP_SERVERS_PATH = `${MCP_DIR}/servers.yaml`;
 var SKILLS_DIR = `${RULEGATE_DIR}/skills`;
+var COMMANDS_DIR = `${RULEGATE_DIR}/commands`;
 var STATE_PATH = `${RULEGATE_DIR}/state.json`;
 var BACKUP_DIR = `${RULEGATE_DIR}/backup`;
 

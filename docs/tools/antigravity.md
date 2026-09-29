@@ -105,8 +105,11 @@ Source: [Google Antigravity — Skills](https://antigravity.google/docs/skills) 
   Source: [Google Antigravity — Rules configuration reference](https://antigravity.google/docs/rules) — retrieved 2026-09-26
 - **warn** — Antigravity also reads AGENTS.md and GEMINI.md in every directory. With codex or gemini enabled as well, the same rules reach Antigravity from two or three files and are billed each time.
   Source: [Google Antigravity — Rules configuration reference](https://antigravity.google/docs/rules) — retrieved 2026-09-26
+- **info** — Rulegate renders no workflows for Antigravity: the vendor page names no project folder, and workflows are deprecated in favour of Agent Skills by November 2026. Put a reusable prompt in `.rulegate/skills/` instead.
+  Source: [Google Antigravity — Workflows](https://antigravity.google/docs/ide/workflows/) — retrieved 2026-09-29
 
 ## Sources
 
+- [Google Antigravity — Workflows](https://antigravity.google/docs/ide/workflows/) — retrieved 2026-09-29
 - [Google Antigravity — Rules configuration reference](https://antigravity.google/docs/rules) — retrieved 2026-09-26
 - [Google Antigravity — Skills](https://antigravity.google/docs/skills) — retrieved 2026-09-29

@@ -32,9 +32,22 @@ All notable changes to this project are recorded here. This project follows
   import. `tools:` is set to the tools that were reading it.
 - **`doctor` lists each tool's skills** and warns (`W_DUPLICATE_LOAD`) when a tool finds the
   same skill in two of its directories.
+- **Canonical commands.** `.rulegate/commands/<name>.md` holds a prompt a user runs as
+  `/<name>`: a `description`, an optional `argument-hint`, and one placeholder, `$ARGUMENTS`,
+  for whatever is typed after the name. `sync` writes it into each enabled tool's own folder
+  and format — `.claude/commands/`, `.github/prompts/*.prompt.md`, Gemini CLI's
+  `.gemini/commands/*.toml`, `.opencode/commands/`, `.kilo/commands/`, `.roo/commands/` and
+  Windsurf's `.windsurf/workflows/` — with `$ARGUMENTS` spelled as each tool expects, and
+  `check` verifies them. A tool with no argument syntax does not get a command that uses one
+  (`W_COMMAND_ARGUMENTS`); a key a tool does not read is left out and named
+  (`W_COMMAND_FIELD_DROPPED`); `$1`-style positional arguments are refused unless `tools:` names
+  one tool, because tools count them differently. Codex, Cursor, Antigravity and Cline get no
+  commands: each has retired them for skills or documents no project folder.
+- **`init` imports the commands a repository already has**, in each tool's format, and `doctor`
+  lists every tool's commands by `/name`.
 - `AdapterDocs.skills` (the directories a tool reads and the keys it understands),
-  `Artifact.bytes`, and the `Skill`, `SkillAsset` and `SkillsSupport` types join the adapter
-  kit — additive, per `docs/adapter-api-v1.md`.
+  `Artifact.bytes`, `AdapterDocs.commands`, and the `Skill`, `SkillAsset`, `SkillsSupport`,
+  `Command` and `CommandsSupport` types join the adapter kit — additive, per `docs/adapter-api-v1.md`.
 
 ## [0.4.1] — 2026-09-29
 

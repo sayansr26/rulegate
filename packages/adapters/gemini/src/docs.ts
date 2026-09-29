@@ -93,4 +93,17 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // TOML with `description` and `prompt`. A project command wins over a user command of the same name.
+  commands: {
+    dir: '.gemini/commands',
+    extension: '.toml',
+    format: 'toml',
+    arguments: '{{args}}',
+    extensions: [],
+    source: {
+      url: 'https://geminicli.com/docs/cli/custom-commands/',
+      title: 'Gemini CLI — Custom commands',
+      retrieved: '2026-09-29',
+    },
+  },
 };

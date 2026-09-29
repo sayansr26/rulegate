@@ -26,6 +26,8 @@ import type {
   Skill,
   SkillAsset,
   SkillsSupport,
+  Command,
+  CommandsSupport,
   McpTransport,
   SecretValue,
   Canonical,
@@ -123,3 +125,15 @@ pin<Exact<Skill['frontmatter'], readonly (readonly [string, JsonValue])[]>>();
 pin<Exact<keyof SkillAsset, 'path' | 'bytes'>>();
 pin<Exact<SkillAsset['bytes'], Uint8Array>>();
 pin<Exact<keyof SkillsSupport, 'dirs' | 'extensions' | 'source'>>();
+
+// Commands (T053).
+pin<
+  Exact<keyof Command, 'id' | 'path' | 'description' | 'tools' | 'frontmatter' | 'body' | 'source'>
+>();
+pin<
+  Exact<
+    keyof CommandsSupport,
+    'dir' | 'extension' | 'format' | 'arguments' | 'extensions' | 'maxChars' | 'source'
+  >
+>();
+pin<Exact<CommandsSupport['format'], 'markdown' | 'markdown-plain' | 'toml'>>();

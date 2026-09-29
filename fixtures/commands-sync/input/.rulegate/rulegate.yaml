@@ -1,0 +1,10 @@
+schemaVersion: 1
+tools:
+  - claude-code
+  - codex
+  - copilot
+  - gemini
+  - kilo
+  - opencode
+  - roo-code
+  - windsurf

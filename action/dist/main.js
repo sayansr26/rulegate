@@ -10606,6 +10606,10 @@ var SKILL_ID_PATTERN = /^(?!-)(?!.*--)[a-z0-9-]{1,64}(?<!-)$/;
 var SKILL_DESCRIPTION_MAX = 1024;
 var SKILL_COMPATIBILITY_MAX = 500;
 
+// ../packages/core/dist/model/command.js
+var ARGUMENTS_TOKEN = /\$ARGUMENTS(?![\w[])/g;
+var POSITIONAL_TOKEN = /\$(?:\d|ARGUMENTS\[\d+\])/;
+
 // ../packages/core/dist/model/lint.js
 var LINT_SEVERITIES = ["error", "warn", "off"];
 function isLintSeverity(value) {
@@ -10638,6 +10642,7 @@ var MCP_DIR = `${RULEGATE_DIR}/mcp`;
 var MCP_SERVERS_PATH = `${MCP_DIR}/servers.yaml`;
 var SKILLS_DIR = `${RULEGATE_DIR}/skills`;
 var SKILL_FILE = "SKILL.md";
+var COMMANDS_DIR = `${RULEGATE_DIR}/commands`;
 var STATE_PATH = `${RULEGATE_DIR}/state.json`;
 var BACKUP_DIR = `${RULEGATE_DIR}/backup`;
 var AGENTS_MD = "AGENTS.md";
@@ -11734,6 +11739,136 @@ async function walk(fs2, base, rel) {
   return { files: files.sort(compareCodepoint), errors };
 }
 
+// ../packages/core/dist/parse/commands.js
+var import_yaml12 = __toESM(require_dist(), 1);
+var invalid2 = (file, message, hint) => new RulegateError({
+  code: "E_COMMAND_INVALID",
+  message,
+  source: { file },
+  ...hint === void 0 ? {} : { hint }
+});
+async function parseCommands(fs2, root) {
+  const dir = root === "" ? COMMANDS_DIR : `${root}/${COMMANDS_DIR}`;
+  if (!await fs2.exists(dir))
+    return { commands: [], errors: [], sourceFiles: [] };
+  const commands = [];
+  const errors = [];
+  const sourceFiles = [];
+  for (const entry of await fs2.listDir(dir)) {
+    const path4 = `${dir}/${entry.name}`;
+    if (entry.kind === "symlink") {
+      errors.push(invalid2(path4, "a command may not be a symlink", "replace it with the file itself"));
+      continue;
+    }
+    if (entry.kind === "dir") {
+      errors.push(invalid2(path4, `commands cannot be grouped in folders: ${path4}/`, `move each command directly into ${dir}/`));
+      continue;
+    }
+    if (!entry.name.endsWith(".md")) {
+      errors.push(invalid2(path4, `${path4} is not a command`, `commands are \`<name>.md\` files`));
+      continue;
+    }
+    sourceFiles.push(path4);
+    const parsed = parseCommandFile(await fs2.readFile(path4), path4, entry.name.slice(0, -".md".length));
+    errors.push(...parsed.errors);
+    if (parsed.command !== void 0)
+      commands.push(parsed.command);
+  }
+  return {
+    commands: commands.sort((a, b) => compareCodepoint(a.id, b.id)),
+    errors,
+    sourceFiles: sourceFiles.sort(compareCodepoint)
+  };
+}
+function parseCommandFile(raw, path4, id, options2 = {}) {
+  const importing = options2.importing === true;
+  const errors = [];
+  const ignored = [];
+  if (!SKILL_ID_PATTERN.test(id)) {
+    errors.push(invalid2(path4, `command name \`${id}\` is not valid`, "use 1-64 lowercase letters, digits and hyphens, with no leading, trailing or double hyphen"));
+  }
+  const split = splitFrontmatter(raw, path4);
+  if (!split.ok)
+    return { errors: [...errors, split.error], ignored };
+  const { yaml, yamlLineOffset, body } = split.value;
+  const fallback = importing ? firstLine(body) : void 0;
+  if (yaml === void 0 || yaml.trim() === "") {
+    if (fallback === void 0) {
+      errors.push(invalid2(path4, "a command has no frontmatter", "add a `description` between `---` lines"));
+    }
+    if (errors.length > 0)
+      return { errors, ignored };
+    return {
+      command: {
+        id,
+        path: path4,
+        description: fallback,
+        tools: ALL_TOOLS,
+        frontmatter: [["description", fallback]],
+        body,
+        source: { file: path4 }
+      },
+      errors,
+      ignored
+    };
+  }
+  const parsedYaml = parseYaml(yaml, path4, yamlLineOffset);
+  if (!parsedYaml.ok)
+    return { errors: [...errors, parsedYaml.error], ignored };
+  const v = new Validator(path4, parsedYaml.value, "E_COMMAND_INVALID");
+  const rootNode = parsedYaml.value.doc.contents;
+  const map = rootNode === null ? void 0 : v.asMap(rootNode, "frontmatter");
+  let description = v.string(v.get(map, "description"), "description");
+  const described = description !== void 0 && description.trim() !== "";
+  if (!described && fallback !== void 0) {
+    description = fallback;
+  } else if (!described) {
+    v.fail(map, "description", "`description` is required", "say what the command does; most tools list it beside `/name`");
+  }
+  if (v.get(map, "argument-hint") !== void 0) {
+    v.string(v.get(map, "argument-hint"), "argument-hint");
+  }
+  const tools = importing ? void 0 : parseToolSelector(v, v.get(map, "tools"));
+  const selector = tools ?? ALL_TOOLS;
+  const single = selector.kind === "include" && selector.tools.length === 1;
+  const positional = POSITIONAL_TOKEN.exec(body);
+  if (positional !== null && !single && !importing) {
+    v.fail(map, "tools", `\`${positional[0]}\` means a different argument in different tools: Claude Code counts from $0, OpenCode from $1`, "use $ARGUMENTS, or name the one tool this command is for with `tools:`");
+  }
+  const frontmatter = [];
+  if (!described && description !== void 0)
+    frontmatter.push(["description", description]);
+  for (const key of v.keys(map)) {
+    if (importing && key === "tools") {
+      ignored.push(key);
+      continue;
+    }
+    if (key === "description" && !described)
+      continue;
+    frontmatter.push([key, v.plain(v.get(map, key))]);
+  }
+  errors.push(...v.errors);
+  if (errors.length > 0)
+    return { errors, ignored };
+  return {
+    command: {
+      id,
+      path: path4,
+      description: description ?? "",
+      tools: selector,
+      frontmatter,
+      body,
+      source: { file: path4 }
+    },
+    errors,
+    ignored
+  };
+}
+function firstLine(body) {
+  const line = body.split("\n").map((l) => l.replace(/^#+\s*/, "").trim()).find((l) => l !== "");
+  return line;
+}
+
 // ../packages/core/dist/parse/suggest.js
 function editDistance(a, b) {
   if (a === b)
@@ -11848,6 +11983,13 @@ async function parse(input) {
     errors.push(...parsed.errors);
     sourceFiles.push(...parsed.sourceFiles);
   }
+  const commands = [];
+  if (mode !== "bare-agents-md") {
+    const parsed = await parseCommands(fs2, dir);
+    commands.push(...parsed.commands);
+    errors.push(...parsed.errors);
+    sourceFiles.push(...parsed.sourceFiles);
+  }
   sourceFiles.sort(compareCodepoint);
   return {
     canonical: {
@@ -11855,7 +11997,8 @@ async function parse(input) {
       manifest,
       rules,
       mcpServers,
-      skills
+      skills,
+      commands
     },
     errors,
     warnings,
@@ -11922,7 +12065,8 @@ function emptyResultCanonical() {
     },
     rules: [],
     mcpServers: [],
-    skills: []
+    skills: [],
+    commands: []
   };
 }
 
@@ -12635,6 +12779,145 @@ function sortedEntries(map) {
   return [...map].sort(([a], [b]) => compareCodepoint(a, b));
 }
 
+// ../packages/core/dist/render/commands.js
+function planCommands(commands, skills, adapters, marker) {
+  const tools = adapters.filter((a) => a.docs.commands !== void 0).map((a) => ({ id: a.name, support: a.docs.commands, skills: a.docs.skills !== void 0 })).sort((a, b) => compareCodepoint(a.id, b.id));
+  if (tools.length === 0 || commands.length === 0)
+    return { artifacts: [], warnings: [] };
+  const artifacts = [];
+  const noArguments = /* @__PURE__ */ new Map();
+  const dropped = /* @__PURE__ */ new Map();
+  const overLimit = /* @__PURE__ */ new Map();
+  const shadowed = /* @__PURE__ */ new Map();
+  for (const command of [...commands].sort((a, b) => compareCodepoint(a.id, b.id))) {
+    const usesArguments = new RegExp(ARGUMENTS_TOKEN.source).test(command.body);
+    for (const tool of tools) {
+      if (!selects(command.tools, tool.id))
+        continue;
+      const { support } = tool;
+      if (usesArguments && support.arguments === void 0) {
+        noArguments.set(tool.id, [...noArguments.get(tool.id) ?? [], command.id]);
+        continue;
+      }
+      const understood = new Set(support.extensions);
+      const entries = [];
+      for (const entry of command.frontmatter) {
+        const [key] = entry;
+        if (key === "tools")
+          continue;
+        if (key === "description" || understood.has(key)) {
+          entries.push(entry);
+          continue;
+        }
+        const k = `${command.id}\0${key}`;
+        dropped.set(k, [...dropped.get(k) ?? [], tool.id]);
+      }
+      const body = support.arguments === void 0 ? command.body : respell(command.body, support.arguments);
+      const contents = renderCommand(support, entries, command.description, body, marker);
+      if (support.maxChars !== void 0 && [...contents].length > support.maxChars) {
+        overLimit.set(tool.id, [...overLimit.get(tool.id) ?? [], command.id]);
+      }
+      if (tool.skills && skills.some((s) => s.id === command.id && selects(s.tools, tool.id))) {
+        shadowed.set(tool.id, [...shadowed.get(tool.id) ?? [], command.id]);
+      }
+      artifacts.push({
+        path: `${support.dir}/${command.id}${support.extension}`,
+        contents,
+        adapter: tool.id,
+        kind: "command"
+      });
+    }
+  }
+  const warnings = [];
+  const list = (ids) => ids.map((i) => `\`${i}\``).join(", ");
+  for (const [tool, ids] of sortedEntries2(noArguments)) {
+    const them = ids.length === 1 ? "it" : "them";
+    warnings.push(new RulegateError({
+      code: "W_COMMAND_ARGUMENTS",
+      message: `${list(ids)} ${ids.length === 1 ? "uses" : "use"} $ARGUMENTS, which ${tool} has no syntax for, so ${tool} does not get ${them}`,
+      hint: "leave $ARGUMENTS out of a command every tool should get, or scope it with `tools:`"
+    }));
+  }
+  for (const [k, toolIds] of sortedEntries2(dropped)) {
+    const [id, key] = k.split("\0");
+    warnings.push(new RulegateError({
+      code: "W_COMMAND_FIELD_DROPPED",
+      message: `\`${key}\` in \`${id}\` was left out for ${toolIds.join(", ")}, which ${toolIds.length === 1 ? "does" : "do"} not read it`,
+      hint: "keep it only if a tool you use reads it, or scope the command with `tools:`"
+    }));
+  }
+  for (const [tool, ids] of sortedEntries2(overLimit)) {
+    const max = tools.find((t) => t.id === tool).support.maxChars;
+    warnings.push(new RulegateError({
+      code: "W_COMMAND_OVER_LIMIT",
+      message: `${list(ids)} ${ids.length === 1 ? "is" : "are"} longer than the ${max} characters ${tool} reads of a command`,
+      hint: "shorten it, or move the detail into a skill"
+    }));
+  }
+  for (const [tool, ids] of sortedEntries2(shadowed)) {
+    warnings.push(new RulegateError({
+      code: "W_COMMAND_SHADOWED",
+      message: `${list(ids)} ${ids.length === 1 ? "is" : "are"} both a skill and a command for ${tool}, so two things answer the same /name`,
+      hint: "rename one of them, or scope one away from this tool with `tools:`"
+    }));
+  }
+  return { artifacts, warnings };
+}
+function respell(body, spelling) {
+  return body.replace(ARGUMENTS_TOKEN, () => spelling);
+}
+function renderCommand(support, entries, description, body, marker) {
+  switch (support.format) {
+    case "markdown":
+      return renderSkillFile(entries, body, marker);
+    case "markdown-plain": {
+      const text = `${description.trim()}
+
+${ensureSingleTrailingNewline(body)}`;
+      return marker ? `${HTML_MARKER}
+
+${text}` : text;
+    }
+    case "toml": {
+      const toml = `description = ${tomlBasic(description)}
+prompt = """
+${tomlMultiline(ensureSingleTrailingNewline(body))}"""
+`;
+      return marker ? `${HASH_MARKER}
+
+${toml}` : toml;
+    }
+  }
+}
+function tomlBasic(value) {
+  return `"${escapeToml(value, false)}"`;
+}
+function tomlMultiline(value) {
+  return escapeToml(value, true);
+}
+function escapeToml(value, multiline) {
+  let out = "";
+  for (const ch of value) {
+    const code = ch.codePointAt(0);
+    if (ch === '"')
+      out += '\\"';
+    else if (ch === "\\")
+      out += "\\\\";
+    else if (ch === "\n")
+      out += multiline ? "\n" : "\\n";
+    else if (ch === "	")
+      out += multiline ? "	" : "\\t";
+    else if (code < 32 || code === 127)
+      out += `\\u${code.toString(16).padStart(4, "0")}`;
+    else
+      out += ch;
+  }
+  return out;
+}
+function sortedEntries2(map) {
+  return [...map].sort(([a], [b]) => compareCodepoint(a, b));
+}
+
 // ../packages/core/dist/pipeline/plan.js
 init_glob();
 async function computePlan(input) {
@@ -12757,9 +13040,14 @@ async function computePlan(input) {
         accept(raw, adapter.name);
     }
     if (!nested) {
-      const skills = planSkills(canonical.skills, eligible.filter((a) => a.apiVersion === ADAPTER_API_VERSION), canonical.manifest.options.marker);
+      const current = eligible.filter((a) => a.apiVersion === ADAPTER_API_VERSION);
+      const skills = planSkills(canonical.skills, current, canonical.manifest.options.marker);
       warnings.push(...skills.warnings);
       for (const raw of skills.artifacts)
+        accept(raw, raw.adapter);
+      const commands = planCommands(canonical.commands, canonical.skills, current, canonical.manifest.options.marker);
+      warnings.push(...commands.warnings);
+      for (const raw of commands.artifacts)
         accept(raw, raw.adapter);
     } else {
       const own = canonical.skills.filter((sk) => sk.path.startsWith(`${level.dir}/`));
@@ -12769,6 +13057,15 @@ async function computePlan(input) {
           message: `skills in ${level.dir}/.rulegate/skills/ are not rendered yet: ${own.map((sk) => `\`${sk.id}\``).join(", ")}`,
           source: { file: own[0].path },
           hint: "move them to the root .rulegate/skills/ and scope them with `tools:` if needed"
+        }));
+      }
+      const ownCommands = canonical.commands.filter((c) => c.path.startsWith(`${level.dir}/`));
+      if (ownCommands.length > 0) {
+        warnings.push(new RulegateError({
+          code: "W_COMMAND_NESTED",
+          message: `commands in ${level.dir}/.rulegate/commands/ are not rendered yet: ${ownCommands.map((c) => `\`${c.id}\``).join(", ")}`,
+          source: { file: ownCommands[0].path },
+          hint: "move them to the root .rulegate/commands/ and scope them with `tools:` if needed"
         }));
       }
     }
@@ -13815,6 +14112,15 @@ var docs2 = {
       level: "warn",
       message: "Antigravity also reads AGENTS.md and GEMINI.md in every directory. With codex or gemini enabled as well, the same rules reach Antigravity from two or three files and are billed each time.",
       source: RULES_DOCS
+    },
+    {
+      level: "info",
+      message: "Rulegate renders no workflows for Antigravity: the vendor page names no project folder, and workflows are deprecated in favour of Agent Skills by November 2026. Put a reusable prompt in `.rulegate/skills/` instead.",
+      source: {
+        url: "https://antigravity.google/docs/ide/workflows/",
+        title: "Google Antigravity \u2014 Workflows",
+        retrieved: "2026-09-29"
+      }
     }
   ],
   // `.agents/skills/` is the default; `.agent/skills/` is kept for backward compatibility.
@@ -14523,6 +14829,34 @@ var docs3 = {
       title: "Claude Code \u2014 Extend Claude with skills",
       retrieved: "2026-09-29"
     }
+  },
+  // Commands still work from `.claude/commands/`, though Claude Code now calls them the older form of a skill: a skill of the same name wins. `$0` is the first positional argument here, which is why canonical positionals are refused.
+  commands: {
+    dir: ".claude/commands",
+    extension: ".md",
+    format: "markdown",
+    arguments: "$ARGUMENTS",
+    extensions: [
+      "argument-hint",
+      "arguments",
+      "when_to_use",
+      "allowed-tools",
+      "disallowed-tools",
+      "disable-model-invocation",
+      "user-invocable",
+      "model",
+      "effort",
+      "context",
+      "agent",
+      "background",
+      "hooks",
+      "shell"
+    ],
+    source: {
+      url: "https://code.claude.com/docs/en/slash-commands",
+      title: "Claude Code \u2014 Extend Claude with skills (custom commands)",
+      retrieved: "2026-09-29"
+    }
   }
 };
 
@@ -14717,6 +15051,15 @@ var docs4 = {
       level: "info",
       message: "Cline has no project-level MCP configuration file: MCP servers live in user-level storage, outside any repository. This adapter therefore generates no MCP artifact.",
       source: RULES_DOCS2
+    },
+    {
+      level: "info",
+      message: "Rulegate renders no workflows for Cline. `.clinerules/workflows/` is described only in a 2025 blog post, and the current docs have no workflows page; Cline reads skills, so put a reusable prompt in `.rulegate/skills/` instead.",
+      source: {
+        url: "https://cline.bot/blog/stop-adding-rules-when-you-need-workflows",
+        title: "Cline \u2014 Stop Adding Rules When You Need Workflows",
+        retrieved: "2026-09-29"
+      }
     }
   ],
   // `.cline/skills/` is recommended; `.clinerules/skills/` and `.claude/skills/` are also read.
@@ -15370,6 +15713,15 @@ var docs5 = {
     {
       level: "info",
       message: 'Codex has no per-glob rule mechanism, so a glob-scoped canonical rule is rendered with an "Applies to:" line stating its scope in prose. Lossy, but visibly so; dropping the scope silently would turn a component-only rule into a repo-wide one.'
+    },
+    {
+      level: "info",
+      message: "Codex has no project commands. Custom prompts live only in `~/.codex/prompts/`, outside the repository, and are deprecated in favour of skills \u2014 so Rulegate renders no commands for Codex; put a reusable prompt in `.rulegate/skills/` instead.",
+      source: {
+        url: "https://learn.chatgpt.com/docs/custom-prompts",
+        title: "Codex \u2014 Custom prompts",
+        retrieved: "2026-09-29"
+      }
     }
   ],
   // Codex reads `.agents/skills/`, walking up to the repository root. Its extra UI data lives in a skill's `agents/openai.yaml`, which Rulegate carries as an asset.
@@ -15717,6 +16069,19 @@ var docs6 = {
     source: {
       url: "https://docs.github.com/en/copilot/concepts/agents/about-agent-skills",
       title: "GitHub Copilot \u2014 About agent skills",
+      retrieved: "2026-09-29"
+    }
+  },
+  // Prompt files, read by VS Code, Visual Studio and JetBrains — not by Copilot CLI or github.com. The prompt file's own `tools:` key cannot be expressed: canonical `tools` selects adapters and is never rendered.
+  commands: {
+    dir: ".github/prompts",
+    extension: ".prompt.md",
+    format: "markdown",
+    arguments: "${input:args}",
+    extensions: ["argument-hint", "agent", "model"],
+    source: {
+      url: "https://code.visualstudio.com/docs/copilot/customization/prompt-files",
+      title: "Visual Studio Code \u2014 Use prompt files",
       retrieved: "2026-09-29"
     }
   }
@@ -16076,6 +16441,15 @@ var docs7 = {
     {
       level: "info",
       message: 'Cursor scopes rules natively via `globs`, so glob-scoped rules do not carry the prose "Applies to:" line that single-file targets such as CLAUDE.md require.'
+    },
+    {
+      level: "info",
+      message: "Rulegate renders no commands for Cursor. `.cursor/commands/` shipped in Cursor 1.6, but current docs describe only skills and a `/migrate-to-skills` that converts commands into them; put a reusable prompt in `.rulegate/skills/` instead.",
+      source: {
+        url: "https://cursor.com/help/customization/skills",
+        title: "Cursor \u2014 Skills",
+        retrieved: "2026-09-29"
+      }
     }
   ],
   // Cursor prefers `.agents/skills/` and `.cursor/skills/`, and still reads `.claude/skills/` and `.codex/skills/` for compatibility. `globs` is the legacy spelling of `paths`.
@@ -16298,6 +16672,19 @@ var docs8 = {
     source: {
       url: "https://geminicli.com/docs/cli/skills/",
       title: "Gemini CLI \u2014 Agent skills",
+      retrieved: "2026-09-29"
+    }
+  },
+  // TOML with `description` and `prompt`. A project command wins over a user command of the same name.
+  commands: {
+    dir: ".gemini/commands",
+    extension: ".toml",
+    format: "toml",
+    arguments: "{{args}}",
+    extensions: [],
+    source: {
+      url: "https://geminicli.com/docs/cli/custom-commands/",
+      title: "Gemini CLI \u2014 Custom commands",
       retrieved: "2026-09-29"
     }
   }
@@ -16628,6 +17015,18 @@ var docs9 = {
     source: {
       url: "https://kilo.ai/docs/agent-behavior/skills",
       title: "Kilo Code \u2014 Skills",
+      retrieved: "2026-09-29"
+    }
+  },
+  // Legacy `.kilocode/workflows/` is migrated to `.kilo/commands/` on startup. The page documents no argument placeholder, so a command using one is not rendered here.
+  commands: {
+    dir: ".kilo/commands",
+    extension: ".md",
+    format: "markdown",
+    extensions: ["agent", "model", "variant", "subtask"],
+    source: {
+      url: "https://kilo.ai/docs/customize/workflows",
+      title: "Kilo Code \u2014 Workflows",
       retrieved: "2026-09-29"
     }
   }
@@ -16993,6 +17392,19 @@ var docs10 = {
       title: "OpenCode \u2014 Agent skills",
       retrieved: "2026-09-29"
     }
+  },
+  // `command/` (singular) is still read for backwards compatibility; the plural is documented.
+  commands: {
+    dir: ".opencode/commands",
+    extension: ".md",
+    format: "markdown",
+    arguments: "$ARGUMENTS",
+    extensions: ["agent", "model", "subtask"],
+    source: {
+      url: "https://opencode.ai/docs/commands/",
+      title: "OpenCode \u2014 Commands",
+      retrieved: "2026-09-29"
+    }
   }
 };
 
@@ -17270,6 +17682,18 @@ var docs11 = {
       title: "Roo Code \u2014 Skills",
       retrieved: "2026-09-29"
     }
+  },
+  // `argument-hint` is shown to the user only; no placeholder is documented, so a command using one is not rendered here.
+  commands: {
+    dir: ".roo/commands",
+    extension: ".md",
+    format: "markdown",
+    extensions: ["argument-hint", "mode"],
+    source: {
+      url: "https://roocodeinc.github.io/Roo-Code/features/slash-commands",
+      title: "Roo Code \u2014 Slash Commands",
+      retrieved: "2026-09-29"
+    }
   }
 };
 
@@ -17365,13 +17789,13 @@ var rooCode = {
 };
 
 // ../packages/adapters/windsurf/dist/frontmatter.js
-function invalid2(what, hint) {
+function invalid3(what, hint) {
   return new RulegateError({ code: "E_FRONTMATTER_INVALID", message: what, hint });
 }
 function renderGlobs2(globs) {
   for (const glob of globs) {
     if (glob.includes(",")) {
-      throw invalid2(`glob \`${glob}\` contains a comma, which windsurf cannot express`, "windsurf separates patterns with commas and has no escape for one inside a pattern; split the rule in two");
+      throw invalid3(`glob \`${glob}\` contains a comma, which windsurf cannot express`, "windsurf separates patterns with commas and has no escape for one inside a pattern; split the rule in two");
     }
   }
   return globs.join(",");
@@ -17508,6 +17932,19 @@ var docs12 = {
     source: {
       url: "https://docs.devin.ai/desktop/cascade/skills",
       title: "Windsurf \u2014 Cascade skills",
+      retrieved: "2026-09-29"
+    }
+  },
+  // Workflows. `.devin/workflows/` is preferred by the vendor and never written, like `.devin/rules/`; `.windsurf/workflows/` is still read. No frontmatter or argument syntax is documented, and a workflow is capped at 12 000 characters.
+  commands: {
+    dir: ".windsurf/workflows",
+    extension: ".md",
+    format: "markdown-plain",
+    extensions: [],
+    maxChars: 12e3,
+    source: {
+      url: "https://docs.devin.ai/desktop/cascade/workflows",
+      title: "Windsurf \u2014 Cascade workflows",
       retrieved: "2026-09-29"
     }
   }
