@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Verify a release against the registry, not against the publish step's exit code.
 //
-//   node scripts/verify-published.mjs <version> [--attestations]
+//   node scripts/verify-published.mjs <version> [--attestations] [--settled <hours>]
 //
 // Every non-private workspace package must answer `<version>` on npm, and with
 // --attestations must carry a provenance attestation. Both are read back from the registry
@@ -10,7 +10,12 @@
 // minutes for packages that already had versions, so each package is retried for a while
 // before it counts as missing.
 //
-// Repo tooling, run by release.yml after publishing: it is the one place in the repository
+// --settled <hours> also requires every package to have been on npm for at least <hours>, and
+// exits 3 — not 1 — while one is younger: not a failure, just not yet. Homebrew refuses npm
+// dependencies published less than a day ago (`--min-release-age`), so homebrew.yml asks this
+// before pointing the tap at a version its users could not yet install (T061).
+//
+// Repo tooling, run by release.yml and homebrew.yml: it is the one place in the repository
 // allowed to reach the network, and it only reads.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -18,8 +23,16 @@ import { join } from 'node:path';
 
 const version = process.argv[2];
 const wantAttestations = process.argv.includes('--attestations');
-if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
-  process.stderr.write('usage: verify-published.mjs <x.y.z> [--attestations]\n');
+const settledFlag = process.argv.indexOf('--settled');
+const settledHours = settledFlag === -1 ? undefined : Number(process.argv[settledFlag + 1]);
+if (
+  !version ||
+  !/^\d+\.\d+\.\d+$/.test(version) ||
+  (settledHours !== undefined && !(settledHours > 0))
+) {
+  process.stderr.write(
+    'usage: verify-published.mjs <x.y.z> [--attestations] [--settled <hours>]\n',
+  );
   process.exit(2);
 }
 
@@ -86,3 +99,33 @@ if (pending.length > 0) {
 process.stdout.write(
   `${names.length} package(s) at ${version}${wantAttestations ? ', each with a provenance attestation' : ''}\n`,
 );
+
+if (settledHours !== undefined) {
+  let youngest;
+  for (const name of names) {
+    const at = Date.parse(
+      JSON.parse(
+        execFileSync(npm, ['view', name, 'time', '--json'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          shell: process.platform === 'win32',
+        }),
+      )[version],
+    );
+    if (Number.isNaN(at)) {
+      process.stderr.write(`${name}: npm records no publish time for ${version}\n`);
+      process.exit(1);
+    }
+    if (youngest === undefined || at > youngest.at) youngest = { name, at };
+  }
+  const ready = youngest.at + settledHours * 3_600_000;
+  if (Date.now() < ready) {
+    process.stdout.write(
+      `not settled: ${youngest.name}@${version} was published ${new Date(youngest.at).toISOString()}; ready after ${new Date(ready).toISOString()}\n`,
+    );
+    process.exit(3);
+  }
+  process.stdout.write(
+    `every package at ${version} has been on npm for ${settledHours}h or more\n`,
+  );
+}

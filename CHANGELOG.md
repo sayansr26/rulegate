@@ -54,9 +54,11 @@ All notable changes to this project are recorded here. This project follows
   Code's names does not get that agent (`W_AGENT_RESTRICTED`), rather than get one with every
   tool. Windsurf and Roo Code get no agents. `init` imports existing agents, and `doctor` lists
   each tool's agents and one it finds in two folders.
-- **Homebrew.** `brew install sayansr26/rulegate/rulegate`. Each release updates the tap once
-  the version is live and signed on npm, pinning the formula to the exact tarball npm serves,
-  then installs, audits and tests it on a clean macOS runner.
+- **Homebrew.** `brew install sayansr26/rulegate/rulegate`. A scheduled workflow moves the tap
+  to each release once all its packages are a day old on npm — Homebrew refuses newer npm
+  dependencies — pinning the formula to the exact tarball npm serves, then installs, audits and
+  tests it on a clean macOS runner. So Homebrew follows npm by about a day, and never points at
+  a version it cannot install.
 - `AdapterDocs.skills` (the directories a tool reads and the keys it understands),
   `Artifact.bytes`, `AdapterDocs.commands`, `AdapterDocs.agents`, and the `Skill`, `SkillAsset`, `SkillsSupport`,
   `Command`, `CommandsSupport`, `Agent`, `AgentFolder` and `AgentsSupport` types join the adapter

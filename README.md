@@ -75,7 +75,8 @@ npx rulegate check    # verify they match — exit 1 on drift. Put this in CI.
 `.rulegate/backup/`, and `rulegate restore` puts them back.
 
 On macOS or Linux with Homebrew, `brew install sayansr26/rulegate/rulegate` installs the same
-release npm serves, and then it is `rulegate init` without `npx`.
+release npm serves — about a day after it reaches npm, since Homebrew refuses newer npm
+dependencies — and then it is `rulegate init` without `npx`.
 
 ### Claude Code
 

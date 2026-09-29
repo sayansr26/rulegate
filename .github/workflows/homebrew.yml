@@ -1,0 +1,119 @@
+# Homebrew tap (T061).
+#
+# Points sayansr26/homebrew-rulegate at npm's latest release — but only once Homebrew can
+# install it. Homebrew refuses npm dependencies published less than a day ago
+# (`--min-release-age`), and every release publishes fresh @rulegate/* packages, so a formula
+# pushed at release time fails every `brew install` for its first day. This runs on a schedule
+# instead and moves the tap once every package of the version has settled; the lag behind npm
+# is Homebrew's cooldown plus at most one interval, and never a formula that cannot install.
+name: Homebrew
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time, so two runs never race to push the same formula.
+concurrency:
+  group: homebrew
+  cancel-in-progress: false
+
+jobs:
+  tap:
+    name: update the tap
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      pushed: ${{ steps.push.outputs.pushed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: sayansr26/homebrew-rulegate
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 25 hours: Homebrew's one-day cooldown, and an hour for clock skew between the registry
+      # and wherever `brew` runs.
+      - name: the latest version, once it has settled
+        id: plan
+        run: |
+          version="$(npm view rulegate version)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if grep -q "rulegate-$version.tgz" tap/Formula/rulegate.rb; then
+            echo "the tap already installs $version"
+            echo "stage=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          set +e
+          VERIFY_PUBLISHED_ATTEMPTS=1 node scripts/verify-published.mjs "$version" --attestations --settled 25
+          code=$?
+          set -e
+          if [ "$code" = 3 ]; then
+            echo "stage=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [ "$code" = 0 ] || exit "$code"
+          echo "stage=true" >> "$GITHUB_OUTPUT"
+
+      # Pinned to the bytes npm serves, checked against npm's own integrity first, so the
+      # formula installs exactly the tarball npm signed.
+      - name: formula for the tarball npm serves
+        if: steps.plan.outputs.stage == 'true'
+        run: |
+          version="${{ steps.plan.outputs.version }}"
+          tarball="$RUNNER_TEMP/rulegate.tgz"
+          curl -fsSL "https://registry.npmjs.org/rulegate/-/rulegate-$version.tgz" -o "$tarball"
+          want="$(npm view "rulegate@$version" dist.integrity)"
+          got="sha512-$(openssl dgst -sha512 -binary "$tarball" | base64 | tr -d '\n')"
+          if [ "$want" != "$got" ]; then
+            echo "downloaded tarball does not match npm's integrity: $got != $want" >&2
+            exit 1
+          fi
+          sha="$(sha256sum "$tarball" | cut -d' ' -f1)"
+          node scripts/stage-homebrew-tap.mjs tap "$version" "$sha"
+
+      - name: push the formula
+        id: push
+        if: steps.plan.outputs.stage == 'true'
+        working-directory: tap
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -q -m "rulegate ${{ steps.plan.outputs.version }}"
+          git push
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+  # `brew install` on a clean macOS runner, from the tap as a user reaches it: T061's validation.
+  # After every push, and on every manual run, so a formula Homebrew has since stopped
+  # accepting is found here rather than by a user.
+  brew-install:
+    name: brew install from the tap
+    needs: tap
+    if: needs.tap.outputs.pushed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    steps:
+      - name: install, audit and test
+        run: |
+          brew install sayansr26/rulegate/rulegate
+          brew audit --formula sayansr26/rulegate/rulegate
+          brew test sayansr26/rulegate/rulegate
+          installed="$(rulegate --version)"
+          echo "installed $installed"
+          if [ "${{ needs.tap.outputs.pushed }}" = true ] && [ "$installed" != "${{ needs.tap.outputs.version }}" ]; then
+            echo "the tap was moved to ${{ needs.tap.outputs.version }} but brew installed $installed" >&2
+            exit 1
+          fi

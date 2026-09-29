@@ -83,6 +83,15 @@ end
     expect(await readFile(path.join(dir, 'README.md'), 'utf8')).toBe('edited\n');
   });
 
+  it('asks verify-published for a positive cooldown, as a usage error otherwise', async () => {
+    const verify = path.join(repoRoot, 'scripts/verify-published.mjs');
+    for (const hours of ['0', '-1', 'soon']) {
+      await expect(
+        run(process.execPath, [verify, '1.2.3', '--settled', hours]),
+      ).rejects.toMatchObject({ code: 2 });
+    }
+  });
+
   it('refuses a version or checksum it cannot vouch for, as a usage error', async () => {
     const dir = await tap();
     await expect(stage(dir, 'latest', SHA)).rejects.toMatchObject({ code: 2 });
