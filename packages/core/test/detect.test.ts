@@ -28,6 +28,7 @@ const canonical: Canonical = {
   mcpServers: [],
   skills: [],
   commands: [],
+  agents: [],
 };
 
 const source = { url: 'https://example.test/docs', title: 'Docs', retrieved: '2026-09-02' };

@@ -108,6 +108,16 @@ export const docs: AdapterDocs = {
         'trigger: is derived, not authored. A rule with globs becomes trigger: glob and a repo-wide rule becomes trigger: always_on; model_decision and manual are never generated, because both let the model skip a rule the author asked for.',
       source: RULES_DOCS,
     },
+    {
+      level: 'info',
+      message:
+        "Rulegate renders no agents for Windsurf: custom subagents are documented for the Devin CLI (`.devin/agents/`, `.agents/agents/`), not for Windsurf's Cascade.",
+      source: {
+        url: 'https://docs.devin.ai/cli/subagents',
+        title: 'Devin CLI — Subagents',
+        retrieved: '2026-09-29',
+      },
+    },
   ],
   // `.devin/skills/` is preferred and `.windsurf/skills/` is legacy. `.claude/skills/` is read only when a setting enables it, so it is not counted on.
   skills: {

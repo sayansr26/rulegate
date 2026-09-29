@@ -2,6 +2,7 @@ import { DEFAULT_LINT_CONFIG, type LintConfig } from './lint.js';
 import type { JsonValue, SourceRef, ToolId } from './ids.js';
 import type { McpServer } from './mcp.js';
 import type { RuleDocument } from './rule.js';
+import type { Agent } from './agent.js';
 import type { Command } from './command.js';
 import type { Skill } from './skill.js';
 
@@ -89,6 +90,7 @@ export interface Canonical {
   readonly mcpServers: readonly McpServer[];
   readonly skills: readonly Skill[];
   readonly commands: readonly Command[];
+  readonly agents: readonly Agent[];
 }
 
 export function emptyManifest(source: SourceRef): RulegateManifest {
@@ -110,6 +112,7 @@ export function emptyCanonical(source: SourceRef): Canonical {
     mcpServers: [],
     skills: [],
     commands: [],
+    agents: [],
   };
 }
 

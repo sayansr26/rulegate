@@ -199,4 +199,31 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // Named by file. Access is set with `permission`, so a canonical restriction cannot be carried. Legacy `.kilocode/agents/` is migrated on startup.
+  agents: {
+    folders: [
+      {
+        dir: '.kilo/agents',
+        extension: '.md',
+        format: 'markdown',
+        extensions: [
+          'mode',
+          'model',
+          'temperature',
+          'top_p',
+          'permission',
+          'color',
+          'steps',
+          'variant',
+          'hidden',
+          'disable',
+        ],
+      },
+    ],
+    source: {
+      url: 'https://kilo.ai/docs/customize/custom-modes',
+      title: 'Kilo Code — Custom Modes',
+      retrieved: '2026-09-29',
+    },
+  },
 };

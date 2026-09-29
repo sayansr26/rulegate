@@ -1,6 +1,6 @@
 /**
- * A TOML reader for exactly what a command file holds: top-level `key = string` pairs, in any
- * of TOML's four string forms, and comments (RFC-0001 §13.3, T053).
+ * A TOML reader for exactly what a command or agent file holds: top-level `key = string`
+ * pairs, in any of TOML's four string forms, and comments (RFC-0001 §13.3, §14.3).
  *
  * Hand-written because core's dependencies are an allowlist and a command file needs a sliver
  * of TOML. Anything outside that sliver — a table, a number, an array — makes the whole file
@@ -27,7 +27,7 @@ export function readCommandToml(text: string): CommandToml {
       while (i < text.length && text[i] !== '\n') i += 1;
       continue;
     }
-    if (text[i] === '[') return fail('it has a table, and a command file holds only strings');
+    if (text[i] === '[') return fail('it has a table, and only top-level string keys are read');
 
     const eq = text.indexOf('=', i);
     const nl = text.indexOf('\n', i);

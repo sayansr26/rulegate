@@ -76,6 +76,7 @@ const threeRuleModel: Canonical = {
   mcpServers: [],
   skills: [],
   commands: [],
+  agents: [],
 };
 
 function stripSources(model: Canonical): unknown {

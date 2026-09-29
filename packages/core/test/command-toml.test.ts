@@ -43,7 +43,7 @@ describe('readCommandToml (T053)', () => {
   });
 
   it('refuses everything outside the sliver rather than half-reading it', () => {
-    expect(values('[table]\n')).toBe('it has a table, and a command file holds only strings');
+    expect(values('[table]\n')).toBe('it has a table, and only top-level string keys are read');
     expect(values('n = 1\n')).toBe('`n` is not a string');
     expect(values('a = "x"\na = "y"\n')).toBe('`a` is set twice');
     expect(values('a = "x" "y"\n')).toBe('something follows the value of `a`');

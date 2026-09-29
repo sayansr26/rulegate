@@ -218,4 +218,36 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // Agents are named by `name`, not by file. `tools` and `disallowedTools` are in Claude Code's own tool names, which is the spelling canonical restrictions use.
+  agents: {
+    folders: [
+      {
+        dir: '.claude/agents',
+        extension: '.md',
+        format: 'markdown',
+        extensions: [
+          'tools',
+          'disallowedTools',
+          'model',
+          'permissionMode',
+          'maxTurns',
+          'skills',
+          'mcpServers',
+          'hooks',
+          'memory',
+          'background',
+          'omitClaudeMd',
+          'effort',
+          'isolation',
+          'color',
+          'initialPrompt',
+        ],
+      },
+    ],
+    source: {
+      url: 'https://code.claude.com/docs/en/sub-agents',
+      title: 'Claude Code — Create custom subagents',
+      retrieved: '2026-09-29',
+    },
+  },
 };

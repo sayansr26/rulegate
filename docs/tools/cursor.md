@@ -60,6 +60,15 @@ Frontmatter it reads beyond the Agent Skills fields: `paths`, `disable-model-inv
 
 Source: [Cursor — Agent skills](https://cursor.com/docs/context/skills) — retrieved 2026-09-29
 
+## Agents
+
+Reads project agents from `.cursor/agents/<name>.md`, `.claude/agents/<name>.md`, preferred first.
+
+- `.cursor/agents/` (Markdown): `model`, `readonly`, `is_background`. Cannot carry a tool restriction, so a restricted agent is not written here for this tool.
+- `.claude/agents/` (Markdown): `model`, `readonly`, `is_background`. Cannot carry a tool restriction, so a restricted agent is not written here for this tool.
+
+Source: [Cursor — Subagents](https://cursor.com/docs/context/subagents) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Cursor documents no `type` key for a remote MCP server, so an SSE endpoint and a streamable-HTTP one are both written as a bare `url`. A canonical `transport: sse` therefore survives into Claude Code’s .mcp.json and is lost here — the same shape of lossy mapping as the prose “Applies to:” line, recorded rather than left to be discovered.
@@ -77,5 +86,6 @@ Source: [Cursor — Agent skills](https://cursor.com/docs/context/skills) — re
 
 - [Cursor — Model Context Protocol](https://cursor.com/docs/context/mcp) — retrieved 2026-09-04
 - [Cursor — Agent skills](https://cursor.com/docs/context/skills) — retrieved 2026-09-29
+- [Cursor — Subagents](https://cursor.com/docs/context/subagents) — retrieved 2026-09-29
 - [Cursor — Skills](https://cursor.com/help/customization/skills) — retrieved 2026-09-29
 - [Cursor — Rules](https://docs.cursor.com/context/rules) — retrieved 2026-09-01

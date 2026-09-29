@@ -119,6 +119,14 @@ Frontmatter it reads beyond `description`: `agent`, `model`, `variant`, `subtask
 
 Source: [Kilo Code — Workflows](https://kilo.ai/docs/customize/workflows) — retrieved 2026-09-29
 
+## Agents
+
+Reads project agents from `.kilo/agents/<name>.md`, preferred first.
+
+- `.kilo/agents/` (Markdown): `mode`, `model`, `temperature`, `top_p`, `permission`, `color`, `steps`, `variant`, `hidden`, `disable`. Cannot carry a tool restriction, so a restricted agent is not written here for this tool.
+
+Source: [Kilo Code — Custom Modes](https://kilo.ai/docs/customize/custom-modes) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Rulegate writes .kilocode/rules/, which Kilo documents as legacy and loads only for backward compatibility; its docs recommend moving rules into kilo.jsonc instructions. Rulegate cannot follow that advice without owning kilo.jsonc, which Kilo's own Settings UI edits. If Kilo drops the legacy loader, the generated rules stop loading and nothing reports it.
@@ -135,6 +143,7 @@ Source: [Kilo Code — Workflows](https://kilo.ai/docs/customize/workflows) — 
 - [Kilo source — Kilocode rules migration](https://github.com/Kilo-Org/kilo/blob/main/packages/opencode/src/kilocode/docs/rules-migration.md) — retrieved 2026-09-26
 - [Kilo Code — Skills](https://kilo.ai/docs/agent-behavior/skills) — retrieved 2026-09-29
 - [Kilo Code — AGENTS.md](https://kilo.ai/docs/customize/agents-md) — retrieved 2026-09-26
+- [Kilo Code — Custom Modes](https://kilo.ai/docs/customize/custom-modes) — retrieved 2026-09-29
 - [Kilo Code — Custom rules](https://kilo.ai/docs/customize/custom-rules) — retrieved 2026-09-26
 - [Kilo Code — Workflows](https://kilo.ai/docs/customize/workflows) — retrieved 2026-09-29
 - [Kilo Code — Settings and config files](https://kilo.ai/docs/getting-started/settings) — retrieved 2026-09-26

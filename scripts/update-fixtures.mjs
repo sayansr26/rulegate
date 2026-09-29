@@ -98,6 +98,8 @@ const NOT_ADAPTER_FIXTURES = new Set([
   'skills-sync',
   // Likewise through core's commands renderer (T053).
   'commands-sync',
+  // And its agents renderer (T054).
+  'agents-sync',
 ]);
 
 /** Every `fixtures/<dir>` that has both `input/` and `expected/`. */

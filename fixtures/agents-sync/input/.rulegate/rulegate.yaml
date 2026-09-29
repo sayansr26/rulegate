@@ -1,0 +1,8 @@
+schemaVersion: 1
+tools:
+  - claude-code
+  - codex
+  - copilot
+  - cursor
+  - gemini
+  - opencode

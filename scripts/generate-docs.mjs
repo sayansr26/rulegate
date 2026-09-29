@@ -168,6 +168,30 @@ function renderToolPage(adapter) {
     out.push(`Source: ${sourceLine(c.source)}`, '');
   }
 
+  // Agents (T054): the folders this tool reads agents from, and what it reads in each.
+  if (docs.agents !== undefined) {
+    out.push('## Agents', '');
+    out.push(
+      `Reads project agents from ${docs.agents.folders.map((f) => `\`${f.dir}/<name>${f.extension}\``).join(', ')}, preferred first.`,
+      '',
+    );
+    for (const f of docs.agents.folders) {
+      const restricts = f.extensions.some((k) => k === 'tools' || k === 'disallowedTools');
+      out.push(
+        `- \`${f.dir}/\` (${f.format === 'toml' ? 'TOML' : 'Markdown'}): ${
+          f.extensions.length === 0
+            ? 'no key beyond `name` and `description`'
+            : f.extensions.map((k) => `\`${k}\``).join(', ')
+        }${restricts ? '' : '. Cannot carry a tool restriction, so a restricted agent is not written here for this tool'}.`,
+      );
+    }
+    out.push('');
+    if (docs.agents.maxChars !== undefined) {
+      out.push(`Capped at ${String(docs.agents.maxChars)} characters of prompt.`, '');
+    }
+    out.push(`Source: ${sourceLine(docs.agents.source)}`, '');
+  }
+
   if ((docs.notes ?? []).length > 0) {
     out.push('## Notes', '');
     for (const note of docs.notes ?? []) {
@@ -185,6 +209,7 @@ function renderToolPage(adapter) {
   }
   if (docs.skills !== undefined) seen.set(docs.skills.source.url, docs.skills.source);
   if (docs.commands !== undefined) seen.set(docs.commands.source.url, docs.commands.source);
+  if (docs.agents !== undefined) seen.set(docs.agents.source.url, docs.agents.source);
   for (const source of [...seen.values()].sort((a, b) => (a.url < b.url ? -1 : 1))) {
     out.push(`- ${sourceLine(source)}`);
   }
@@ -201,6 +226,7 @@ function coverageOf(adapter) {
   if (roles.has('mcp')) parts.push('MCP');
   if (roles.has('skills') || adapter.docs.skills !== undefined) parts.push('skills');
   if (adapter.docs.commands !== undefined) parts.push('commands');
+  if (adapter.docs.agents !== undefined) parts.push('agents');
   return parts.length === 0 ? '—' : parts.join(', ');
 }
 

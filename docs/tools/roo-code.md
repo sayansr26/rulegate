@@ -92,10 +92,13 @@ Source: [Roo Code — Slash Commands](https://roocodeinc.github.io/Roo-Code/feat
   Source: [Roo Code — Using MCP in Roo](https://roocodeinc.github.io/Roo-Code/features/mcp/using-mcp-in-roo) — retrieved 2026-09-04
 - **info** — Roo reads every file in .roo/rules/ regardless of extension. Rulegate imports .md and .txt only; a rule kept under another extension is not lost from disk, but it will not be imported into .rulegate/.
   Source: [Roo Code — Custom Instructions](https://roocodeinc.github.io/Roo-Code/features/custom-instructions) — retrieved 2026-09-04
+- **info** — Rulegate renders no agents for Roo Code. Roo's custom modes are a different concept — one `.roomodes` file of modes with `roleDefinition` and permission `groups`, which replace the assistant rather than hand work to it.
+  Source: [Roo Code — Customizing Modes](https://roocodeinc.github.io/Roo-Code/features/custom-modes) — retrieved 2026-09-29
 
 ## Sources
 
 - [Roo Code — Custom Instructions](https://roocodeinc.github.io/Roo-Code/features/custom-instructions) — retrieved 2026-09-04
+- [Roo Code — Customizing Modes](https://roocodeinc.github.io/Roo-Code/features/custom-modes) — retrieved 2026-09-29
 - [Roo Code — Using MCP in Roo](https://roocodeinc.github.io/Roo-Code/features/mcp/using-mcp-in-roo) — retrieved 2026-09-04
 - [Roo Code — Skills](https://roocodeinc.github.io/Roo-Code/features/skills) — retrieved 2026-09-29
 - [Roo Code — Slash Commands](https://roocodeinc.github.io/Roo-Code/features/slash-commands) — retrieved 2026-09-29

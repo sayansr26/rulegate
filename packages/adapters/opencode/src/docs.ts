@@ -195,4 +195,30 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // Named by file; `tools` is deprecated for `permission`, so a canonical restriction cannot be carried.
+  agents: {
+    folders: [
+      {
+        dir: '.opencode/agents',
+        extension: '.md',
+        format: 'markdown',
+        extensions: [
+          'mode',
+          'model',
+          'temperature',
+          'top_p',
+          'permission',
+          'steps',
+          'disable',
+          'hidden',
+          'color',
+        ],
+      },
+    ],
+    source: {
+      url: 'https://opencode.ai/docs/agents/',
+      title: 'OpenCode — Agents',
+      retrieved: '2026-09-29',
+    },
+  },
 };

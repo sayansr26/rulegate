@@ -16,7 +16,7 @@ import {
   toolNoteWarnings,
 } from './warnings.js';
 import type { Adapter } from '../adapter/adapter.js';
-import type { FileResolution } from '../adapter/docs.js';
+import type { AgentFolder, FileResolution } from '../adapter/docs.js';
 import type { RulegateError } from '../model/errors.js';
 import type { Plan } from '../pipeline/plan.js';
 import type { ReadOnlyFileSystem } from '../fs/types.js';
@@ -132,6 +132,8 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
       docs.commands === undefined
         ? undefined
         : await commandsOnDisk(fs, docs.commands.dir, docs.commands.extension);
+    const agents =
+      docs.agents === undefined ? undefined : await agentsOnDisk(fs, docs.agents.folders);
     const diagnosis: ToolDiagnosis = {
       name: detected.name,
       toolName: docs.toolName,
@@ -145,6 +147,7 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
       loadedTokens: resolved.loaded.reduce((n, m) => n + m.tokens, 0),
       ...(skills === undefined ? {} : { skills }),
       ...(commands === undefined ? {} : { commands }),
+      ...(agents === undefined ? {} : { agents }),
       ...(detected.failed === undefined ? {} : { failed: detected.failed }),
     };
     tools.push(diagnosis);
@@ -155,6 +158,7 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
     // tools nobody runs here.
     if (diagnosis.detected || (explicitManifest && diagnosis.enabled)) {
       warnings.push(...skillDuplicateWarnings(diagnosis));
+      warnings.push(...agentDuplicateWarnings(diagnosis, docs.agents?.folders ?? []));
     }
     warnings.push(...overLimitWarnings(diagnosis, docs, resolved.loaded));
     warnings.push(...toolNoteWarnings(diagnosis, docs));
@@ -221,5 +225,44 @@ function skillDuplicateWarnings(tool: ToolDiagnosis): readonly DoctorWarning[] {
       tool: tool.name,
       paths: s.dirs.map((d) => `${d}/${s.id}/SKILL.md`).sort(compareCodepoint),
       message: `loads the skill \`${s.id}\` twice, from ${s.dirs.join(' and ')}`,
+    }));
+}
+
+/** Which agents sit in each of a tool's agent folders on disk, by file name (T054). */
+async function agentsOnDisk(
+  fs: ReadOnlyFileSystem,
+  folders: readonly AgentFolder[],
+): Promise<readonly SkillDiagnosis[]> {
+  const found = new Map<string, string[]>();
+  for (const { dir, extension } of folders) {
+    if (!(await fs.exists(dir))) continue;
+    for (const entry of await fs.listDir(dir)) {
+      if (entry.kind !== 'file' || !entry.name.endsWith(extension)) continue;
+      const id = entry.name.slice(0, -extension.length);
+      found.set(id, [...(found.get(id) ?? []), dir]);
+    }
+  }
+  return [...found]
+    .sort(([a], [b]) => compareCodepoint(a, b))
+    .map(([id, where]) => ({ id, dirs: where }));
+}
+
+/**
+ * An agent a tool finds in two of its folders (T054). Worded as "finds", not "loads twice":
+ * Cursor documents that its own folder wins a clash, so what it costs depends on the tool.
+ */
+function agentDuplicateWarnings(
+  tool: ToolDiagnosis,
+  folders: readonly AgentFolder[],
+): readonly DoctorWarning[] {
+  const file = (dir: string, id: string): string =>
+    `${dir}/${id}${folders.find((f) => f.dir === dir)?.extension ?? '.md'}`;
+  return (tool.agents ?? [])
+    .filter((a) => a.dirs.length > 1)
+    .map((a) => ({
+      code: 'W_DUPLICATE_LOAD' as const,
+      tool: tool.name,
+      paths: a.dirs.map((d) => file(d, a.id)).sort(compareCodepoint),
+      message: `finds the agent \`${a.id}\` in both ${a.dirs.join(' and ')}`,
     }));
 }

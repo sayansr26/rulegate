@@ -119,4 +119,26 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // Cursor also reads `.claude/agents/`, so one copy there serves both tools; on a name clash `.cursor/agents/` wins. It documents no `tools` key, so it cannot carry a restriction. It reads `.codex/agents/` too, but as Markdown, where Codex keeps TOML — so that folder is not counted as Cursor's.
+  agents: {
+    folders: [
+      {
+        dir: '.cursor/agents',
+        extension: '.md',
+        format: 'markdown',
+        extensions: ['model', 'readonly', 'is_background'],
+      },
+      {
+        dir: '.claude/agents',
+        extension: '.md',
+        format: 'markdown',
+        extensions: ['model', 'readonly', 'is_background'],
+      },
+    ],
+    source: {
+      url: 'https://cursor.com/docs/context/subagents',
+      title: 'Cursor — Subagents',
+      retrieved: '2026-09-29',
+    },
+  },
 };

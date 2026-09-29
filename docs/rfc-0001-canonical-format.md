@@ -546,7 +546,7 @@ resolve.
 **Cursor cannot express `transport: sse`.** It documents `url` plus optional `headers` and
 no discriminator, so an SSE endpoint and a streamable-HTTP one render identically there
 while Claude Code keeps the distinction. This is a lossy mapping of the same kind as the
-prose `**Applies to:**` line Codex and Gemini get for a glob-scoped rule (§15): recorded in
+prose `**Applies to:**` line Codex and Gemini get for a glob-scoped rule (§16): recorded in
 the adapter's `docs`, and visible in `doctor`, rather than left for a user to find.
 
 **Codex has no variable substitution at all**, and that makes it the one target where an
@@ -859,7 +859,85 @@ deprecated for skills), Cursor (`.cursor/commands/` is being migrated to skills 
 documented), Antigravity (no documented project folder; workflows deprecated for skills by
 November 2026), Cline (workflows documented only in a blog post), Aider and Zed (none).
 
-## 14. Explicitly deferred
+## 14. `agents/` (v1)
+
+> **Parsed and validated, and generated, since T054 (2026-09-29).**
+
+Canonical subagents: named agents with their own prompt that a tool can hand work to. Most
+tools read one shape — Markdown with YAML frontmatter, `name` and `description`, the body as
+the agent's prompt — and several read one another's folders, so an agent is placed like a
+skill (§12.3) and spelled per tool like a command (§13.2). Both are adapter data
+(`AdapterDocs.agents`).
+
+```markdown
+---
+name: reviewer
+description: Reviews a diff for risks. Use after any change to src/.
+tools: Read, Grep, Glob
+model: sonnet
+adapters: [claude-code, cursor, gemini]
+---
+
+You review diffs. List every risk with the file and line it is on.
+```
+
+### 14.1 The agent file
+
+- **One agent per `<name>.md` file directly under `agents/`.** Folders are an error. `name`
+  is required and must equal the file name, the one rule every tool agrees on: Claude Code,
+  Gemini CLI and Codex name an agent by `name`, OpenCode and Kilo by file. It follows the skill
+  name rules (§12.1).
+- **`description` is required.** The body is the agent's prompt.
+- **`adapters` selects adapters**, in §6.1's three forms, and is **never rendered**. It is not
+  `tools`: in an agent file `tools` is the agent's own tool allowlist, as every tool that reads
+  Claude's format writes it, and an imported agent keeps it unchanged.
+- **Restrictions** — `tools` and `disallowedTools`, a comma-separated string or a list, in
+  Claude Code's tool names — narrow what the agent may do.
+- **Any other key** (`model`, `color`, `temperature`, …) is a tool extension, passed to the
+  folders whose readers understand it and dropped there with `W_AGENT_FIELD_DROPPED`
+  otherwise.
+
+### 14.2 Rendering contract — normative
+
+- **Placement is §12.3's.** Each agent goes into the fewest folders that reach every enabled
+  tool it selects; a folder several tools read has one owner in `state.json`, its first reader
+  in codepoint order. A tool that loads an agent twice is named (`W_AGENT_LOAD`).
+- **A restriction is never dropped.** Tool names do not port, so a folder can carry `tools` or
+  `disallowedTools` only if its reader documents that key in Claude Code's names. A tool that
+  cannot carry an agent's restriction **does not get the agent** (`W_AGENT_RESTRICTED`) —
+  dropping the key would hand the agent more power than its author wrote. A tool that reads a
+  chosen folder and cannot honour the restriction there is named (`W_AGENT_LOAD`).
+- **Markdown folders** get the frontmatter (minus `adapters`, minus dropped keys), the marker,
+  then the prompt. **Codex** gets TOML: `name`, `description` and the prompt as
+  `developer_instructions`, the marker as a `#` comment.
+- Agents in a nested `.rulegate/` are not rendered yet (`W_AGENT_NESTED`).
+
+### 14.3 Import
+
+`rulegate init` imports the agents the detected tools already have, from the folders those
+tools declare, into `.rulegate/agents/<name>.md` — named by `name`, or by file where a tool has
+no `name`. Identical copies become one agent; of copies that differ, the one in the first folder
+in codepoint order is imported and the rest named (`W_AGENT_IMPORT`), as is one that is not a
+valid agent here. `adapters:` is set to the tools that had it.
+
+### 14.4 Sources, verified 2026-09-29
+
+| Tool           | Reads (project)                                                                                             | Source                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Claude Code    | `.claude/agents/*.md`, named by `name`                                                                      | https://code.claude.com/docs/en/sub-agents                             |
+| Cursor         | `.cursor/agents/`, `.claude/agents/`, `.codex/agents/` (`.cursor/` wins a clash); no `tools` key            | https://cursor.com/docs/context/subagents                              |
+| GitHub Copilot | `.github/agents/*.agent.md`; `.claude/agents/*.md`, mapping Claude's tool names; prompt ≤ 30 000 characters | https://code.visualstudio.com/docs/copilot/customization/custom-agents |
+| Gemini CLI     | `.gemini/agents/*.md`, its own tool names                                                                   | https://geminicli.com/docs/core/subagents/                             |
+| Antigravity    | `.agents/agents/*.md`, its own tool names                                                                   | https://antigravity.google/docs/subagents/                             |
+| OpenCode       | `.opencode/agents/*.md`, named by file; `permission`, not `tools`                                           | https://opencode.ai/docs/agents/                                       |
+| Kilo Code      | `.kilo/agents/*.md`, named by file; `permission`, not `tools`                                               | https://kilo.ai/docs/customize/custom-modes                            |
+| Codex          | `.codex/agents/*.toml`: `name`, `description`, `developer_instructions`; no tools allowlist                 | https://learn.chatgpt.com/docs/agent-configuration/subagents           |
+
+Not rendered, and recorded in each adapter's `docs`: Windsurf (custom agents are documented for
+the Devin CLI only, not for Windsurf), Roo Code (custom modes are one `.roomodes` file of a
+different concept), Cline, Aider and Zed (none).
+
+## 15. Explicitly deferred
 
 Resolving PRD §12 Q2 at the minimal end. Each of these was considered and left out.
 The escape hatch in every case is §6.2: unknown keys are preserved, so experimenting
@@ -875,7 +953,7 @@ costs nothing and loses nothing.
 | **Priority weights beyond one integer**                          | `order` plus an id tiebreak is total and predictable. Multi-key precedence is harder to reason about and no more expressive.                                               | A concrete case `order` cannot express.                         |
 | **Nested `.rulegate/`** (monorepos)                              | Specified in §4.3: resolution as of T055, emission and command semantics as of T056. No longer deferred.                                                                   | Shipped.                                                        |
 
-## 15. Worked example
+## 16. Worked example
 
 Given this canonical source:
 
@@ -997,7 +1075,7 @@ Note Cursor's `.mdc` dialect: `globs` is a bare comma-joined string rather than 
 list, an empty `globs` is written as a bare key, and `alwaysApply` is _derived_ (true
 exactly when the rule is repo-wide) rather than stored in canonical.
 
-## 16. Compatibility and versioning
+## 17. Compatibility and versioning
 
 `schemaVersion` is an integer, currently `1`.
 

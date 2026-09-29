@@ -122,6 +122,12 @@ export interface ToolDiagnosis {
    * (T053), as their `/name`s, sorted. Absent for a tool Rulegate writes no commands for.
    */
   readonly commands?: readonly string[];
+  /**
+   * The project agents on disk in the folders this tool's `AdapterDocs.agents` names (T054),
+   * by file name, sorted, each with every folder it was found in. Absent for a tool without
+   * agents.
+   */
+  readonly agents?: readonly SkillDiagnosis[];
   /** Set when the adapter's `detect()` threw or its `apiVersion` is unreadable. */
   readonly failed?: RulegateError;
 }

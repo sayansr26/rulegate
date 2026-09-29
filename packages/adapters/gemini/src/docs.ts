@@ -106,4 +106,20 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // Gemini CLI's `tools` takes its own tool names, so a canonical restriction cannot be carried.
+  agents: {
+    folders: [
+      {
+        dir: '.gemini/agents',
+        extension: '.md',
+        format: 'markdown',
+        extensions: ['kind', 'model', 'temperature', 'max_turns', 'timeout_mins', 'mcpServers'],
+      },
+    ],
+    source: {
+      url: 'https://geminicli.com/docs/core/subagents/',
+      title: 'Gemini CLI — Subagents',
+      retrieved: '2026-09-29',
+    },
+  },
 };

@@ -45,6 +45,10 @@ const FROZEN_V1 = [
   // Added at T053: commands are rendered by core from `AdapterDocs.commands`.
   'Command (type)',
   'CommandsSupport (type)',
+  // Added at T054: agents are rendered by core from `AdapterDocs.agents`.
+  'Agent (type)',
+  'AgentFolder (type)',
+  'AgentsSupport (type)',
   'withJsonMarker (value)',
   // Added 2026-09-04 (T040), MCP import. Eight exports, none removed, so no
   // `ADAPTER_API_VERSION` bump. `read()`'s return widened by one OPTIONAL field

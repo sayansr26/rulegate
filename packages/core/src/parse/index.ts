@@ -21,11 +21,13 @@ import { parseMcpServers } from './mcp.js';
 import { parseRuleFile } from './rules.js';
 import { parseSkills } from './skills.js';
 import { parseCommands } from './commands.js';
+import { parseAgents } from './agents.js';
 import { suggest } from './suggest.js';
 import type { McpServer } from '../model/mcp.js';
 import type { RuleDocument } from '../model/rule.js';
 import type { Skill } from '../model/skill.js';
 import type { Command } from '../model/command.js';
+import type { Agent } from '../model/agent.js';
 import type { ReadOnlyFileSystem } from '../fs/types.js';
 
 export type CanonicalMode = 'rulegate-dir' | 'rules-only' | 'bare-agents-md';
@@ -182,6 +184,15 @@ export async function parse(input: ParseInput): Promise<ParseResult> {
     sourceFiles.push(...parsed.sourceFiles);
   }
 
+  // And agents (RFC-0001 §14).
+  const agents: Agent[] = [];
+  if (mode !== 'bare-agents-md') {
+    const parsed = await parseAgents(fs, dir);
+    agents.push(...parsed.agents);
+    errors.push(...parsed.errors);
+    sourceFiles.push(...parsed.sourceFiles);
+  }
+
   sourceFiles.sort(compareCodepoint);
 
   return {
@@ -192,6 +203,7 @@ export async function parse(input: ParseInput): Promise<ParseResult> {
       mcpServers,
       skills,
       commands,
+      agents,
     },
     errors,
     warnings,
@@ -286,6 +298,7 @@ function emptyResultCanonical(): Canonical {
     mcpServers: [],
     skills: [],
     commands: [],
+    agents: [],
   };
 }
 

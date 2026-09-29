@@ -30,6 +30,8 @@ export type {
   ReadOnlyFileSystem,
   SkillsSupport,
   CommandsSupport,
+  AgentFolder,
+  AgentsSupport,
   SourceLink,
   VerifiedAgainst,
 } from '@rulegate/core';
@@ -67,6 +69,8 @@ export type { EnvRef, McpScope, McpServer, McpTransport, SecretValue } from '@ru
 export type { Skill, SkillAsset } from '@rulegate/core';
 // Commands (T053), rendered by core from `AdapterDocs.commands` for the same reason.
 export type { Command } from '@rulegate/core';
+// Agents (T054), rendered by core from `AdapterDocs.agents`.
+export type { Agent } from '@rulegate/core';
 export { DEFAULT_MCP_SCOPE, envRef, formatEnvRef, parseEnvRef } from '@rulegate/core';
 // `selectMcpServers` is here for the reason `slugForId` is (T011): which servers a tool
 // gets is one rule made of three refusals — disabled, `scope: global`, and the `tools`

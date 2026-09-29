@@ -79,11 +79,16 @@ export function defaultFrontmatter(): RuleFrontmatter {
  * misreading a tool selector would send a rule to the wrong tools, which is worse
  * than refusing to proceed.
  */
-export function parseToolSelector(v: Validator, node: Node | undefined): ToolSelector {
+export function parseToolSelector(
+  v: Validator,
+  node: Node | undefined,
+  // `adapters` in an agent file (T054), where `tools` is the agent's own tool allowlist.
+  key = 'tools',
+): ToolSelector {
   if (node === undefined) return ALL_TOOLS;
 
   if (isSeq(node) || (isScalar(node) && typeof node.value === 'string')) {
-    const tools = v.stringArray(node, 'tools');
+    const tools = v.stringArray(node, key);
     return tools.length === 0 ? ALL_TOOLS : { kind: 'include', tools };
   }
 
@@ -92,16 +97,16 @@ export function parseToolSelector(v: Validator, node: Node | undefined): ToolSel
     if (exclude === undefined) {
       v.fail(
         node,
-        'tools',
-        '`tools` mapping must have an `exclude` key',
-        "use `tools: { exclude: ['cursor'] }` or a plain list to include",
+        key,
+        `\`${key}\` mapping must have an \`exclude\` key`,
+        `use \`${key}: { exclude: ['cursor'] }\` or a plain list to include`,
       );
       return ALL_TOOLS;
     }
-    const tools = v.stringArray(exclude, 'tools.exclude');
+    const tools = v.stringArray(exclude, `${key}.exclude`);
     return tools.length === 0 ? ALL_TOOLS : { kind: 'exclude', tools };
   }
 
-  v.fail(node, 'tools', '`tools` must be a list of tool ids or `{ exclude: [...] }`');
+  v.fail(node, key, `\`${key}\` must be a list of tool ids or \`{ exclude: [...] }\``);
   return ALL_TOOLS;
 }

@@ -4,6 +4,7 @@ import { isCanonicalSource } from '../model/canonical.js';
 import { STATE_PATH } from '../model/paths.js';
 import { planSkills } from '../render/skills.js';
 import { planCommands } from '../render/commands.js';
+import { planAgents } from '../render/agents.js';
 import { finalizeArtifact } from '../render/finalize.js';
 import { scanTextForSecrets } from '../render/secrets.js';
 import { sortArtifacts } from '../render/order.js';
@@ -316,6 +317,9 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
       );
       warnings.push(...commands.warnings);
       for (const raw of commands.artifacts) accept(raw, raw.adapter);
+      const agents = planAgents(canonical.agents, current, canonical.manifest.options.marker);
+      warnings.push(...agents.warnings);
+      for (const raw of agents.artifacts) accept(raw, raw.adapter);
     } else {
       const own = canonical.skills.filter((sk) => sk.path.startsWith(`${level.dir}/`));
       if (own.length > 0) {
@@ -336,6 +340,17 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
             message: `commands in ${level.dir}/.rulegate/commands/ are not rendered yet: ${ownCommands.map((c) => `\`${c.id}\``).join(', ')}`,
             source: { file: ownCommands[0]!.path },
             hint: 'move them to the root .rulegate/commands/ and scope them with `tools:` if needed',
+          }),
+        );
+      }
+      const ownAgents = canonical.agents.filter((a) => a.path.startsWith(`${level.dir}/`));
+      if (ownAgents.length > 0) {
+        warnings.push(
+          new RulegateError({
+            code: 'W_AGENT_NESTED',
+            message: `agents in ${level.dir}/.rulegate/agents/ are not rendered yet: ${ownAgents.map((a) => `\`${a.id}\``).join(', ')}`,
+            source: { file: ownAgents[0]!.path },
+            hint: 'move them to the root .rulegate/agents/ and scope them with `adapters:` if needed',
           }),
         );
       }

@@ -63,6 +63,14 @@ Reads no key beyond `description`.
 
 Source: [Gemini CLI — Custom commands](https://geminicli.com/docs/cli/custom-commands/) — retrieved 2026-09-29
 
+## Agents
+
+Reads project agents from `.gemini/agents/<name>.md`, preferred first.
+
+- `.gemini/agents/` (Markdown): `kind`, `model`, `temperature`, `max_turns`, `timeout_mins`, `mcpServers`. Cannot carry a tool restriction, so a restricted agent is not written here for this tool.
+
+Source: [Gemini CLI — Subagents](https://geminicli.com/docs/core/subagents/) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Gemini reads AGENTS.md only if `context.fileName` in .gemini/settings.json says so — it is a configured alias, not a built-in fallback. A repository that has set it and also enables the codex adapter gives Gemini the same rules twice, once from GEMINI.md and once from AGENTS.md. Rulegate does not read settings.json, so it cannot warn about this per-repo; `doctor` reports the setting rather than guessing.
@@ -75,4 +83,5 @@ Source: [Gemini CLI — Custom commands](https://geminicli.com/docs/cli/custom-c
 
 - [Gemini CLI — Custom commands](https://geminicli.com/docs/cli/custom-commands/) — retrieved 2026-09-29
 - [Gemini CLI — Agent skills](https://geminicli.com/docs/cli/skills/) — retrieved 2026-09-29
+- [Gemini CLI — Subagents](https://geminicli.com/docs/core/subagents/) — retrieved 2026-09-29
 - [Gemini CLI — Provide context with GEMINI.md files](https://google-gemini.github.io/gemini-cli/docs/cli/gemini-md.html) — retrieved 2026-09-02
