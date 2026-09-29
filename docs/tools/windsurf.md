@@ -82,9 +82,12 @@ Source: [Windsurf — Cascade workflows](https://docs.devin.ai/desktop/cascade/w
   Source: [Windsurf — Rules and memories (Cascade)](https://docs.devin.ai/desktop/cascade/memories) — retrieved 2026-09-04
 - **info** — trigger: is derived, not authored. A rule with globs becomes trigger: glob and a repo-wide rule becomes trigger: always_on; model_decision and manual are never generated, because both let the model skip a rule the author asked for.
   Source: [Windsurf — Rules and memories (Cascade)](https://docs.devin.ai/desktop/cascade/memories) — retrieved 2026-09-04
+- **info** — Rulegate renders no agents for Windsurf: custom subagents are documented for the Devin CLI (`.devin/agents/`, `.agents/agents/`), not for Windsurf's Cascade.
+  Source: [Devin CLI — Subagents](https://docs.devin.ai/cli/subagents) — retrieved 2026-09-29
 
 ## Sources
 
+- [Devin CLI — Subagents](https://docs.devin.ai/cli/subagents) — retrieved 2026-09-29
 - [Windsurf — Rules and memories (Cascade)](https://docs.devin.ai/desktop/cascade/memories) — retrieved 2026-09-04
 - [Windsurf — Cascade skills](https://docs.devin.ai/desktop/cascade/skills) — retrieved 2026-09-29
 - [Windsurf — Cascade workflows](https://docs.devin.ai/desktop/cascade/workflows) — retrieved 2026-09-29

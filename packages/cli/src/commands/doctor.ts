@@ -127,6 +127,11 @@ function printReport(
     if (commands.length > 0) {
       out.log(`  ${c.dim('commands')}  ${commands.map((id) => `/${id}`).join(', ')}`);
     }
+    // Agents (T054).
+    const agents = tool.agents ?? [];
+    if (agents.length > 0) {
+      out.log(`  ${c.dim('agents')}  ${agents.map((a) => a.id).join(', ')}`);
+    }
   }
 
   const plugin =

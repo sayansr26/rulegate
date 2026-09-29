@@ -166,4 +166,20 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // TOML, one agent per file, the prompt in `developer_instructions`. Access is set by `sandbox_mode`, not a tools allowlist, so a canonical restriction cannot be carried.
+  agents: {
+    folders: [
+      {
+        dir: '.codex/agents',
+        extension: '.toml',
+        format: 'toml',
+        extensions: ['model', 'model_reasoning_effort', 'sandbox_mode'],
+      },
+    ],
+    source: {
+      url: 'https://learn.chatgpt.com/docs/agent-configuration/subagents',
+      title: 'Codex — Subagents',
+      retrieved: '2026-09-29',
+    },
+  },
 };

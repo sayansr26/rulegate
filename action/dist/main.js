@@ -3046,8 +3046,8 @@ var require_identity = __commonJS({
     var isDocument = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === DOC;
     var isMap6 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === MAP;
     var isPair = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === PAIR;
-    var isScalar6 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SCALAR;
-    var isSeq5 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SEQ;
+    var isScalar7 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SCALAR;
+    var isSeq6 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SEQ;
     function isCollection(node) {
       if (node && typeof node === "object")
         switch (node[NODE_TYPE]) {
@@ -3068,7 +3068,7 @@ var require_identity = __commonJS({
         }
       return false;
     }
-    var hasAnchor = (node) => (isScalar6(node) || isCollection(node)) && !!node.anchor;
+    var hasAnchor = (node) => (isScalar7(node) || isCollection(node)) && !!node.anchor;
     exports.ALIAS = ALIAS;
     exports.DOC = DOC;
     exports.MAP = MAP;
@@ -3083,8 +3083,8 @@ var require_identity = __commonJS({
     exports.isMap = isMap6;
     exports.isNode = isNode;
     exports.isPair = isPair;
-    exports.isScalar = isScalar6;
-    exports.isSeq = isSeq5;
+    exports.isScalar = isScalar7;
+    exports.isSeq = isSeq6;
   }
 });
 
@@ -8625,7 +8625,7 @@ var require_cst = __commonJS({
     var FLOW_END = "";
     var SCALAR = "";
     var isCollection = (token) => !!token && "items" in token;
-    var isScalar6 = (token) => !!token && (token.type === "scalar" || token.type === "single-quoted-scalar" || token.type === "double-quoted-scalar" || token.type === "block-scalar");
+    var isScalar7 = (token) => !!token && (token.type === "scalar" || token.type === "single-quoted-scalar" || token.type === "double-quoted-scalar" || token.type === "block-scalar");
     function prettyToken(token) {
       switch (token) {
         case BOM2:
@@ -8709,7 +8709,7 @@ var require_cst = __commonJS({
     exports.FLOW_END = FLOW_END;
     exports.SCALAR = SCALAR;
     exports.isCollection = isCollection;
-    exports.isScalar = isScalar6;
+    exports.isScalar = isScalar7;
     exports.prettyToken = prettyToken;
     exports.tokenType = tokenType;
   }
@@ -10610,6 +10610,9 @@ var SKILL_COMPATIBILITY_MAX = 500;
 var ARGUMENTS_TOKEN = /\$ARGUMENTS(?![\w[])/g;
 var POSITIONAL_TOKEN = /\$(?:\d|ARGUMENTS\[\d+\])/;
 
+// ../packages/core/dist/model/agent.js
+var AGENT_RESTRICTIONS = ["tools", "disallowedTools"];
+
 // ../packages/core/dist/model/lint.js
 var LINT_SEVERITIES = ["error", "warn", "off"];
 function isLintSeverity(value) {
@@ -10643,6 +10646,7 @@ var MCP_SERVERS_PATH = `${MCP_DIR}/servers.yaml`;
 var SKILLS_DIR = `${RULEGATE_DIR}/skills`;
 var SKILL_FILE = "SKILL.md";
 var COMMANDS_DIR = `${RULEGATE_DIR}/commands`;
+var AGENTS_DIR = `${RULEGATE_DIR}/agents`;
 var STATE_PATH = `${RULEGATE_DIR}/state.json`;
 var BACKUP_DIR = `${RULEGATE_DIR}/backup`;
 var AGENTS_MD = "AGENTS.md";
@@ -11562,23 +11566,23 @@ function makeRule(id, path4, body, frontmatter) {
 function defaultFrontmatter() {
   return { globs: [], tools: ALL_TOOLS, order: DEFAULT_RULE_ORDER, unknown: {} };
 }
-function parseToolSelector(v, node) {
+function parseToolSelector(v, node, key = "tools") {
   if (node === void 0)
     return ALL_TOOLS;
   if ((0, import_yaml8.isSeq)(node) || (0, import_yaml8.isScalar)(node) && typeof node.value === "string") {
-    const tools = v.stringArray(node, "tools");
+    const tools = v.stringArray(node, key);
     return tools.length === 0 ? ALL_TOOLS : { kind: "include", tools };
   }
   if ((0, import_yaml8.isMap)(node)) {
     const exclude = v.get(node, "exclude");
     if (exclude === void 0) {
-      v.fail(node, "tools", "`tools` mapping must have an `exclude` key", "use `tools: { exclude: ['cursor'] }` or a plain list to include");
+      v.fail(node, key, `\`${key}\` mapping must have an \`exclude\` key`, `use \`${key}: { exclude: ['cursor'] }\` or a plain list to include`);
       return ALL_TOOLS;
     }
-    const tools = v.stringArray(exclude, "tools.exclude");
+    const tools = v.stringArray(exclude, `${key}.exclude`);
     return tools.length === 0 ? ALL_TOOLS : { kind: "exclude", tools };
   }
-  v.fail(node, "tools", "`tools` must be a list of tool ids or `{ exclude: [...] }`");
+  v.fail(node, key, `\`${key}\` must be a list of tool ids or \`{ exclude: [...] }\``);
   return ALL_TOOLS;
 }
 
@@ -11869,6 +11873,117 @@ function firstLine(body) {
   return line;
 }
 
+// ../packages/core/dist/parse/agents.js
+var import_yaml14 = __toESM(require_dist(), 1);
+var invalid3 = (file, message, hint) => new RulegateError({
+  code: "E_AGENT_INVALID",
+  message,
+  source: { file },
+  ...hint === void 0 ? {} : { hint }
+});
+async function parseAgents(fs2, root) {
+  const dir = root === "" ? AGENTS_DIR : `${root}/${AGENTS_DIR}`;
+  if (!await fs2.exists(dir))
+    return { agents: [], errors: [], sourceFiles: [] };
+  const agents = [];
+  const errors = [];
+  const sourceFiles = [];
+  for (const entry of await fs2.listDir(dir)) {
+    const path4 = `${dir}/${entry.name}`;
+    if (entry.kind === "symlink") {
+      errors.push(invalid3(path4, "an agent may not be a symlink", "replace it with the file itself"));
+      continue;
+    }
+    if (entry.kind === "dir") {
+      errors.push(invalid3(path4, `agents cannot be grouped in folders: ${path4}/`, `move each agent directly into ${dir}/`));
+      continue;
+    }
+    if (!entry.name.endsWith(".md")) {
+      errors.push(invalid3(path4, `${path4} is not an agent`, "agents are `<name>.md` files"));
+      continue;
+    }
+    sourceFiles.push(path4);
+    const parsed = parseAgentFile(await fs2.readFile(path4), path4, entry.name.slice(0, -".md".length));
+    errors.push(...parsed.errors);
+    if (parsed.agent !== void 0)
+      agents.push(parsed.agent);
+  }
+  return {
+    agents: agents.sort((a, b) => compareCodepoint(a.id, b.id)),
+    errors,
+    sourceFiles: sourceFiles.sort(compareCodepoint)
+  };
+}
+function parseAgentFile(raw, path4, fileId, options2 = {}) {
+  const importing = options2.importing === true;
+  const errors = [];
+  const split = splitFrontmatter(raw, path4);
+  if (!split.ok)
+    return { errors: [split.error] };
+  const { yaml, yamlLineOffset, body } = split.value;
+  if (yaml === void 0 || yaml.trim() === "") {
+    return {
+      errors: [
+        invalid3(path4, "an agent has no frontmatter", "add `name` and `description` between `---` lines")
+      ]
+    };
+  }
+  const parsedYaml = parseYaml(yaml, path4, yamlLineOffset);
+  if (!parsedYaml.ok)
+    return { errors: [parsedYaml.error] };
+  const v = new Validator(path4, parsedYaml.value, "E_AGENT_INVALID");
+  const rootNode = parsedYaml.value.doc.contents;
+  const map = rootNode === null ? void 0 : v.asMap(rootNode, "frontmatter");
+  const declared = v.string(v.get(map, "name"), "name");
+  const id = importing ? declared ?? fileId : fileId;
+  if (!SKILL_ID_PATTERN.test(id)) {
+    v.fail(v.get(map, "name") ?? map, "name", `agent name \`${id}\` is not valid`, "use 1-64 lowercase letters, digits and hyphens, with no leading, trailing or double hyphen");
+  }
+  if (declared === void 0 && !importing) {
+    v.fail(map, "name", "`name` is required", `set \`name: ${fileId}\``);
+  } else if (declared !== void 0 && declared !== id) {
+    v.fail(v.get(map, "name"), "name", `\`name\` is \`${declared}\` but the file is \`${fileId}.md\`; they must match`, `rename the file to ${declared}.md, or set \`name: ${fileId}\``);
+  }
+  const description = v.string(v.get(map, "description"), "description");
+  if (description === void 0 || description.trim() === "") {
+    v.fail(map, "description", "`description` is required", "say when a tool should hand work to this agent");
+  }
+  for (const key of AGENT_RESTRICTIONS) {
+    const node = v.get(map, key);
+    if (node === void 0)
+      continue;
+    if ((0, import_yaml14.isScalar)(node) && typeof node.value === "string")
+      continue;
+    if ((0, import_yaml14.isSeq)(node)) {
+      v.stringArray(node, key);
+      continue;
+    }
+    v.fail(node, key, `\`${key}\` must be a comma-separated string or a list of tool names`);
+  }
+  const adapters = parseToolSelector(v, v.get(map, "adapters"), "adapters");
+  const frontmatter = [];
+  if (declared === void 0 && importing)
+    frontmatter.push(["name", id]);
+  for (const key of v.keys(map))
+    frontmatter.push([key, v.plain(v.get(map, key))]);
+  errors.push(...v.errors);
+  if (errors.length > 0)
+    return { errors };
+  return {
+    agent: {
+      id,
+      path: path4,
+      name: id,
+      description: description ?? "",
+      adapters,
+      frontmatter,
+      body,
+      source: { file: path4 }
+    },
+    errors
+  };
+}
+
 // ../packages/core/dist/parse/suggest.js
 function editDistance(a, b) {
   if (a === b)
@@ -11990,6 +12105,13 @@ async function parse(input) {
     errors.push(...parsed.errors);
     sourceFiles.push(...parsed.sourceFiles);
   }
+  const agents = [];
+  if (mode !== "bare-agents-md") {
+    const parsed = await parseAgents(fs2, dir);
+    agents.push(...parsed.agents);
+    errors.push(...parsed.errors);
+    sourceFiles.push(...parsed.sourceFiles);
+  }
   sourceFiles.sort(compareCodepoint);
   return {
     canonical: {
@@ -11998,7 +12120,8 @@ async function parse(input) {
       rules,
       mcpServers,
       skills,
-      commands
+      commands,
+      agents
     },
     errors,
     warnings,
@@ -12066,7 +12189,8 @@ function emptyResultCanonical() {
     rules: [],
     mcpServers: [],
     skills: [],
-    commands: []
+    commands: [],
+    agents: []
   };
 }
 
@@ -12656,6 +12780,29 @@ async function compareToDisk(state, artifacts, fs2) {
   };
 }
 
+// ../packages/core/dist/render/cover.js
+function cover(targets) {
+  const uncovered = new Set(targets.map((t) => t.id));
+  const chosen = [];
+  while (uncovered.size > 0) {
+    const pending = targets.filter((t) => uncovered.has(t.id));
+    const candidates = [...new Set(pending.flatMap((t) => t.dirs))].sort(compareCodepoint);
+    let best;
+    for (const dir of candidates) {
+      const readers = pending.filter((t) => t.dirs.includes(dir));
+      const rank = readers.reduce((sum, t) => sum + t.dirs.indexOf(dir), 0);
+      if (best === void 0 || readers.length > best.count || readers.length === best.count && rank < best.rank) {
+        best = { dir, count: readers.length, rank };
+      }
+    }
+    chosen.push(best.dir);
+    for (const t of pending)
+      if (t.dirs.includes(best.dir))
+        uncovered.delete(t.id);
+  }
+  return chosen.sort(compareCodepoint);
+}
+
 // ../packages/core/dist/render/skills.js
 var AGENT_SKILLS_FIELDS = /* @__PURE__ */ new Set([
   "name",
@@ -12754,29 +12901,35 @@ function planSkills(skills, adapters, marker) {
   }
   return { artifacts, warnings };
 }
-function cover(targets) {
-  const uncovered = new Set(targets.map((t) => t.id));
-  const chosen = [];
-  while (uncovered.size > 0) {
-    const pending = targets.filter((t) => uncovered.has(t.id));
-    const candidates = [...new Set(pending.flatMap((t) => t.dirs))].sort(compareCodepoint);
-    let best;
-    for (const dir of candidates) {
-      const readers = pending.filter((t) => t.dirs.includes(dir));
-      const rank = readers.reduce((sum, t) => sum + t.dirs.indexOf(dir), 0);
-      if (best === void 0 || readers.length > best.count || readers.length === best.count && rank < best.rank) {
-        best = { dir, count: readers.length, rank };
-      }
-    }
-    chosen.push(best.dir);
-    for (const t of pending)
-      if (t.dirs.includes(best.dir))
-        uncovered.delete(t.id);
-  }
-  return chosen.sort(compareCodepoint);
-}
 function sortedEntries(map) {
   return [...map].sort(([a], [b]) => compareCodepoint(a, b));
+}
+
+// ../packages/core/dist/render/toml.js
+function tomlBasic(value) {
+  return `"${escapeToml(value, false)}"`;
+}
+function tomlMultiline(value) {
+  return escapeToml(value, true);
+}
+function escapeToml(value, multiline) {
+  let out = "";
+  for (const ch of value) {
+    const code = ch.codePointAt(0);
+    if (ch === '"')
+      out += '\\"';
+    else if (ch === "\\")
+      out += "\\\\";
+    else if (ch === "\n")
+      out += multiline ? "\n" : "\\n";
+    else if (ch === "	")
+      out += multiline ? "	" : "\\t";
+    else if (code < 32 || code === 127)
+      out += `\\u${code.toString(16).padStart(4, "0")}`;
+    else
+      out += ch;
+  }
+  return out;
 }
 
 // ../packages/core/dist/render/commands.js
@@ -12889,32 +13042,159 @@ ${toml}` : toml;
     }
   }
 }
-function tomlBasic(value) {
-  return `"${escapeToml(value, false)}"`;
-}
-function tomlMultiline(value) {
-  return escapeToml(value, true);
-}
-function escapeToml(value, multiline) {
-  let out = "";
-  for (const ch of value) {
-    const code = ch.codePointAt(0);
-    if (ch === '"')
-      out += '\\"';
-    else if (ch === "\\")
-      out += "\\\\";
-    else if (ch === "\n")
-      out += multiline ? "\n" : "\\n";
-    else if (ch === "	")
-      out += multiline ? "	" : "\\t";
-    else if (code < 32 || code === 127)
-      out += `\\u${code.toString(16).padStart(4, "0")}`;
-    else
-      out += ch;
-  }
-  return out;
-}
 function sortedEntries2(map) {
+  return [...map].sort(([a], [b]) => compareCodepoint(a, b));
+}
+
+// ../packages/core/dist/render/agents.js
+var ALWAYS = /* @__PURE__ */ new Set(["name", "description"]);
+function planAgents(agents, adapters, marker) {
+  const readers = adapters.filter((a) => a.docs.agents !== void 0).map((a) => ({
+    id: a.name,
+    folders: a.docs.agents.folders,
+    ...a.docs.agents.maxChars === void 0 ? {} : { maxChars: a.docs.agents.maxChars }
+  })).sort((a, b) => compareCodepoint(a.id, b.id));
+  if (readers.length === 0 || agents.length === 0)
+    return { artifacts: [], warnings: [] };
+  const artifacts = [];
+  const restricted = /* @__PURE__ */ new Map();
+  const doubleLoads = /* @__PURE__ */ new Map();
+  const leaks = /* @__PURE__ */ new Map();
+  const unrestricted = /* @__PURE__ */ new Map();
+  const dropped = /* @__PURE__ */ new Map();
+  const overLimit = /* @__PURE__ */ new Map();
+  const push = (map, key, id) => {
+    map.set(key, [...map.get(key) ?? [], id]);
+  };
+  const folderOf = (reader, dir) => reader.folders.find((f) => f.dir === dir);
+  for (const agent of [...agents].sort((a, b) => compareCodepoint(a.id, b.id))) {
+    const keys = new Set(agent.frontmatter.map(([k]) => k));
+    const restrictions = AGENT_RESTRICTIONS.filter((k) => keys.has(k));
+    const carries = (folder) => restrictions.every((k) => folder.extensions.includes(k));
+    const targets = [];
+    for (const reader of readers) {
+      if (!selects(agent.adapters, reader.id))
+        continue;
+      const dirs = reader.folders.filter(carries).map((f) => f.dir);
+      if (dirs.length === 0)
+        push(restricted, reader.id, agent.id);
+      else
+        targets.push({ id: reader.id, dirs });
+    }
+    if (targets.length === 0)
+      continue;
+    const chosen = cover(targets);
+    for (const dir of chosen) {
+      const readersOfDir = readers.filter((r) => folderOf(r, dir) !== void 0);
+      const owner = readersOfDir[0];
+      const folder = folderOf(owner, dir);
+      const understood = new Set(readersOfDir.flatMap((r) => folderOf(r, dir).extensions));
+      const entries = [];
+      for (const entry of agent.frontmatter) {
+        const [key] = entry;
+        if (key === "adapters")
+          continue;
+        if (ALWAYS.has(key) || restrictions.includes(key) || understood.has(key)) {
+          entries.push(entry);
+          continue;
+        }
+        push(dropped, `${dir}\0${key}`, agent.id);
+      }
+      artifacts.push({
+        path: `${dir}/${agent.id}${folder.extension}`,
+        contents: folder.format === "toml" ? renderToml(entries, agent.body, marker, (key) => push(dropped, `${dir}\0${key}`, agent.id)) : renderSkillFile(entries, agent.body, marker),
+        adapter: owner.id,
+        kind: "subagent"
+      });
+    }
+    for (const reader of readers) {
+      const reads = chosen.filter((d) => folderOf(reader, d) !== void 0);
+      if (reads.length === 0)
+        continue;
+      const blind = reads.filter((d) => !carries(folderOf(reader, d)));
+      if (blind.length > 0) {
+        push(unrestricted, `${reader.id}\0${blind.join(" and ")}`, agent.id);
+      } else if (reads.length > 1) {
+        push(doubleLoads, `${reader.id}\0${reads.join(" and ")}`, agent.id);
+      } else if (!selects(agent.adapters, reader.id)) {
+        push(leaks, `${reader.id}\0${reads[0]}`, agent.id);
+      }
+      if (reader.maxChars !== void 0 && [...agent.body].length > reader.maxChars) {
+        push(overLimit, reader.id, agent.id);
+      }
+    }
+  }
+  const warnings = [];
+  const list = (ids) => ids.map((i) => `\`${i}\``).join(", ");
+  const split = (k) => k.split("\0");
+  const them = (ids) => ids.length === 1 ? "it" : "them";
+  for (const [tool, ids] of sortedEntries3(restricted)) {
+    warnings.push(new RulegateError({
+      code: "W_AGENT_RESTRICTED",
+      message: `${list(ids)} ${ids.length === 1 ? "restricts" : "restrict"} its tools, which ${tool} cannot be told, so ${tool} does not get ${them(ids)}`,
+      hint: "an agent without `tools` or `disallowedTools` goes to every tool; or scope this one with `adapters:`"
+    }));
+  }
+  for (const [k, ids] of sortedEntries3(unrestricted)) {
+    const [tool, dirs] = split(k);
+    warnings.push(new RulegateError({
+      code: "W_AGENT_LOAD",
+      message: `${tool} reads ${dirs}, where ${list(ids)} ${ids.length === 1 ? "loads" : "load"} without the tool restriction ${tool} cannot read`,
+      hint: "disable one of the tools, or drop the restriction if every tool may have it"
+    }));
+  }
+  for (const [k, ids] of sortedEntries3(doubleLoads)) {
+    const [tool, dirs] = split(k);
+    warnings.push(new RulegateError({
+      code: "W_AGENT_LOAD",
+      message: `${tool} reads ${dirs}, so it loads ${list(ids)} twice`,
+      hint: "add `adapters:` to the agent to keep it out of one of the folders, or disable a tool"
+    }));
+  }
+  for (const [k, ids] of sortedEntries3(leaks)) {
+    const [tool, dir] = split(k);
+    warnings.push(new RulegateError({
+      code: "W_AGENT_LOAD",
+      message: `${list(ids)} leave ${tool} out with \`adapters:\`, but ${tool} also reads ${dir}, where another tool gets ${them(ids)}`,
+      hint: "a folder several tools read cannot be given to only some of them"
+    }));
+  }
+  for (const [k, ids] of sortedEntries3(dropped)) {
+    const [dir, key] = split(k);
+    warnings.push(new RulegateError({
+      code: "W_AGENT_FIELD_DROPPED",
+      message: `\`${key}\` in ${list([...new Set(ids)])} was left out of ${dir}/: no tool that reads it understands the key`,
+      hint: "keep it only if a tool you use reads it, or scope the agent with `adapters:`"
+    }));
+  }
+  for (const [tool, ids] of sortedEntries3(overLimit)) {
+    const max = readers.find((r) => r.id === tool).maxChars;
+    warnings.push(new RulegateError({
+      code: "W_AGENT_OVER_LIMIT",
+      message: `${list(ids)} ${ids.length === 1 ? "has a prompt" : "have prompts"} longer than the ${max} characters ${tool} reads`,
+      hint: "shorten the prompt, or move the detail into a skill the agent loads"
+    }));
+  }
+  return { artifacts, warnings };
+}
+function renderToml(entries, body, marker, drop) {
+  const lines = [];
+  for (const [key, value] of entries) {
+    if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(key)) {
+      drop(key);
+      continue;
+    }
+    lines.push(`${key} = ${tomlBasic(value)}`);
+  }
+  lines.push(`developer_instructions = """
+${tomlMultiline(ensureSingleTrailingNewline(body))}"""`);
+  const toml = `${lines.join("\n")}
+`;
+  return marker ? `${HASH_MARKER}
+
+${toml}` : toml;
+}
+function sortedEntries3(map) {
   return [...map].sort(([a], [b]) => compareCodepoint(a, b));
 }
 
@@ -13049,6 +13329,10 @@ async function computePlan(input) {
       warnings.push(...commands.warnings);
       for (const raw of commands.artifacts)
         accept(raw, raw.adapter);
+      const agents = planAgents(canonical.agents, current, canonical.manifest.options.marker);
+      warnings.push(...agents.warnings);
+      for (const raw of agents.artifacts)
+        accept(raw, raw.adapter);
     } else {
       const own = canonical.skills.filter((sk) => sk.path.startsWith(`${level.dir}/`));
       if (own.length > 0) {
@@ -13066,6 +13350,15 @@ async function computePlan(input) {
           message: `commands in ${level.dir}/.rulegate/commands/ are not rendered yet: ${ownCommands.map((c) => `\`${c.id}\``).join(", ")}`,
           source: { file: ownCommands[0].path },
           hint: "move them to the root .rulegate/commands/ and scope them with `tools:` if needed"
+        }));
+      }
+      const ownAgents = canonical.agents.filter((a) => a.path.startsWith(`${level.dir}/`));
+      if (ownAgents.length > 0) {
+        warnings.push(new RulegateError({
+          code: "W_AGENT_NESTED",
+          message: `agents in ${level.dir}/.rulegate/agents/ are not rendered yet: ${ownAgents.map((a) => `\`${a.id}\``).join(", ")}`,
+          source: { file: ownAgents[0].path },
+          hint: "move them to the root .rulegate/agents/ and scope them with `adapters:` if needed"
         }));
       }
     }
@@ -14132,6 +14425,30 @@ var docs2 = {
       title: "Google Antigravity \u2014 Skills",
       retrieved: "2026-09-29"
     }
+  },
+  // Antigravity's `tools` takes its own exact tool names — a wrong one can hang the agent — so a canonical restriction cannot be carried.
+  agents: {
+    folders: [
+      {
+        dir: ".agents/agents",
+        extension: ".md",
+        format: "markdown",
+        extensions: [
+          "subagent",
+          "mainAgent",
+          "model",
+          "commandExecutionPolicy",
+          "mcpServers",
+          "skills",
+          "plugins"
+        ]
+      }
+    ],
+    source: {
+      url: "https://antigravity.google/docs/subagents/",
+      title: "Google Antigravity \u2014 Custom Subagents",
+      retrieved: "2026-09-29"
+    }
   }
 };
 
@@ -14855,6 +15172,38 @@ var docs3 = {
     source: {
       url: "https://code.claude.com/docs/en/slash-commands",
       title: "Claude Code \u2014 Extend Claude with skills (custom commands)",
+      retrieved: "2026-09-29"
+    }
+  },
+  // Agents are named by `name`, not by file. `tools` and `disallowedTools` are in Claude Code's own tool names, which is the spelling canonical restrictions use.
+  agents: {
+    folders: [
+      {
+        dir: ".claude/agents",
+        extension: ".md",
+        format: "markdown",
+        extensions: [
+          "tools",
+          "disallowedTools",
+          "model",
+          "permissionMode",
+          "maxTurns",
+          "skills",
+          "mcpServers",
+          "hooks",
+          "memory",
+          "background",
+          "omitClaudeMd",
+          "effort",
+          "isolation",
+          "color",
+          "initialPrompt"
+        ]
+      }
+    ],
+    source: {
+      url: "https://code.claude.com/docs/en/sub-agents",
+      title: "Claude Code \u2014 Create custom subagents",
       retrieved: "2026-09-29"
     }
   }
@@ -15733,6 +16082,22 @@ var docs5 = {
       title: "Codex \u2014 Build skills",
       retrieved: "2026-09-29"
     }
+  },
+  // TOML, one agent per file, the prompt in `developer_instructions`. Access is set by `sandbox_mode`, not a tools allowlist, so a canonical restriction cannot be carried.
+  agents: {
+    folders: [
+      {
+        dir: ".codex/agents",
+        extension: ".toml",
+        format: "toml",
+        extensions: ["model", "model_reasoning_effort", "sandbox_mode"]
+      }
+    ],
+    source: {
+      url: "https://learn.chatgpt.com/docs/agent-configuration/subagents",
+      title: "Codex \u2014 Subagents",
+      retrieved: "2026-09-29"
+    }
   }
 };
 
@@ -16082,6 +16447,39 @@ var docs6 = {
     source: {
       url: "https://code.visualstudio.com/docs/copilot/customization/prompt-files",
       title: "Visual Studio Code \u2014 Use prompt files",
+      retrieved: "2026-09-29"
+    }
+  },
+  // VS Code reads `.github/agents/*.agent.md` and Claude-format `.claude/agents/*.md`, mapping Claude's tool names in the latter — so a restriction is carried only there. The coding agent caps a prompt at 30 000 characters.
+  agents: {
+    folders: [
+      {
+        dir: ".github/agents",
+        extension: ".agent.md",
+        format: "markdown",
+        extensions: [
+          "argument-hint",
+          "agents",
+          "model",
+          "user-invocable",
+          "disable-model-invocation",
+          "target",
+          "mcp-servers",
+          "handoffs",
+          "hooks"
+        ]
+      },
+      {
+        dir: ".claude/agents",
+        extension: ".md",
+        format: "markdown",
+        extensions: ["tools", "model"]
+      }
+    ],
+    maxChars: 3e4,
+    source: {
+      url: "https://code.visualstudio.com/docs/copilot/customization/custom-agents",
+      title: "Visual Studio Code \u2014 Custom agents",
       retrieved: "2026-09-29"
     }
   }
@@ -16461,6 +16859,28 @@ var docs7 = {
       title: "Cursor \u2014 Agent skills",
       retrieved: "2026-09-29"
     }
+  },
+  // Cursor also reads `.claude/agents/`, so one copy there serves both tools; on a name clash `.cursor/agents/` wins. It documents no `tools` key, so it cannot carry a restriction. It reads `.codex/agents/` too, but as Markdown, where Codex keeps TOML — so that folder is not counted as Cursor's.
+  agents: {
+    folders: [
+      {
+        dir: ".cursor/agents",
+        extension: ".md",
+        format: "markdown",
+        extensions: ["model", "readonly", "is_background"]
+      },
+      {
+        dir: ".claude/agents",
+        extension: ".md",
+        format: "markdown",
+        extensions: ["model", "readonly", "is_background"]
+      }
+    ],
+    source: {
+      url: "https://cursor.com/docs/context/subagents",
+      title: "Cursor \u2014 Subagents",
+      retrieved: "2026-09-29"
+    }
   }
 };
 
@@ -16685,6 +17105,22 @@ var docs8 = {
     source: {
       url: "https://geminicli.com/docs/cli/custom-commands/",
       title: "Gemini CLI \u2014 Custom commands",
+      retrieved: "2026-09-29"
+    }
+  },
+  // Gemini CLI's `tools` takes its own tool names, so a canonical restriction cannot be carried.
+  agents: {
+    folders: [
+      {
+        dir: ".gemini/agents",
+        extension: ".md",
+        format: "markdown",
+        extensions: ["kind", "model", "temperature", "max_turns", "timeout_mins", "mcpServers"]
+      }
+    ],
+    source: {
+      url: "https://geminicli.com/docs/core/subagents/",
+      title: "Gemini CLI \u2014 Subagents",
       retrieved: "2026-09-29"
     }
   }
@@ -17027,6 +17463,33 @@ var docs9 = {
     source: {
       url: "https://kilo.ai/docs/customize/workflows",
       title: "Kilo Code \u2014 Workflows",
+      retrieved: "2026-09-29"
+    }
+  },
+  // Named by file. Access is set with `permission`, so a canonical restriction cannot be carried. Legacy `.kilocode/agents/` is migrated on startup.
+  agents: {
+    folders: [
+      {
+        dir: ".kilo/agents",
+        extension: ".md",
+        format: "markdown",
+        extensions: [
+          "mode",
+          "model",
+          "temperature",
+          "top_p",
+          "permission",
+          "color",
+          "steps",
+          "variant",
+          "hidden",
+          "disable"
+        ]
+      }
+    ],
+    source: {
+      url: "https://kilo.ai/docs/customize/custom-modes",
+      title: "Kilo Code \u2014 Custom Modes",
       retrieved: "2026-09-29"
     }
   }
@@ -17405,6 +17868,32 @@ var docs10 = {
       title: "OpenCode \u2014 Commands",
       retrieved: "2026-09-29"
     }
+  },
+  // Named by file; `tools` is deprecated for `permission`, so a canonical restriction cannot be carried.
+  agents: {
+    folders: [
+      {
+        dir: ".opencode/agents",
+        extension: ".md",
+        format: "markdown",
+        extensions: [
+          "mode",
+          "model",
+          "temperature",
+          "top_p",
+          "permission",
+          "steps",
+          "disable",
+          "hidden",
+          "color"
+        ]
+      }
+    ],
+    source: {
+      url: "https://opencode.ai/docs/agents/",
+      title: "OpenCode \u2014 Agents",
+      retrieved: "2026-09-29"
+    }
   }
 };
 
@@ -17671,6 +18160,15 @@ var docs11 = {
       level: "info",
       message: "Roo reads every file in .roo/rules/ regardless of extension. Rulegate imports .md and .txt only; a rule kept under another extension is not lost from disk, but it will not be imported into .rulegate/.",
       source: RULES_DOCS6
+    },
+    {
+      level: "info",
+      message: "Rulegate renders no agents for Roo Code. Roo's custom modes are a different concept \u2014 one `.roomodes` file of modes with `roleDefinition` and permission `groups`, which replace the assistant rather than hand work to it.",
+      source: {
+        url: "https://roocodeinc.github.io/Roo-Code/features/custom-modes",
+        title: "Roo Code \u2014 Customizing Modes",
+        retrieved: "2026-09-29"
+      }
     }
   ],
   // Roo Code also reads mode-specific `skills-<mode>/` directories, which Rulegate does not generate.
@@ -17789,13 +18287,13 @@ var rooCode = {
 };
 
 // ../packages/adapters/windsurf/dist/frontmatter.js
-function invalid3(what, hint) {
+function invalid4(what, hint) {
   return new RulegateError({ code: "E_FRONTMATTER_INVALID", message: what, hint });
 }
 function renderGlobs2(globs) {
   for (const glob of globs) {
     if (glob.includes(",")) {
-      throw invalid3(`glob \`${glob}\` contains a comma, which windsurf cannot express`, "windsurf separates patterns with commas and has no escape for one inside a pattern; split the rule in two");
+      throw invalid4(`glob \`${glob}\` contains a comma, which windsurf cannot express`, "windsurf separates patterns with commas and has no escape for one inside a pattern; split the rule in two");
     }
   }
   return globs.join(",");
@@ -17923,6 +18421,15 @@ var docs12 = {
       level: "info",
       message: "trigger: is derived, not authored. A rule with globs becomes trigger: glob and a repo-wide rule becomes trigger: always_on; model_decision and manual are never generated, because both let the model skip a rule the author asked for.",
       source: RULES_DOCS7
+    },
+    {
+      level: "info",
+      message: "Rulegate renders no agents for Windsurf: custom subagents are documented for the Devin CLI (`.devin/agents/`, `.agents/agents/`), not for Windsurf's Cascade.",
+      source: {
+        url: "https://docs.devin.ai/cli/subagents",
+        title: "Devin CLI \u2014 Subagents",
+        retrieved: "2026-09-29"
+      }
     }
   ],
   // `.devin/skills/` is preferred and `.windsurf/skills/` is legacy. `.claude/skills/` is read only when a setting enables it, so it is not counted on.

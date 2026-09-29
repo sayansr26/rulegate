@@ -18,6 +18,7 @@ import {
 import { serializeCanonical, serializeSkill } from '../model/serialize.js';
 import { importSkills } from './skills.js';
 import { importCommands } from './commands.js';
+import { importAgents } from './agents.js';
 import { parse } from '../parse/index.js';
 import { MemoryFileSystem } from '../io/memory.js';
 import { compareCodepoint } from '../render/order.js';
@@ -250,7 +251,17 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   const commands = await importCommands(filesOnly(importFs), adapters, detected);
   warnings.push(...commands.warnings);
   for (const file of commands.importedFrom) importedFrom.add(file);
-  const canonical = canonicalFrom(rules, mcpServers, detected, imported.skills, commands.commands);
+  const agents = await importAgents(filesOnly(importFs), adapters, detected);
+  warnings.push(...agents.warnings);
+  for (const file of agents.importedFrom) importedFrom.add(file);
+  const canonical = canonicalFrom(
+    rules,
+    mcpServers,
+    detected,
+    imported.skills,
+    commands.commands,
+    agents.agents,
+  );
 
   // Import warnings are warnings and never errors. `runInit` returns without writing while
   // `errors` is non-empty, so one odd server in somebody's `.mcp.json` would otherwise make
@@ -320,6 +331,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   );
   warnings.push(...leftBehindWarnings(collected.sources, generatedPaths));
   warnings.push(...skillsLeftBehind(imported.copies, generatedPaths, adapters, detected));
+  warnings.push(...agentsLeftBehind(agents.copies, generatedPaths));
   // Only for a plan that will be applied: the hint is "delete it once init has run", and
   // when init refuses, the file it names may be the only copy of the output left.
   if (errors.length === 0) warnings.push(...outputLeftWarnings(generated, generatedPaths));
@@ -558,6 +570,7 @@ function canonicalFrom(
   detected: readonly ToolId[],
   skills: Canonical['skills'],
   commands: Canonical['commands'],
+  agents: Canonical['agents'],
 ): Canonical {
   const source = { file: MANIFEST_PATH };
   const tools: ToolConfig[] = [...detected]
@@ -582,6 +595,7 @@ function canonicalFrom(
     mcpServers,
     skills,
     commands,
+    agents,
   };
 }
 
@@ -751,4 +765,27 @@ function outputLeftWarnings(
     );
   }
   return out;
+}
+
+/**
+ * An imported agent's tool file that the render does not replace stays loaded beside the
+ * generated copy — the agents half of `leftBehindWarnings` (T054). Placement chooses the fewest
+ * folders, so Cursor's `.cursor/agents/x.md` is left when `.claude/agents/` now serves it.
+ */
+function agentsLeftBehind(
+  copies: readonly { readonly path: string; readonly readers: readonly ToolId[] }[],
+  generated: readonly string[],
+): readonly RulegateError[] {
+  const written = new Set(generated);
+  return copies
+    .filter((c) => !written.has(c.path))
+    .map(
+      (c) =>
+        new RulegateError({
+          code: 'W_IMPORT_LEFT_BEHIND',
+          message: `${c.path} was imported and stays on disk: ${c.readers.join(', ')} will load it beside the generated copy`,
+          source: { file: c.path },
+          hint: `delete ${c.path} once init has run; the agent now lives in .rulegate/agents/`,
+        }),
+    );
 }

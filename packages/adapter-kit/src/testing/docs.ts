@@ -168,6 +168,44 @@ export async function expectDocsValid(
     problems.push(...checkSource(where, source));
   }
 
+  if (docs.agents !== undefined) {
+    // Core writes every agent into these folders (T054). A restriction key is listed only where
+    // the tool reads Claude Code's tool names; it cannot be checked here, but a folder listed
+    // twice or a malformed path can.
+    const where = `${adapter.name}.docs.agents`;
+    const { folders, maxChars, source } = docs.agents;
+    if (folders.length === 0) problems.push(`${where}.folders is empty; omit \`agents\` instead`);
+    const dirs = folders.map((f) => f.dir);
+    if (new Set(dirs).size !== dirs.length) problems.push(`${where}.folders lists a folder twice`);
+    for (const f of folders) {
+      if (
+        f.dir.startsWith('/') ||
+        f.dir.includes('\\') ||
+        f.dir.split('/').includes('..') ||
+        f.dir.endsWith('/')
+      ) {
+        problems.push(
+          `${where}: \`${f.dir}\` must be a repo-relative POSIX path with no trailing /`,
+        );
+      }
+      if (!/^\.[a-z.]+$/.test(f.extension)) {
+        problems.push(`${where}: extension \`${f.extension}\` must start with a dot`);
+      }
+      if (new Set(f.extensions).size !== f.extensions.length) {
+        problems.push(`${where}: ${f.dir} lists a key twice`);
+      }
+      if (f.extensions.some((k) => k === 'name' || k === 'description' || k === 'adapters')) {
+        problems.push(
+          `${where}: ${f.dir} must not list \`name\`, \`description\` or \`adapters\`; core handles them`,
+        );
+      }
+    }
+    if (maxChars !== undefined && !(Number.isInteger(maxChars) && maxChars > 0)) {
+      problems.push(`${where}.maxChars must be a positive integer`);
+    }
+    problems.push(...checkSource(where, source));
+  }
+
   if (docs.resolution === undefined) {
     // The field is optional in the type so that an external adapter is not broken by its
     // addition, but every adapter *we* ship must state it: "highest precedence first"

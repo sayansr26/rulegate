@@ -97,6 +97,14 @@ Reads only the Agent Skills frontmatter fields.
 
 Source: [Google Antigravity — Skills](https://antigravity.google/docs/skills) — retrieved 2026-09-29
 
+## Agents
+
+Reads project agents from `.agents/agents/<name>.md`, preferred first.
+
+- `.agents/agents/` (Markdown): `subagent`, `mainAgent`, `model`, `commandExecutionPolicy`, `mcpServers`, `skills`, `plugins`. Cannot carry a tool restriction, so a restricted agent is not written here for this tool.
+
+Source: [Google Antigravity — Custom Subagents](https://antigravity.google/docs/subagents/) — retrieved 2026-09-29
+
 ## Notes
 
 - **info** — trigger: is derived, not authored. A rule with globs becomes trigger: glob and a repo-wide rule becomes trigger: always_on; model_decision and manual are never generated, because both let the model skip a rule the author asked for. Imported rules in either mode come back as ordinary rules, with a warning.
@@ -113,3 +121,4 @@ Source: [Google Antigravity — Skills](https://antigravity.google/docs/skills) 
 - [Google Antigravity — Workflows](https://antigravity.google/docs/ide/workflows/) — retrieved 2026-09-29
 - [Google Antigravity — Rules configuration reference](https://antigravity.google/docs/rules) — retrieved 2026-09-26
 - [Google Antigravity — Skills](https://antigravity.google/docs/skills) — retrieved 2026-09-29
+- [Google Antigravity — Custom Subagents](https://antigravity.google/docs/subagents/) — retrieved 2026-09-29

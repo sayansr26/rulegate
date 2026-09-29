@@ -91,6 +91,14 @@ Frontmatter it reads beyond `description`: `argument-hint`, `arguments`, `when_t
 
 Source: [Claude Code — Extend Claude with skills (custom commands)](https://code.claude.com/docs/en/slash-commands) — retrieved 2026-09-29
 
+## Agents
+
+Reads project agents from `.claude/agents/<name>.md`, preferred first.
+
+- `.claude/agents/` (Markdown): `tools`, `disallowedTools`, `model`, `permissionMode`, `maxTurns`, `skills`, `mcpServers`, `hooks`, `memory`, `background`, `omitClaudeMd`, `effort`, `isolation`, `color`, `initialPrompt`.
+
+Source: [Claude Code — Create custom subagents](https://code.claude.com/docs/en/sub-agents) — retrieved 2026-09-29
+
 ## Notes
 
 - **info** — Claude Code expands ${NAME} and ${NAME:-default} in command, args, url, and in env and headers values. Cursor spells the same substitution ${env:NAME}, so a canonical `env:NAME` reference renders differently for each tool — copying an .mcp.json into .cursor/mcp.json by hand produces a config that looks right and does not resolve.
@@ -111,5 +119,6 @@ Source: [Claude Code — Extend Claude with skills (custom commands)](https://co
 - [Claude Code — How Claude remembers your project](https://code.claude.com/docs/en/memory) — retrieved 2026-09-26
 - [Claude Code — Extend Claude with skills](https://code.claude.com/docs/en/skills) — retrieved 2026-09-29
 - [Claude Code — Extend Claude with skills (custom commands)](https://code.claude.com/docs/en/slash-commands) — retrieved 2026-09-29
+- [Claude Code — Create custom subagents](https://code.claude.com/docs/en/sub-agents) — retrieved 2026-09-29
 - [Claude Code — Settings](https://docs.claude.com/en/docs/claude-code/settings) — retrieved 2026-09-01
 - [Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts) — retrieved 2026-09-20

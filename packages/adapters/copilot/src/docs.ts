@@ -176,4 +176,37 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // VS Code reads `.github/agents/*.agent.md` and Claude-format `.claude/agents/*.md`, mapping Claude's tool names in the latter — so a restriction is carried only there. The coding agent caps a prompt at 30 000 characters.
+  agents: {
+    folders: [
+      {
+        dir: '.github/agents',
+        extension: '.agent.md',
+        format: 'markdown',
+        extensions: [
+          'argument-hint',
+          'agents',
+          'model',
+          'user-invocable',
+          'disable-model-invocation',
+          'target',
+          'mcp-servers',
+          'handoffs',
+          'hooks',
+        ],
+      },
+      {
+        dir: '.claude/agents',
+        extension: '.md',
+        format: 'markdown',
+        extensions: ['tools', 'model'],
+      },
+    ],
+    maxChars: 30000,
+    source: {
+      url: 'https://code.visualstudio.com/docs/copilot/customization/custom-agents',
+      title: 'Visual Studio Code — Custom agents',
+      retrieved: '2026-09-29',
+    },
+  },
 };

@@ -62,6 +62,14 @@ Reads only the Agent Skills frontmatter fields.
 
 Source: [Codex — Build skills](https://learn.chatgpt.com/docs/build-skills) — retrieved 2026-09-29
 
+## Agents
+
+Reads project agents from `.codex/agents/<name>.toml`, preferred first.
+
+- `.codex/agents/` (TOML): `model`, `model_reasoning_effort`, `sandbox_mode`. Cannot carry a tool restriction, so a restricted agent is not written here for this tool.
+
+Source: [Codex — Subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — A server Codex cannot express is omitted from .codex/config.toml and named in it as a `# omitted:` comment, rather than failing the run (T041). The remaining case is `env`: Codex forwards variables through `env_vars`, which names one string that is both the key and the variable, so a renamed reference such as `API_KEY: env:MY_TOKEN` has nowhere to go. Headers no longer hit this — they are written as `env_http_headers`, which takes any header name (T088). Check the top of the generated file if a server you configured is missing.
@@ -87,6 +95,7 @@ Source: [Codex — Build skills](https://learn.chatgpt.com/docs/build-skills) �
 - [AGENTS.md — a simple, open format for guiding coding agents](https://agents.md/) — retrieved 2026-09-02
 - [Codex — Custom instructions with AGENTS.md](https://developers.openai.com/codex/guides/agents-md) — retrieved 2026-09-02
 - [Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts) — retrieved 2026-09-20
+- [Codex — Subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents) — retrieved 2026-09-29
 - [Codex — Build skills](https://learn.chatgpt.com/docs/build-skills) — retrieved 2026-09-29
 - [Codex — Config reference](https://learn.chatgpt.com/docs/config-file/config-reference) — retrieved 2026-09-04
 - [Codex — Custom prompts](https://learn.chatgpt.com/docs/custom-prompts) — retrieved 2026-09-29

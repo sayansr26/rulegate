@@ -45,9 +45,19 @@ All notable changes to this project are recorded here. This project follows
   commands: each has retired them for skills or documents no project folder.
 - **`init` imports the commands a repository already has**, in each tool's format, and `doctor`
   lists every tool's commands by `/name`.
+- **Canonical subagents.** `.rulegate/agents/<name>.md` holds an agent a tool can hand work to:
+  `name` (the file name), `description`, and the agent's prompt as the body. `sync` places it
+  like a skill — one `.claude/agents/` copy serves Claude Code, Cursor and Copilot at once — and
+  writes Gemini CLI, Antigravity, OpenCode, Kilo and Codex (as TOML) their own. `adapters:` picks
+  which tools get it, because in an agent file `tools:` is the agent's own tool allowlist. **A
+  restriction is never dropped:** a tool that cannot read `tools` or `disallowedTools` in Claude
+  Code's names does not get that agent (`W_AGENT_RESTRICTED`), rather than get one with every
+  tool. Windsurf and Roo Code get no agents. `init` imports existing agents, and `doctor` lists
+  each tool's agents and one it finds in two folders.
 - `AdapterDocs.skills` (the directories a tool reads and the keys it understands),
-  `Artifact.bytes`, `AdapterDocs.commands`, and the `Skill`, `SkillAsset`, `SkillsSupport`,
-  `Command` and `CommandsSupport` types join the adapter kit — additive, per `docs/adapter-api-v1.md`.
+  `Artifact.bytes`, `AdapterDocs.commands`, `AdapterDocs.agents`, and the `Skill`, `SkillAsset`, `SkillsSupport`,
+  `Command`, `CommandsSupport`, `Agent`, `AgentFolder` and `AgentsSupport` types join the adapter
+  kit — additive, per `docs/adapter-api-v1.md`.
 
 ## [0.4.1] — 2026-09-29
 

@@ -40,6 +40,24 @@ export type RulegateErrorCode =
   // A tool's command `init` could not import as-is — invalid here, or a copy that differs from
   // the one imported under the same name (T053). It is left where it is.
   | 'W_COMMAND_IMPORT'
+  // An agent file Rulegate cannot render (T054): no frontmatter, `name` missing or not the
+  // file name, no `description`, a folder, or a restriction in a shape no tool reads.
+  | 'E_AGENT_INVALID'
+  // A tool loads an agent twice, loads one its `adapters:` leaves out, or loads one without the
+  // tool restriction it could not carry, from a folder another tool gets it in (T054).
+  | 'W_AGENT_LOAD'
+  // A tool that cannot carry an agent's `tools` or `disallowedTools` does not get the agent
+  // (T054): dropping a restriction would give the agent more power than its author wrote.
+  | 'W_AGENT_RESTRICTED'
+  // An agent's key no reader of a folder understands was left out of that folder's copy (T054).
+  | 'W_AGENT_FIELD_DROPPED'
+  // An agent's prompt is longer than a tool's documented cap (T054).
+  | 'W_AGENT_OVER_LIMIT'
+  // Agents in a nested `.rulegate/` are not rendered yet (T054), as for skills.
+  | 'W_AGENT_NESTED'
+  // A tool's agent `init` could not import as-is — invalid here, or a copy that differs from
+  // the one imported under the same name (T054). It is left where it is.
+  | 'W_AGENT_IMPORT'
   | 'E_UNKNOWN_TOOL'
   | 'E_ARTIFACT_PATH_CONFLICT'
   | 'E_ARTIFACT_OVERWRITES_SOURCE'

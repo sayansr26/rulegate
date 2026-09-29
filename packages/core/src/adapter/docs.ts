@@ -85,6 +85,36 @@ export interface CommandsSupport {
   readonly source: SourceLink;
 }
 
+/** One folder a tool reads **project agents** from (RFC-0001 §14, T054). */
+export interface AgentFolder {
+  /** Repo-relative POSIX. */
+  readonly dir: string;
+  /** Appended to the agent name: `.md`, `.agent.md`, `.toml`. */
+  readonly extension: string;
+  /** `markdown`: YAML frontmatter, then the prompt. `toml`: `name`, `description`, `developer_instructions`. */
+  readonly format: 'markdown' | 'toml';
+  /**
+   * Keys beyond `name` and `description` this tool reads from files **in this folder**. A
+   * restriction (`tools`, `disallowedTools`) is listed only where the tool reads it in Claude
+   * Code's tool names — the same tool can read Claude's names in `.claude/agents/` and its own
+   * elsewhere, which is why this is per folder.
+   */
+  readonly extensions: readonly string[];
+}
+
+/**
+ * Where a tool reads project agents, and how (RFC-0001 §14, T054). Data for the reason
+ * `skills` is: core places and renders agents generically, sharing a folder several tools
+ * read.
+ */
+export interface AgentsSupport {
+  /** Preferred first. */
+  readonly folders: readonly AgentFolder[];
+  /** A documented cap on an agent's prompt, in characters. */
+  readonly maxChars?: number;
+  readonly source: SourceLink;
+}
+
 export interface DocNote {
   readonly level: 'info' | 'warn';
   readonly message: string;
@@ -150,6 +180,11 @@ export interface AdapterDocs {
    * tool has none Rulegate writes — the adapter's `notes` say why when a tool has some.
    */
   readonly commands?: CommandsSupport;
+  /**
+   * Where this tool reads **project agents** (RFC-0001 §14, T054). Absent means the tool has
+   * none Rulegate writes — the adapter's `notes` say why when a tool has some.
+   */
+  readonly agents?: AgentsSupport;
   /**
    * Who looks after this adapter, for the generated registry page (T060).
    *

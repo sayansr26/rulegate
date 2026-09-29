@@ -118,6 +118,16 @@ export const docs: AdapterDocs = {
         'Roo reads every file in .roo/rules/ regardless of extension. Rulegate imports .md and .txt only; a rule kept under another extension is not lost from disk, but it will not be imported into .rulegate/.',
       source: RULES_DOCS,
     },
+    {
+      level: 'info',
+      message:
+        "Rulegate renders no agents for Roo Code. Roo's custom modes are a different concept — one `.roomodes` file of modes with `roleDefinition` and permission `groups`, which replace the assistant rather than hand work to it.",
+      source: {
+        url: 'https://roocodeinc.github.io/Roo-Code/features/custom-modes',
+        title: 'Roo Code — Customizing Modes',
+        retrieved: '2026-09-29',
+      },
+    },
   ],
   // Roo Code also reads mode-specific `skills-<mode>/` directories, which Rulegate does not generate.
   skills: {

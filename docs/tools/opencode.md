@@ -105,6 +105,14 @@ Frontmatter it reads beyond `description`: `agent`, `model`, `subtask`.
 
 Source: [OpenCode — Commands](https://opencode.ai/docs/commands/) — retrieved 2026-09-29
 
+## Agents
+
+Reads project agents from `.opencode/agents/<name>.md`, preferred first.
+
+- `.opencode/agents/` (Markdown): `mode`, `model`, `temperature`, `top_p`, `permission`, `steps`, `disable`, `hidden`, `color`. Cannot carry a tool restriction, so a restricted agent is not written here for this tool.
+
+Source: [OpenCode — Agents](https://opencode.ai/docs/agents/) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Rulegate owns .opencode/opencode.json entirely and writes only $schema and instructions into it. Put every other setting in the root opencode.json: OpenCode merges the two, and a setting added to the generated file is reported by check as a hand-edit and overwritten only with --force.
@@ -122,6 +130,7 @@ Source: [OpenCode — Commands](https://opencode.ai/docs/commands/) — retrieve
 
 - [OpenCode source — config.ts (mergeConfigConcatArrays)](https://github.com/sst/opencode/blob/dev/packages/opencode/src/config/config.ts) — retrieved 2026-09-26
 - [OpenCode source — instruction.ts (systemPaths)](https://github.com/sst/opencode/blob/dev/packages/opencode/src/session/instruction.ts) — retrieved 2026-09-26
+- [OpenCode — Agents](https://opencode.ai/docs/agents/) — retrieved 2026-09-29
 - [OpenCode — Commands](https://opencode.ai/docs/commands/) — retrieved 2026-09-29
 - [OpenCode — Config](https://opencode.ai/docs/config/) — retrieved 2026-09-26
 - [OpenCode — Rules](https://opencode.ai/docs/rules/) — retrieved 2026-09-26

@@ -84,6 +84,17 @@ Frontmatter it reads beyond `description`: `argument-hint`, `agent`, `model`.
 
 Source: [Visual Studio Code — Use prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files) — retrieved 2026-09-29
 
+## Agents
+
+Reads project agents from `.github/agents/<name>.agent.md`, `.claude/agents/<name>.md`, preferred first.
+
+- `.github/agents/` (Markdown): `argument-hint`, `agents`, `model`, `user-invocable`, `disable-model-invocation`, `target`, `mcp-servers`, `handoffs`, `hooks`. Cannot carry a tool restriction, so a restricted agent is not written here for this tool.
+- `.claude/agents/` (Markdown): `tools`, `model`.
+
+Capped at 30000 characters of prompt.
+
+Source: [Visual Studio Code — Custom agents](https://code.visualstudio.com/docs/copilot/customization/custom-agents) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — The MCP file’s top-level key is `servers`, not the `mcpServers` Claude Code and Cursor use. A `.mcp.json` copied to `.vscode/mcp.json` is valid JSON, loads without complaint and supplies no servers at all — a config that looks right and does nothing. Rulegate generates each from canonical rather than copying one to the other.
@@ -102,6 +113,7 @@ Source: [Visual Studio Code — Use prompt files](https://code.visualstudio.com/
 ## Sources
 
 - [Visual Studio Code — MCP configuration reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) — retrieved 2026-09-04
+- [Visual Studio Code — Custom agents](https://code.visualstudio.com/docs/copilot/customization/custom-agents) — retrieved 2026-09-29
 - [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-26
 - [Visual Studio Code — Use prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files) — retrieved 2026-09-29
 - [Visual Studio Code — Variables reference](https://code.visualstudio.com/docs/reference/variables-reference) — retrieved 2026-09-04

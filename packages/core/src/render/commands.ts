@@ -5,6 +5,7 @@ import { selects } from '../model/selector.js';
 import { compareCodepoint } from '../render/order.js';
 import { HASH_MARKER, HTML_MARKER } from '../render/marker.js';
 import { ensureSingleTrailingNewline } from '../render/eol.js';
+import { tomlBasic, tomlMultiline } from './toml.js';
 import type { Adapter } from '../adapter/adapter.js';
 import type { Artifact } from '../adapter/artifact.js';
 import type { CommandsSupport } from '../adapter/docs.js';
@@ -157,33 +158,6 @@ function renderCommand(
       return marker ? `${HASH_MARKER}\n\n${toml}` : toml;
     }
   }
-}
-
-/**
- * TOML strings, for the two a command file holds. Every `"` and `\` is escaped, and every
- * control character but newline and tab, so no body can close the string early or change
- * what TOML reads. Reference: https://toml.io/en/v1.0.0#string.
- */
-function tomlBasic(value: string): string {
-  return `"${escapeToml(value, false)}"`;
-}
-
-function tomlMultiline(value: string): string {
-  return escapeToml(value, true);
-}
-
-function escapeToml(value: string, multiline: boolean): string {
-  let out = '';
-  for (const ch of value) {
-    const code = ch.codePointAt(0)!;
-    if (ch === '"') out += '\\"';
-    else if (ch === '\\') out += '\\\\';
-    else if (ch === '\n') out += multiline ? '\n' : '\\n';
-    else if (ch === '\t') out += multiline ? '\t' : '\\t';
-    else if (code < 0x20 || code === 0x7f) out += `\\u${code.toString(16).padStart(4, '0')}`;
-    else out += ch;
-  }
-  return out;
 }
 
 function sortedEntries<T>(map: ReadonlyMap<string, T>): [string, T][] {

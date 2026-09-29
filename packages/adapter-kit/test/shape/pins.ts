@@ -28,6 +28,9 @@ import type {
   SkillsSupport,
   Command,
   CommandsSupport,
+  Agent,
+  AgentFolder,
+  AgentsSupport,
   McpTransport,
   SecretValue,
   Canonical,
@@ -137,3 +140,14 @@ pin<
   >
 >();
 pin<Exact<CommandsSupport['format'], 'markdown' | 'markdown-plain' | 'toml'>>();
+
+// Agents (T054).
+pin<
+  Exact<
+    keyof Agent,
+    'id' | 'path' | 'name' | 'description' | 'adapters' | 'frontmatter' | 'body' | 'source'
+  >
+>();
+pin<Exact<keyof AgentFolder, 'dir' | 'extension' | 'format' | 'extensions'>>();
+pin<Exact<AgentFolder['format'], 'markdown' | 'toml'>>();
+pin<Exact<keyof AgentsSupport, 'folders' | 'maxChars' | 'source'>>();

@@ -51,6 +51,7 @@ function canonicalFor(): Canonical {
     mcpServers: [],
     skills: [],
     commands: [],
+    agents: [],
   };
 }
 

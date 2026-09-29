@@ -162,4 +162,28 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // Antigravity's `tools` takes its own exact tool names — a wrong one can hang the agent — so a canonical restriction cannot be carried.
+  agents: {
+    folders: [
+      {
+        dir: '.agents/agents',
+        extension: '.md',
+        format: 'markdown',
+        extensions: [
+          'subagent',
+          'mainAgent',
+          'model',
+          'commandExecutionPolicy',
+          'mcpServers',
+          'skills',
+          'plugins',
+        ],
+      },
+    ],
+    source: {
+      url: 'https://antigravity.google/docs/subagents/',
+      title: 'Google Antigravity — Custom Subagents',
+      retrieved: '2026-09-29',
+    },
+  },
 };

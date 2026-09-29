@@ -8,6 +8,7 @@ import { MANIFEST_PATH, MCP_SERVERS_PATH, SKILL_FILE, ruleIdToPath } from './pat
 import { DEFAULT_MCP_SCOPE, formatEnvRef, type McpServer, type SecretValue } from './mcp.js';
 import type { Canonical } from './canonical.js';
 import type { RuleDocument } from './rule.js';
+import type { Agent } from './agent.js';
 import type { Command } from './command.js';
 import type { Skill } from './skill.js';
 import type { JsonValue } from './ids.js';
@@ -32,6 +33,7 @@ export function serializeCanonical(canonical: Canonical): ReadonlyMap<string, st
     out.set(MCP_SERVERS_PATH, serializeMcpServers(canonical.mcpServers));
   }
   for (const command of canonical.commands) out.set(command.path, serializeCommand(command));
+  for (const agent of canonical.agents) out.set(agent.path, serializeAgent(agent));
   return new Map([...out].sort(([a], [b]) => compareCodepoint(a, b)));
 }
 
@@ -202,6 +204,11 @@ export function serializeSkill(skill: Skill): ReadonlyMap<string, string | Uint8
  */
 export function serializeCommand(command: Command): string {
   return renderSkillFile(command.frontmatter, command.body, false);
+}
+
+/** A canonical agent -> its `.rulegate/agents/<id>.md` (RFC-0001 §14), the same shape again. */
+export function serializeAgent(agent: Agent): string {
+  return renderSkillFile(agent.frontmatter, agent.body, false);
 }
 
 /**
