@@ -122,5 +122,10 @@ and what follows the push:
 - After it succeeds: `npm view rulegate version` shows `<x.y.z>`; in Claude Code,
   `/plugin marketplace update rulegate` then `/plugin update rulegate@rulegate` picks up the
   plugin; draft a GitHub Release from the CHANGELOG section (T111).
-- Provenance: T092 records that `--provenance` has not signed a release yet. Do not claim
-  the release is signed.
+- Homebrew (T061): the `update the Homebrew tap` job pushes `Formula/rulegate.rb` to
+  `sayansr26/homebrew-rulegate` once npm has the version, and `brew install from the tap`
+  installs, audits and tests it on macOS. Both run after publishing, so a red one has not
+  burned the npm version: fix `scripts/stage-homebrew-tap.mjs` or the `HOMEBREW_TAP_TOKEN`
+  secret and re-run the failed jobs. `brew info sayansr26/rulegate/rulegate` shows `<x.y.z>`.
+- Provenance: `verify-published.mjs --attestations` fails the run unless every package has a
+  signed attestation (T092, since v0.4.1). A green run means the release is signed.

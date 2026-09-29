@@ -74,6 +74,9 @@ npx rulegate check    # verify they match — exit 1 on drift. Put this in CI.
 `init` writes nothing without `--yes`, backs up every file it takes ownership of into
 `.rulegate/backup/`, and `rulegate restore` puts them back.
 
+On macOS or Linux with Homebrew, `brew install sayansr26/rulegate/rulegate` installs the same
+release npm serves, and then it is `rulegate init` without `npx`.
+
 ### Claude Code
 
 When Claude Code is configured, `init` also reports its setup state and the Rulegate plugin's
