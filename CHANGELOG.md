@@ -64,6 +64,16 @@ All notable changes to this project are recorded here. This project follows
   `Command`, `CommandsSupport`, `Agent`, `AgentFolder` and `AgentsSupport` types join the adapter
   kit — additive, per `docs/adapter-api-v1.md`.
 
+### Changed
+
+- **`check` and `sync` are about three times faster on large repositories.** Each generated
+  file is now read once instead of twice, in parallel rather than one at a time, and finding
+  nested `.rulegate/` levels walks the repository once instead of twice. On fifty packages
+  `check` takes about 0.3s, down from 0.7s; a `sync` with nothing to write costs the same as
+  `check`. Output is unchanged byte for byte. A benchmark in CI (`pnpm bench`) now fails if
+  `check` or a no-op `sync` goes over 1s on a typical repository or 2s on fifty packages, or
+  grows faster than the number of files.
+
 ## [0.4.1] — 2026-09-29
 
 ### Fixed

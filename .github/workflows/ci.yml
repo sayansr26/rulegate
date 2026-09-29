@@ -163,3 +163,20 @@ jobs:
       # the formatter off every generated path — a formatter and a generator cannot both
       # own a file.
       - run: pnpm format
+
+  bench:
+    name: performance budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # NFR6 as a gate (T062): `check` and a no-op `sync` within budget on a typical repository
+      # and on fifty packages, and growing no faster than O(files) from fifty to a hundred. One
+      # Linux cell, since the budgets are absolute and the runners' speeds are not the same.
+      - run: node scripts/bench.mjs

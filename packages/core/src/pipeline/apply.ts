@@ -1,3 +1,4 @@
+import { ReadCache } from '../fs/read-cache.js';
 import { RulegateError } from '../model/errors.js';
 import { BACKUP_DIR, STATE_PATH } from '../model/paths.js';
 import {
@@ -153,8 +154,14 @@ export async function applyPlan(
   fs: WritableFileSystem,
   options: ApplyOptions = { dryRun: false },
 ): Promise<ApplyReport> {
-  const { state: previous, warning: stateWarning } = await loadState(fs);
-  const comparison = await compareToDisk(previous, plan.artifacts, fs);
+  // Every read up to the write loop's decisions is of the disk as it was before this run: a
+  // planned path is read before it is written and written at most once, since `computePlan`
+  // refuses two artifacts on one path, case-folded. So those reads share one cache, filled in
+  // parallel, as `verifyPlan`'s do (T062); the writes, and every read after one, go to `fs`.
+  const before = new ReadCache(fs);
+  await before.prefetch(plan.artifacts.map((a) => ({ path: a.path, raw: isBinaryArtifact(a) })));
+  const { state: previous, warning: stateWarning } = await loadState(before);
+  const comparison = await compareToDisk(previous, plan.artifacts, before);
   // The comparison already asked the filesystem whether it folds case; reuse its answer
   // rather than probing again, so every layer of one run identifies paths identically
   // (T077). Two layers disagreeing is how a file gets refused as somebody else's by the
@@ -171,7 +178,7 @@ export async function applyPlan(
   const skipped: { path: string; reason: SkipReason }[] = [];
 
   for (const artifact of plan.artifacts) {
-    const diskHash = await hashOnDisk(fs, artifact.path, isBinaryArtifact(artifact));
+    const diskHash = await hashOnDisk(before, artifact.path, isBinaryArtifact(artifact));
     if (diskHash !== undefined && diskHash === artifactHash(artifact)) {
       // Skip the write entirely rather than rewriting identical bytes: this preserves
       // mtimes, keeps file watchers and build caches quiet, and makes "a second run

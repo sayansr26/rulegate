@@ -69,10 +69,18 @@ export async function discoverSources(
     dirs.add(dir);
   };
 
-  for (const p of await fs.glob(`**/${MANIFEST_PATH}`)) add(p, MANIFEST_PATH);
-  // A level may be rules-only, exactly as the root may be. Globbing the manifest alone
-  // would silently skip it, and `parse` already supports the mode.
-  for (const p of await fs.glob(`**/${RULES_GLOB}`)) add(p, `${RULEGATE_DIR}/rules/`);
+  // One walk of the repository, not one per marker (T062): a whole-tree walk is the most
+  // expensive thing `check` does in a monorepo, and the two patterns are applied to its result
+  // exactly as two globs would apply them.
+  //
+  // A level may be rules-only, exactly as the root may be. Matching the manifest alone would
+  // silently skip it, and `parse` already supports the mode.
+  const manifests = `**/${MANIFEST_PATH}`;
+  const rules = `**/${RULES_GLOB}`;
+  for (const p of await fs.glob(`**/${RULEGATE_DIR}/**`)) {
+    if (matchesGlob(p, manifests)) add(p, MANIFEST_PATH);
+    else if (matchesGlob(p, rules)) add(p, `${RULEGATE_DIR}/rules/`);
+  }
 
   const out: NestedSource[] = [];
   // Sequentially and in sorted order, never `Promise.all`: appending in settle order

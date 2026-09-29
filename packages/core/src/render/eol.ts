@@ -21,7 +21,11 @@ export function normalizeEol(s: string): string {
  */
 export function ensureSingleTrailingNewline(s: string): string {
   if (s === '') return '';
-  return s.replace(/\n*$/, '') + '\n';
+  // A scan from the end, not `/\n*$/`: an unanchored regex retries at every position, and
+  // every artifact passes through here, so on a large render it was the hottest line (T062).
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 10) end -= 1;
+  return `${s.slice(0, end)}\n`;
 }
 
 /** stripBom -> normalizeEol. Applied to every text read at the io boundary. */

@@ -1,3 +1,4 @@
+import { ReadCache } from '../fs/read-cache.js';
 import {
   artifactHash,
   hashOnDisk,
@@ -80,7 +81,12 @@ export interface VerifyReport {
  * EOL-normalized, `hashContents` is EOL-blind, and `sync` would not rewrite it, so
  * `check` must not fail a Windows checkout for a difference `sync` does not see.
  */
-export async function verifyPlan(plan: Plan, fs: ReadOnlyFileSystem): Promise<VerifyReport> {
+export async function verifyPlan(plan: Plan, disk: ReadOnlyFileSystem): Promise<VerifyReport> {
+  // Every read below goes through one cache, filled in parallel first: each artifact is read
+  // once instead of once per comparison, and never one await at a time (T062). The answers are
+  // the disk's, keyed by path, so the report is the one the sequential reads would give.
+  const fs = new ReadCache(disk);
+  await fs.prefetch(plan.artifacts.map((a) => ({ path: a.path, raw: isBinaryArtifact(a) })));
   const { state, warning } = await loadState(fs);
   const comparison = await compareToDisk(state, plan.artifacts, fs);
   const handEdited = new Set(comparison.changed);
