@@ -592,6 +592,10 @@ async function read(ctx: AdapterContext): Promise<InteropResult> {
   const rules: RuleDocument[] = [];
   const taken = new Set<string>();
   const generated: string[] = [];
+  const skillSources: string[] = [];
+  // Skill copies carry no banner, so which of them are agent-os's output is decided by
+  // content: see the loop below.
+  const inferred: string[] = [];
   const notImported: string[] = [];
   const notes: Note[] = [];
   const errors: RulegateError[] = [];
@@ -697,20 +701,22 @@ async function read(ctx: AdapterContext): Promise<InteropResult> {
 
   // By files, not by the directory: `agent-os init` creates an empty `skills/`, and git does
   // not track an empty directory, so a check on it would answer differently in a fresh clone.
-  if ((await ctx.fs.glob(`${SKILLS_DIR}/**/*`)).length > 0) {
-    notImported.push(SKILLS_DIR);
-    const copies: string[] = [];
-    for (const skill of await ctx.fs.glob(`${SKILLS_DIR}/*/SKILL.md`)) {
-      const name = skill.slice(SKILLS_DIR.length + 1, -'/SKILL.md'.length);
-      for (const dir of SKILL_COPIES) {
-        if (await ctx.fs.exists(`${dir}/${name}`)) copies.push(`${dir}/${name}`);
+  // Skills are imported from their source (T052): each `.agent-os/skills/<name>/` becomes a
+  // canonical skill, and the copies agent-os made of it in the tools' directories are its
+  // output — listed file by file, because they are masked by exact path, so the skills importer
+  // never takes a copy for a second source.
+  for (const skill of await ctx.fs.glob(`${SKILLS_DIR}/*/SKILL.md`)) {
+    const name = skill.slice(SKILLS_DIR.length + 1, -'/SKILL.md'.length);
+    skillSources.push(`${SKILLS_DIR}/${name}`);
+    for (const dir of SKILL_COPIES) {
+      for (const file of await ctx.fs.glob(`${dir}/${name}/**`)) {
+        if (!file.startsWith(`${dir}/${name}/`)) continue;
+        generated.push(file);
+        // A copy byte-identical to its source is agent-os's output, verified. One that differs
+        // was edited, so `init` names it before replacing it rather than take it on trust.
+        const source = `${SKILLS_DIR}/${name}/${file.slice(dir.length + name.length + 2)}`;
+        if (!(await sameFile(ctx, source, file))) inferred.push(file);
       }
-    }
-    if (copies.length > 0) {
-      notes.push({
-        path: SKILLS_DIR,
-        message: `agent-os copied these skills to ${copies.join(', ')}. Rulegate does not manage skills yet, so the copies stay as they are and nothing keeps them in step with ${SKILLS_DIR} any more`,
-      });
     }
   }
 
@@ -763,7 +769,16 @@ async function read(ctx: AdapterContext): Promise<InteropResult> {
     if (lines.length > 0) notes.push(mentionNote(path, lines));
   }
 
-  return { rules, generated, notImported, tools: [...tools], notes, errors };
+  return {
+    rules,
+    generated,
+    inferred,
+    skillSources,
+    notImported,
+    tools: [...tools],
+    notes,
+    errors,
+  };
 }
 
 export const agentOs: InteropImporter = {
@@ -772,3 +787,10 @@ export const agentOs: InteropImporter = {
   detect,
   read,
 };
+
+/** Whether two files hold the same bytes; false when either is absent. */
+async function sameFile(ctx: AdapterContext, a: string, b: string): Promise<boolean> {
+  if (!(await ctx.fs.exists(a)) || !(await ctx.fs.exists(b))) return false;
+  const [x, y] = [await ctx.fs.readFileRaw(a), await ctx.fs.readFileRaw(b)];
+  return x.length === y.length && x.every((v, i) => v === y[i]);
+}

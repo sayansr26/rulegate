@@ -101,4 +101,14 @@ export const docs: AdapterDocs = {
       source: RULES_DOCS,
     },
   ],
+  // `.cline/skills/` is recommended; `.clinerules/skills/` and `.claude/skills/` are also read.
+  skills: {
+    dirs: ['.cline/skills', '.clinerules/skills', '.claude/skills'],
+    extensions: [],
+    source: {
+      url: 'https://docs.cline.bot/features/skills',
+      title: 'Cline — Skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };

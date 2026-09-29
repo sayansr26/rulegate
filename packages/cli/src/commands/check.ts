@@ -214,6 +214,7 @@ export function reportCheck(result: CheckResult, options: CheckOptions): ExitCod
  * deletion, is noise about content the reader already knows.
  */
 function diffFor(entry: VerifyEntry, c: Parameters<typeof renderDiff>[1]): string[] {
+  if (entry.binary === true && entry.status !== 'missing') return ['  binary files differ'];
   if (entry.expected === undefined || entry.actual === undefined) return [];
   return renderDiff(formatHunks(diffLines(entry.actual, entry.expected)), c);
 }

@@ -94,6 +94,8 @@ const NOT_ADAPTER_FIXTURES = new Set([
   'agent-os-import-scaffold',
   'ruler-import',
   'rulesync-import',
+  // Rendered through core's skills planner from the whole registry, not one adapter (T052).
+  'skills-sync',
 ]);
 
 /** Every `fixtures/<dir>` that has both `input/` and `expected/`. */

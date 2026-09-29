@@ -161,6 +161,15 @@ export class NodeFileSystem implements WritableFileSystem {
     });
   }
 
+  async writeBytes(relPath: string, bytes: Uint8Array): Promise<void> {
+    const abs = this.resolve(relPath);
+    await withPathErrors(relPath, abs, async () => {
+      await fs.mkdir(path.dirname(abs), { recursive: true });
+      await this.#materialize(abs);
+      await fs.writeFile(abs, bytes);
+    });
+  }
+
   async copyFile(fromRelPath: string, toRelPath: string): Promise<void> {
     const to = this.resolve(toRelPath);
     await withPathErrors(toRelPath, to, async () => {

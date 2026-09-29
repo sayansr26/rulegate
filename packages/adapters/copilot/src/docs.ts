@@ -153,4 +153,14 @@ export const docs: AdapterDocs = {
       source: VSCODE_CUSTOM_INSTRUCTIONS,
     },
   ],
+  // Copilot reads all three project directories, so a skill in two of them is loaded twice.
+  skills: {
+    dirs: ['.github/skills', '.claude/skills', '.agents/skills'],
+    extensions: [],
+    source: {
+      url: 'https://docs.github.com/en/copilot/concepts/agents/about-agent-skills',
+      title: 'GitHub Copilot — About agent skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };

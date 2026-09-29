@@ -78,7 +78,10 @@ export async function computeMergePlan(input: MergeInput): Promise<MergePlan> {
 
   const { state } = await loadState(fs);
   const recorded = new Map(state.artifacts.map((a) => [a.path, a.hash]));
-  const rendered = new Map(plan.artifacts.map((a) => [a.path, a.contents]));
+  // Text only: a hand-edit to a binary asset has no lines to merge back (T052).
+  const rendered = new Map(
+    plan.artifacts.filter((a) => a.bytes === undefined).map((a) => [a.path, a.contents]),
+  );
 
   // Which adapter owns each hand-edited path, so only the adapters that actually have an
   // edit to recover are re-read.

@@ -109,4 +109,14 @@ export const docs: AdapterDocs = {
       source: RULES_DOCS,
     },
   ],
+  // `.devin/skills/` is preferred and `.windsurf/skills/` is legacy. `.claude/skills/` is read only when a setting enables it, so it is not counted on.
+  skills: {
+    dirs: ['.devin/skills', '.windsurf/skills', '.agents/skills'],
+    extensions: [],
+    source: {
+      url: 'https://docs.devin.ai/desktop/cascade/skills',
+      title: 'Windsurf — Cascade skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };

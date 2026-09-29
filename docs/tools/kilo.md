@@ -101,6 +101,14 @@ Source: [Kilo source — Kilocode rules migration](https://github.com/Kilo-Org/k
 
 Kilo documents no size cap on rule files or AGENTS.md.
 
+## Skills
+
+Reads project skills from `.kilo/skills/`, `.agents/skills/`, `.claude/skills/`, preferred first.
+
+Reads only the Agent Skills frontmatter fields.
+
+Source: [Kilo Code — Skills](https://kilo.ai/docs/agent-behavior/skills) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Rulegate writes .kilocode/rules/, which Kilo documents as legacy and loads only for backward compatibility; its docs recommend moving rules into kilo.jsonc instructions. Rulegate cannot follow that advice without owning kilo.jsonc, which Kilo's own Settings UI edits. If Kilo drops the legacy loader, the generated rules stop loading and nothing reports it.
@@ -115,6 +123,7 @@ Kilo documents no size cap on rule files or AGENTS.md.
 ## Sources
 
 - [Kilo source — Kilocode rules migration](https://github.com/Kilo-Org/kilo/blob/main/packages/opencode/src/kilocode/docs/rules-migration.md) — retrieved 2026-09-26
+- [Kilo Code — Skills](https://kilo.ai/docs/agent-behavior/skills) — retrieved 2026-09-29
 - [Kilo Code — AGENTS.md](https://kilo.ai/docs/customize/agents-md) — retrieved 2026-09-26
 - [Kilo Code — Custom rules](https://kilo.ai/docs/customize/custom-rules) — retrieved 2026-09-26
 - [Kilo Code — Settings and config files](https://kilo.ai/docs/getting-started/settings) — retrieved 2026-09-26

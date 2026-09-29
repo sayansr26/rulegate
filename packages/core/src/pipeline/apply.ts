@@ -1,7 +1,10 @@
 import { RulegateError } from '../model/errors.js';
 import { BACKUP_DIR, STATE_PATH } from '../model/paths.js';
 import {
-  hashContents,
+  artifactHash,
+  hashOnDisk,
+  isBinaryArtifact,
+  isRawHash,
   loadState,
   serializeState,
   findArtifact,
@@ -168,8 +171,8 @@ export async function applyPlan(
   const skipped: { path: string; reason: SkipReason }[] = [];
 
   for (const artifact of plan.artifacts) {
-    const onDisk = await fs.tryReadFile(artifact.path);
-    if (onDisk !== undefined && hashContents(onDisk) === hashContents(artifact.contents)) {
+    const diskHash = await hashOnDisk(fs, artifact.path, isBinaryArtifact(artifact));
+    if (diskHash !== undefined && diskHash === artifactHash(artifact)) {
       // Skip the write entirely rather than rewriting identical bytes: this preserves
       // mtimes, keeps file watchers and build caches quiet, and makes "a second run
       // rewrites nothing" literally true.
@@ -190,7 +193,7 @@ export async function applyPlan(
       continue;
     }
 
-    if (handEdited.has(artifact.path) && onDisk !== undefined && backupEnabled) {
+    if (handEdited.has(artifact.path) && diskHash !== undefined && backupEnabled) {
       // T069's remaining half. `--force` covered only `unmanaged` paths, so a hand-edited
       // generated file had no flag-based escape hatch at all — the only way forward was to
       // delete the file by hand, and nothing in the output said so. Widening it waited for
@@ -208,14 +211,17 @@ export async function applyPlan(
       continue;
     }
 
-    if (unmanaged.has(artifact.path) && onDisk !== undefined && backupEnabled) {
+    if (unmanaged.has(artifact.path) && diskHash !== undefined && backupEnabled) {
       // Ordering matters: the copy has to land before the overwrite, or `--force` is
       // just data loss with extra steps.
       if (!options.dryRun) await fs.copyFile(artifact.path, backupPathFor(artifact.path));
       backedUp.push(artifact.path);
     }
 
-    if (!options.dryRun) await fs.writeFile(artifact.path, artifact.contents);
+    if (!options.dryRun) {
+      if (artifact.bytes === undefined) await fs.writeFile(artifact.path, artifact.contents);
+      else await fs.writeBytes(artifact.path, artifact.bytes);
+    }
     written.push(artifact.path);
   }
 
@@ -299,13 +305,13 @@ async function reclaimOrphans(
 
   for (const path of candidates) {
     const record = assertDeletable(path, previous, options.key);
-    const onDisk = await fs.tryReadFile(path);
+    const onDisk = await hashOnDisk(fs, path, isRawHash(record.hash));
     if (onDisk === undefined) {
       vanished.push(path);
       continue;
     }
 
-    if (hashContents(onDisk) !== record.hash) {
+    if (onDisk !== record.hash) {
       refused.push(path);
       continue;
     }
@@ -427,6 +433,8 @@ async function listFilesUnder(fs: ReadOnlyFileSystem, dir: string): Promise<read
 export interface CanonicalFile {
   readonly path: string;
   readonly contents: string;
+  /** A skill's asset (T052): written byte for byte, never as text. */
+  readonly bytes?: Uint8Array;
   readonly kind: 'create' | 'modify' | 'leave-alone';
 }
 
@@ -462,7 +470,10 @@ export async function applyCanonicalFiles(
       unchanged.push(file.path);
       continue;
     }
-    if (!options.dryRun) await fs.writeFile(file.path, file.contents);
+    if (!options.dryRun) {
+      if (file.bytes === undefined) await fs.writeFile(file.path, file.contents);
+      else await fs.writeBytes(file.path, file.bytes);
+    }
     written.push(file.path);
   }
 

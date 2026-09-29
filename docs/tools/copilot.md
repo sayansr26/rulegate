@@ -66,6 +66,14 @@ Source: [Visual Studio Code — Use custom instructions in VS Code](https://code
 
 No byte cap is documented in the GitHub or VS Code instruction documentation cited above. The relevant cost is not a cap but the additive loading described in the notes below: the repository-wide file, any matching path-specific file, and AGENTS.md are all sent together.
 
+## Skills
+
+Reads project skills from `.github/skills/`, `.claude/skills/`, `.agents/skills/`, preferred first.
+
+Reads only the Agent Skills frontmatter fields.
+
+Source: [GitHub Copilot — About agent skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — The MCP file’s top-level key is `servers`, not the `mcpServers` Claude Code and Cursor use. A `.mcp.json` copied to `.vscode/mcp.json` is valid JSON, loads without complaint and supplies no servers at all — a config that looks right and does nothing. Rulegate generates each from canonical rather than copying one to the other.
@@ -86,4 +94,5 @@ No byte cap is documented in the GitHub or VS Code instruction documentation cit
 - [Visual Studio Code — MCP configuration reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) — retrieved 2026-09-04
 - [Visual Studio Code — Use custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) — retrieved 2026-09-26
 - [Visual Studio Code — Variables reference](https://code.visualstudio.com/docs/reference/variables-reference) — retrieved 2026-09-04
+- [GitHub Copilot — About agent skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) — retrieved 2026-09-29
 - [GitHub Docs — Adding repository custom instructions for GitHub Copilot](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions) — retrieved 2026-09-02

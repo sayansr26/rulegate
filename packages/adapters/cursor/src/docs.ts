@@ -99,4 +99,14 @@ export const docs: AdapterDocs = {
         'Cursor scopes rules natively via `globs`, so glob-scoped rules do not carry the prose "Applies to:" line that single-file targets such as CLAUDE.md require.',
     },
   ],
+  // Cursor prefers `.agents/skills/` and `.cursor/skills/`, and still reads `.claude/skills/` and `.codex/skills/` for compatibility. `globs` is the legacy spelling of `paths`.
+  skills: {
+    dirs: ['.agents/skills', '.cursor/skills', '.claude/skills', '.codex/skills'],
+    extensions: ['paths', 'disable-model-invocation', 'icon', 'color', 'globs'],
+    source: {
+      url: 'https://cursor.com/docs/context/skills',
+      title: 'Cursor — Agent skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };

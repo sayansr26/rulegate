@@ -393,6 +393,13 @@ async function files(dir: string, prefix = ''): Promise<string[]> {
 }
 
 /** agent-os 0.6.0's bannered outputs in `fixtures/agent-os-import/input`. */
+/** agent-os's copies of `.agent-os/skills/review/`, output by name alone (T052). */
+const AGENT_OS_SKILL_COPIES = [
+  '.agents/skills/review/SKILL.md',
+  '.claude/skills/review/SKILL.md',
+  '.cline/skills/review/SKILL.md',
+];
+
 const AGENT_OS_OUTPUTS = [
   '.agents/rules/api.md',
   '.agents/rules/style.md',
@@ -449,10 +456,15 @@ describe('interop — agent-os (T105)', () => {
 
   it('masks exactly the files that carry a banner', async () => {
     const found = await readWith(agentOs, 'agent-os-import');
-    // Not CLAUDE.md or `.cursor/rules/team.mdc`, not the merged JSON configs, not the skill
-    // copies: none carries a banner, and each is somebody's file or a copy no adapter
-    // imports. `team.mdc` is the one that matters — it is in an output location.
-    expect([...found.generated].sort()).toEqual(AGENT_OS_OUTPUTS);
+    // Not CLAUDE.md or `.cursor/rules/team.mdc`, not the merged JSON configs: none carries a
+    // banner, and each is somebody's file. `team.mdc` is the one that matters — it is in an
+    // output location. The skill copies are masked too (T052).
+    expect([...found.generated].sort()).toEqual(
+      [...AGENT_OS_OUTPUTS, ...AGENT_OS_SKILL_COPIES].sort(),
+    );
+    // Each copy matches its source byte for byte, so none is taken on name alone.
+    expect(found.inferred ?? []).toEqual([]);
+    expect(found.skillSources).toEqual(['.agent-os/skills/review']);
   });
 
   it('takes ownership of every agent-os output by rendering to the same path', async () => {
@@ -462,7 +474,13 @@ describe('interop — agent-os (T105)', () => {
     const plan = await init('agent-os-import');
     const rendered = new Set(plan.plan.artifacts.map((a) => a.path));
     for (const output of AGENT_OS_OUTPUTS) expect(rendered, output).toContain(output);
-    expect(plan.warnings.filter((w) => w.code === 'W_INTEROP_OUTPUT_LEFT')).toEqual([]);
+    // The skill is rendered where the enabled tools read it. Cline reads `.claude/skills/`
+    // too, so its own copy is not regenerated — and is named, since Cline would load both.
+    expect(rendered).toContain('.agents/skills/review/SKILL.md');
+    expect(rendered).toContain('.claude/skills/review/SKILL.md');
+    expect(
+      plan.warnings.filter((w) => w.code === 'W_INTEROP_OUTPUT_LEFT').map((w) => w.source?.file),
+    ).toEqual(['.cline/skills/review/SKILL.md']);
   });
 
   it('names everything it did not carry, and prints the plugin settings it cannot write', async () => {
@@ -471,10 +489,9 @@ describe('interop — agent-os (T105)', () => {
       .filter((w) => w.code === 'W_INTEROP_NOT_IMPORTED')
       .map((w) => w.message);
 
-    expect(messages).toContainEqual(expect.stringContaining('`.agent-os/skills` was found'));
-    expect(messages).toContainEqual(
-      expect.stringContaining('.agents/skills/review, .claude/skills/review, .cline/skills/review'),
-    );
+    // Skills are carried since T052, so nothing about them is reported as left behind.
+    expect(messages.filter((m) => m.includes('skills'))).toEqual([]);
+    expect(plan.canonical.skills.map((s) => s.id)).toEqual(['review']);
     // The exact `.claude/rulegate.json` payload, so /rulegate:init (T106) or a person can
     // write it: `rulegate init` never does, because the file's existence is how the plugin
     // knows a project has been set up.
@@ -561,6 +578,25 @@ describe('interop — agent-os edge cases (T105)', () => {
     await writeFile(path.join(repo, rel), contents);
   };
 
+  it('takes a skill copy edited since agent-os wrote it on name alone, and names it (T052)', async () => {
+    await setup();
+    try {
+      await cp(path.join(fixtures, 'agent-os-import/input'), repo, { recursive: true });
+      await put(
+        '.claude/skills/review/SKILL.md',
+        '---\nname: review\ndescription: Edited.\n---\n\nX\n',
+      );
+      expect((await readAt(repo)).inferred).toEqual(['.claude/skills/review/SKILL.md']);
+      // So init says what it is about to replace, rather than take the edit as agent-os's.
+      const named = (await initAt(repo)).warnings
+        .filter((w) => w.code === 'W_INIT_NOT_IMPORTED')
+        .map((w) => w.source?.file);
+      expect(named).toEqual(['.claude/skills/review/SKILL.md']);
+    } finally {
+      await cleanup();
+    }
+  });
+
   it('names an agent-os output that nothing Rulegate renders replaces', async () => {
     await setup();
     try {
@@ -584,6 +620,7 @@ describe('interop — agent-os edge cases (T105)', () => {
       // output: the hint has to send the user to look first.
       expect(byFile.get('.cursor/rules/API.mdc')?.hint).toContain('list the directory');
       expect(warnings.map((w) => w.source?.file)).toEqual([
+        '.cline/skills/review/SKILL.md',
         '.cursor/rules/API.mdc',
         '.windsurf/rules/stale.md',
       ]);

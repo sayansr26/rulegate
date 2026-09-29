@@ -15,8 +15,14 @@ export type ArtifactKind = 'rules' | 'mcp' | 'skill' | 'command' | 'subagent' | 
 export interface Artifact {
   /** Repo-relative POSIX. Must not be one of `manifest.canonicalSources`. */
   readonly path: string;
-  /** Full file contents: \n only, exactly one trailing \n, no BOM. */
+  /** Full file contents: \n only, exactly one trailing \n, no BOM. Empty when `bytes` is set. */
   readonly contents: string;
+  /**
+   * Set for a binary artifact — a skill's asset (T052). Written byte for byte, hashed over
+   * the raw bytes and compared through `readFileRaw`, because every text path normalises
+   * EOL and strips a BOM, which would corrupt a PNG and change a CRLF script.
+   */
+  readonly bytes?: Uint8Array;
   readonly adapter: ToolId;
   readonly kind: ArtifactKind;
   /** Which canonical rules contributed. Powers `doctor` (T026) and merge (T045). */

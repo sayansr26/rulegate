@@ -110,6 +110,32 @@ export async function expectDocsValid(
       problems.push(...checkSource(`${adapter.name}.docs.notes`, note.source));
   }
 
+  if (docs.skills !== undefined) {
+    // Core decides from these directories where every skill is written (T052), so a path
+    // that is absolute, escapes the repository or is listed twice would put a user's files
+    // somewhere no tool reads — or somewhere outside the repository.
+    const where = `${adapter.name}.docs.skills`;
+    const { dirs, extensions, source } = docs.skills;
+    if (dirs.length === 0) problems.push(`${where}.dirs is empty; omit \`skills\` instead`);
+    for (const dir of dirs) {
+      if (
+        dir.startsWith('/') ||
+        dir.includes('\\') ||
+        dir.split('/').includes('..') ||
+        dir.endsWith('/')
+      ) {
+        problems.push(
+          `${where}.dirs: \`${dir}\` must be a repo-relative POSIX path with no trailing /`,
+        );
+      }
+    }
+    if (new Set(dirs).size !== dirs.length) problems.push(`${where}.dirs lists a directory twice`);
+    if (new Set(extensions).size !== extensions.length) {
+      problems.push(`${where}.extensions lists a key twice`);
+    }
+    problems.push(...checkSource(where, source));
+  }
+
   if (docs.resolution === undefined) {
     // The field is optional in the type so that an external adapter is not broken by its
     // addition, but every adapter *we* ship must state it: "highest precedence first"

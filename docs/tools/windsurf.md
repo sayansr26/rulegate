@@ -54,6 +54,14 @@ Source: [Windsurf — Rules and memories (Cascade)](https://docs.devin.ai/deskto
 
 Windsurf documents 12,000 characters per workspace rule file and 6,000 for the global one. Rulegate measures bytes, so a rule using non-ASCII characters may be reported over the limit while still being under it.
 
+## Skills
+
+Reads project skills from `.devin/skills/`, `.windsurf/skills/`, `.agents/skills/`, preferred first.
+
+Reads only the Agent Skills frontmatter fields.
+
+Source: [Windsurf — Cascade skills](https://docs.devin.ai/desktop/cascade/skills) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Multiple glob patterns are undocumented. The vendor shows a single bare pattern (globs: **/*.test.ts) and does not say how several are separated; Rulegate joins them with commas, matching Cursor .mdc and community practice. A rule whose scoping matters and that carries more than one pattern is worth checking in Windsurf before relying on it.
@@ -66,3 +74,4 @@ Windsurf documents 12,000 characters per workspace rule file and 6,000 for the g
 ## Sources
 
 - [Windsurf — Rules and memories (Cascade)](https://docs.devin.ai/desktop/cascade/memories) — retrieved 2026-09-04
+- [Windsurf — Cascade skills](https://docs.devin.ai/desktop/cascade/skills) — retrieved 2026-09-29

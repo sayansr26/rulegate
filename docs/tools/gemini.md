@@ -45,6 +45,14 @@ Source: [Gemini CLI — Provide context with GEMINI.md files](https://google-gem
 
 No byte cap is documented in the Gemini CLI documentation cited above. Gemini concatenates rather than selects — global, ancestor and subdirectory context files are all joined into every prompt — so the total grows with the number of files on the path, not just their size.
 
+## Skills
+
+Reads project skills from `.agents/skills/`, `.gemini/skills/`, preferred first.
+
+Reads only the Agent Skills frontmatter fields.
+
+Source: [Gemini CLI — Agent skills](https://geminicli.com/docs/cli/skills/) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Gemini reads AGENTS.md only if `context.fileName` in .gemini/settings.json says so — it is a configured alias, not a built-in fallback. A repository that has set it and also enables the codex adapter gives Gemini the same rules twice, once from GEMINI.md and once from AGENTS.md. Rulegate does not read settings.json, so it cannot warn about this per-repo; `doctor` reports the setting rather than guessing.
@@ -55,4 +63,5 @@ No byte cap is documented in the Gemini CLI documentation cited above. Gemini co
 
 ## Sources
 
+- [Gemini CLI — Agent skills](https://geminicli.com/docs/cli/skills/) — retrieved 2026-09-29
 - [Gemini CLI — Provide context with GEMINI.md files](https://google-gemini.github.io/gemini-cli/docs/cli/gemini-md.html) — retrieved 2026-09-02

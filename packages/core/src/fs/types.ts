@@ -36,6 +36,8 @@ export interface ReadOnlyFileSystem {
 export interface WritableFileSystem extends ReadOnlyFileSystem {
   /** Writes UTF-8 without a BOM, creating parent directories as needed. */
   writeFile(relPath: string, contents: string): Promise<void>;
+  /** Writes bytes unmodified, creating parent directories as needed (binary artifacts, T052). */
+  writeBytes(relPath: string, bytes: Uint8Array): Promise<void>;
   /**
    * Copies bytes verbatim, creating parent directories as needed.
    *

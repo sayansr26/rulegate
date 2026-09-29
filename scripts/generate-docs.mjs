@@ -120,6 +120,22 @@ function renderToolPage(adapter) {
   }
   out.push(docs.limits?.note ?? 'No cap is recorded for this tool.', '');
 
+  // Skills (T052): where this tool reads project skills, which decides where `sync` puts them.
+  if (docs.skills !== undefined) {
+    out.push('## Skills', '');
+    out.push(
+      `Reads project skills from ${docs.skills.dirs.map((d) => `\`${d}/\``).join(', ')}, preferred first.`,
+      '',
+    );
+    out.push(
+      docs.skills.extensions.length === 0
+        ? 'Reads only the Agent Skills frontmatter fields.'
+        : `Frontmatter it reads beyond the Agent Skills fields: ${docs.skills.extensions.map((k) => `\`${k}\``).join(', ')}.`,
+      '',
+    );
+    out.push(`Source: ${sourceLine(docs.skills.source)}`, '');
+  }
+
   if ((docs.notes ?? []).length > 0) {
     out.push('## Notes', '');
     for (const note of docs.notes ?? []) {
@@ -135,6 +151,7 @@ function renderToolPage(adapter) {
   for (const note of docs.notes ?? []) {
     if (note.source !== undefined) seen.set(note.source.url, note.source);
   }
+  if (docs.skills !== undefined) seen.set(docs.skills.source.url, docs.skills.source);
   for (const source of [...seen.values()].sort((a, b) => (a.url < b.url ? -1 : 1))) {
     out.push(`- ${sourceLine(source)}`);
   }
@@ -149,7 +166,7 @@ function coverageOf(adapter) {
   const parts = [];
   if (roles.has('instructions')) parts.push('rules');
   if (roles.has('mcp')) parts.push('MCP');
-  if (roles.has('skills')) parts.push('skills');
+  if (roles.has('skills') || adapter.docs.skills !== undefined) parts.push('skills');
   return parts.length === 0 ? '—' : parts.join(', ');
 }
 

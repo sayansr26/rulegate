@@ -177,4 +177,14 @@ export const docs: AdapterDocs = {
       source: SETTINGS_DOCS,
     },
   ],
+  // Kilo reads `.kilo/skills/`, `.agents/skills/` and `.claude/skills/`, plus paths configured in `skills.paths`.
+  skills: {
+    dirs: ['.kilo/skills', '.agents/skills', '.claude/skills'],
+    extensions: [],
+    source: {
+      url: 'https://kilo.ai/docs/agent-behavior/skills',
+      title: 'Kilo Code — Skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };

@@ -111,8 +111,20 @@ export interface ToolDiagnosis {
   readonly loadedCount: number;
   readonly loadedBytes: number;
   readonly loadedTokens: number;
+  /**
+   * The project skills this tool would load from disk, from the directories its
+   * `AdapterDocs.skills` names (T052), sorted by id. Absent for a tool without skills. A skill
+   * listed under two directories is loaded twice, which `W_DUPLICATE_LOAD` reports.
+   */
+  readonly skills?: readonly SkillDiagnosis[];
   /** Set when the adapter's `detect()` threw or its `apiVersion` is unreadable. */
   readonly failed?: RulegateError;
+}
+
+export interface SkillDiagnosis {
+  readonly id: string;
+  /** Every directory the skill was found under, in the tool's preference order. */
+  readonly dirs: readonly string[];
 }
 
 export type DoctorWarningCode =

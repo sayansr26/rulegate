@@ -1,4 +1,4 @@
-import { hashContents, type StateFile } from './state.js';
+import { artifactHash, hashOnDisk, isBinaryArtifact, isRawHash, type StateFile } from './state.js';
 import { compareCodepoint } from '../render/order.js';
 import type { Artifact } from '../adapter/artifact.js';
 import { pathKeyFor, probeCaseInsensitive } from '../fs/case.js';
@@ -66,19 +66,23 @@ export async function compareToDisk(
   const recorded = new Map(state.artifacts.map((a) => [key(a.path), a]));
 
   for (const artifact of artifacts) {
-    const onDisk = await fs.tryReadFile(artifact.path);
+    const binary = isBinaryArtifact(artifact);
+    const diskHash = await hashOnDisk(fs, artifact.path, binary);
     const record = recorded.get(key(artifact.path));
 
-    if (onDisk === undefined) {
+    if (diskHash === undefined) {
       (record === undefined ? untracked : missing).push(artifact.path);
       continue;
     }
 
-    const diskHash = hashContents(onDisk);
     if (record === undefined) {
       // Identical bytes are not a conflict; adopt them rather than block on them.
-      (diskHash === hashContents(artifact.contents) ? unchanged : unmanaged).push(artifact.path);
-    } else if (diskHash !== record.hash) {
+      (diskHash === artifactHash(artifact) ? unchanged : unmanaged).push(artifact.path);
+    } else if (
+      (isRawHash(record.hash) === binary
+        ? diskHash
+        : await hashOnDisk(fs, artifact.path, isRawHash(record.hash))) !== record.hash
+    ) {
       changed.push(artifact.path);
     } else {
       unchanged.push(artifact.path);
@@ -100,6 +104,6 @@ export async function compareToDisk(
 
 /** True when the on-disk bytes already equal what we would write. */
 export async function isUpToDate(artifact: Artifact, fs: ReadOnlyFileSystem): Promise<boolean> {
-  const onDisk = await fs.tryReadFile(artifact.path);
-  return onDisk !== undefined && hashContents(onDisk) === hashContents(artifact.contents);
+  const onDisk = await hashOnDisk(fs, artifact.path, isBinaryArtifact(artifact));
+  return onDisk !== undefined && onDisk === artifactHash(artifact);
 }

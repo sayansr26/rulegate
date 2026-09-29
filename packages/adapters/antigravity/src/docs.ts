@@ -142,4 +142,14 @@ export const docs: AdapterDocs = {
       source: RULES_DOCS,
     },
   ],
+  // `.agents/skills/` is the default; `.agent/skills/` is kept for backward compatibility.
+  skills: {
+    dirs: ['.agents/skills', '.agent/skills'],
+    extensions: [],
+    source: {
+      url: 'https://antigravity.google/docs/skills',
+      title: 'Google Antigravity — Skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };

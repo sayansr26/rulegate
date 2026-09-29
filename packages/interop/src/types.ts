@@ -49,6 +49,13 @@ export interface InteropResult {
    */
   readonly inferred?: readonly string[];
   /**
+   * Skill directories this tool keeps as its **source** (T052), e.g. `.agent-os/skills/review`.
+   * `init` parses each as a canonical skill, ahead of any copy found in a tool's skills
+   * directory — those copies are this tool's output and belong in `generated`, file by file.
+   * Optional, and absent means the tool has no skills.
+   */
+  readonly skillSources?: readonly string[];
+  /**
    * What was found and deliberately not imported — MCP servers, skills, subagents.
    *
    * Printed by `init`. Silence here would be the quiet loss this project refuses everywhere

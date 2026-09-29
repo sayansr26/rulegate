@@ -2,6 +2,7 @@ import { RulegateError } from '../model/errors.js';
 import { escapesRoot, normalizeRelative } from '../fs/paths.js';
 import { isCanonicalSource } from '../model/canonical.js';
 import { STATE_PATH } from '../model/paths.js';
+import { planSkills } from '../render/skills.js';
 import { finalizeArtifact } from '../render/finalize.js';
 import { scanTextForSecrets } from '../render/secrets.js';
 import { sortArtifacts } from '../render/order.js';
@@ -148,6 +149,105 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
       inheritedFrom: level.inheritedFrom,
     });
 
+    // Every artifact this level produces — each adapter's, and the skills core renders from
+    // adapter data (T052) — passes the same gates, so a skill cannot land on a path an adapter
+    // owns, overwrite canonical input or escape the repository by a route the others cannot.
+    const accept = (raw: Artifact, owner: ToolId): void => {
+      const artifact = finalizeArtifact(raw);
+      // The adapter renders a repo-relative path and knows nothing about levels; the
+      // prefix is applied here, once, so no adapter has to be nesting-aware.
+      const local = normalizeRelative(artifact.path);
+      const path = normalizeRelative(nestedPath(level.dir, local));
+
+      if (escapesRoot(path)) {
+        errors.push(
+          new RulegateError({
+            code: 'E_PATH_ESCAPE',
+            message: `adapter \`${owner}\` tried to write outside the repository: ${artifact.path}`,
+            source: { file: artifact.path },
+          }),
+        );
+        return;
+      }
+
+      // The last gate in front of a git-committed credential (T036). The parser refuses
+      // a literal in `env`, `headers` and preserved unknown keys, and `SecretValue` keeps
+      // an adapter from being handed one — but an adapter renders its own text, and this
+      // is the only place that sees what it actually produced. Scoped to `mcp` artifacts
+      // because that is where credentials belong: a generic entropy scan over rendered
+      // *instructions* fires on git hashes and code samples, and a check people learn to
+      // override is not a check.
+      if (artifact.kind === 'mcp') {
+        const found = scanTextForSecrets(artifact.contents);
+        if (found.length > 0) {
+          errors.push(
+            new RulegateError({
+              code: 'E_LITERAL_SECRET',
+              // Locations, never the values. A message that quoted what it found would
+              // print the secret into CI logs.
+              message: `adapter \`${owner}\` would write a literal credential to ${path} (${found.join(', ')})`,
+              source: { file: path },
+              hint: 'use an `env:NAME` reference in .rulegate/mcp/servers.yaml; rulegate never writes a literal secret',
+            }),
+          );
+          return;
+        }
+      }
+
+      // Both spellings, because a level's `canonicalSources` may be written relative to
+      // the level or to the repository and refusing is the safe direction: the failure
+      // this guards is Codex's `AGENTS.md` being both a canonical input and its own
+      // output, and a missed match there overwrites the user's source.
+      if (
+        isCanonicalSource(canonical.manifest, path) ||
+        isCanonicalSource(canonical.manifest, local)
+      ) {
+        errors.push(
+          new RulegateError({
+            code: 'E_ARTIFACT_OVERWRITES_SOURCE',
+            message: `adapter \`${owner}\` tried to overwrite the canonical source ${path}`,
+            source: { file: path },
+            hint: 'the file it generates is also the file it reads from; disable that tool or move your canonical source',
+          }),
+        );
+        return;
+      }
+
+      if (local === STATE_PATH) {
+        errors.push(
+          new RulegateError({
+            code: 'E_ARTIFACT_PATH_CONFLICT',
+            message: `adapter \`${owner}\` tried to write ${STATE_PATH}, which Rulegate owns`,
+            source: { file: path },
+          }),
+        );
+        return;
+      }
+
+      // Case-folded, because NTFS and APFS are case-insensitive: two artifacts differing
+      // only in case are two entries for **one physical file** there, so a plan that is
+      // legal on Linux makes `check` fail forever on Windows and macOS. Refusing costs an
+      // external adapter a rename; not refusing costs a user a repository that can never be
+      // in sync (T063). The map spans levels, so two levels claiming one path — a nested
+      // level whose `dir` collides with a root artifact's directory — is caught here too.
+      const key = path.toLowerCase();
+      const other = claimedBy.get(key);
+      if (other !== undefined) {
+        errors.push(
+          new RulegateError({
+            code: 'E_ARTIFACT_PATH_CONFLICT',
+            message: `adapters \`${other}\` and \`${owner}\` both generate ${path}`,
+            source: { file: path },
+            hint: 'disable one of the two tools, or report this as an adapter bug. Paths that differ only in case are the same file on Windows and macOS.',
+          }),
+        );
+        return;
+      }
+
+      claimedBy.set(key, owner);
+      artifacts.push({ ...artifact, path });
+    };
+
     for (const adapter of eligible) {
       enabledEverywhere.add(adapter.name);
 
@@ -199,100 +299,28 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
         warnings.push(...allMergedWarnings(level, adapter, produced, inherited));
       }
 
-      for (const raw of produced) {
-        const artifact = finalizeArtifact(raw);
-        // The adapter renders a repo-relative path and knows nothing about levels; the
-        // prefix is applied here, once, so no adapter has to be nesting-aware.
-        const local = normalizeRelative(artifact.path);
-        const path = normalizeRelative(nestedPath(level.dir, local));
+      for (const raw of produced) accept(raw, adapter.name);
+    }
 
-        if (escapesRoot(path)) {
-          errors.push(
-            new RulegateError({
-              code: 'E_PATH_ESCAPE',
-              message: `adapter \`${adapter.name}\` tried to write outside the repository: ${artifact.path}`,
-              source: { file: artifact.path },
-            }),
-          );
-          continue;
-        }
-
-        // The last gate in front of a git-committed credential (T036). The parser refuses
-        // a literal in `env`, `headers` and preserved unknown keys, and `SecretValue` keeps
-        // an adapter from being handed one — but an adapter renders its own text, and this
-        // is the only place that sees what it actually produced. Scoped to `mcp` artifacts
-        // because that is where credentials belong: a generic entropy scan over rendered
-        // *instructions* fires on git hashes and code samples, and a check people learn to
-        // override is not a check.
-        if (artifact.kind === 'mcp') {
-          const found = scanTextForSecrets(artifact.contents);
-          if (found.length > 0) {
-            errors.push(
-              new RulegateError({
-                code: 'E_LITERAL_SECRET',
-                // Locations, never the values. A message that quoted what it found would
-                // print the secret into CI logs.
-                message: `adapter \`${adapter.name}\` would write a literal credential to ${path} (${found.join(', ')})`,
-                source: { file: path },
-                hint: 'use an `env:NAME` reference in .rulegate/mcp/servers.yaml; rulegate never writes a literal secret',
-              }),
-            );
-            continue;
-          }
-        }
-
-        // Both spellings, because a level's `canonicalSources` may be written relative to
-        // the level or to the repository and refusing is the safe direction: the failure
-        // this guards is Codex's `AGENTS.md` being both a canonical input and its own
-        // output, and a missed match there overwrites the user's source.
-        if (
-          isCanonicalSource(canonical.manifest, path) ||
-          isCanonicalSource(canonical.manifest, local)
-        ) {
-          errors.push(
-            new RulegateError({
-              code: 'E_ARTIFACT_OVERWRITES_SOURCE',
-              message: `adapter \`${adapter.name}\` tried to overwrite the canonical source ${path}`,
-              source: { file: path },
-              hint: 'the file it generates is also the file it reads from; disable that tool or move your canonical source',
-            }),
-          );
-          continue;
-        }
-
-        if (local === STATE_PATH) {
-          errors.push(
-            new RulegateError({
-              code: 'E_ARTIFACT_PATH_CONFLICT',
-              message: `adapter \`${adapter.name}\` tried to write ${STATE_PATH}, which Rulegate owns`,
-              source: { file: path },
-            }),
-          );
-          continue;
-        }
-
-        // Case-folded, because NTFS and APFS are case-insensitive: two artifacts differing
-        // only in case are two entries for **one physical file** there, so a plan that is
-        // legal on Linux makes `check` fail forever on Windows and macOS. Refusing costs an
-        // external adapter a rename; not refusing costs a user a repository that can never be
-        // in sync (T063). The map spans levels, so two levels claiming one path — a nested
-        // level whose `dir` collides with a root artifact's directory — is caught here too.
-        const key = path.toLowerCase();
-        const other = claimedBy.get(key);
-        if (other !== undefined) {
-          errors.push(
-            new RulegateError({
-              code: 'E_ARTIFACT_PATH_CONFLICT',
-              message: `adapters \`${other}\` and \`${adapter.name}\` both generate ${path}`,
-              source: { file: path },
-              hint: 'disable one of the two tools, or report this as an adapter bug. Paths that differ only in case are the same file on Windows and macOS.',
-            }),
-          );
-          continue;
-        }
-
-        claimedBy.set(key, adapter.name);
-        artifacts.push({ ...artifact, path });
+    if (!nested) {
+      const skills = planSkills(
+        canonical.skills,
+        eligible.filter((a) => a.apiVersion === ADAPTER_API_VERSION),
+        canonical.manifest.options.marker,
+      );
+      warnings.push(...skills.warnings);
+      for (const raw of skills.artifacts) accept(raw, raw.adapter);
+    } else {
+      const own = canonical.skills.filter((sk) => sk.path.startsWith(`${level.dir}/`));
+      if (own.length > 0) {
+        warnings.push(
+          new RulegateError({
+            code: 'W_SKILL_NESTED',
+            message: `skills in ${level.dir}/.rulegate/skills/ are not rendered yet: ${own.map((sk) => `\`${sk.id}\``).join(', ')}`,
+            source: { file: own[0]!.path },
+            hint: 'move them to the root .rulegate/skills/ and scope them with `tools:` if needed',
+          }),
+        );
       }
     }
   }

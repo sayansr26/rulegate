@@ -89,6 +89,14 @@ Source: [Google Antigravity — Rules configuration reference](https://antigravi
 
 Antigravity documents 24,000 bytes per rule file, and a 20,000-token budget shared by every global and always_on rule together. Rulegate checks the per-file cap; the shared budget spans files it does not write, so it is reported here rather than enforced.
 
+## Skills
+
+Reads project skills from `.agents/skills/`, `.agent/skills/`, preferred first.
+
+Reads only the Agent Skills frontmatter fields.
+
+Source: [Google Antigravity — Skills](https://antigravity.google/docs/skills) — retrieved 2026-09-29
+
 ## Notes
 
 - **info** — trigger: is derived, not authored. A rule with globs becomes trigger: glob and a repo-wide rule becomes trigger: always_on; model_decision and manual are never generated, because both let the model skip a rule the author asked for. Imported rules in either mode come back as ordinary rules, with a warning.
@@ -101,3 +109,4 @@ Antigravity documents 24,000 bytes per rule file, and a 20,000-token budget shar
 ## Sources
 
 - [Google Antigravity — Rules configuration reference](https://antigravity.google/docs/rules) — retrieved 2026-09-26
+- [Google Antigravity — Skills](https://antigravity.google/docs/skills) — retrieved 2026-09-29
