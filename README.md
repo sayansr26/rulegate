@@ -195,7 +195,9 @@ anything and both sides are shown instead.
 ## Gate drift on a pull request
 
 The GitHub Action runs `rulegate check` and marks every drifted region **inline on the
-pull request diff**, so a reviewer sees which lines are wrong without opening the log.
+pull request diff**, so a reviewer sees which lines are wrong without opening the log. It is
+on the Marketplace as
+[Rulegate check](https://github.com/marketplace/actions/rulegate-check).
 
 ```yaml
 # .github/workflows/rulegate.yml
@@ -205,8 +207,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: sayansr26/rulegate/action@v1
+      - uses: actions/checkout@v5
+      - uses: sayansr26/rulegate-action@v1
 ```
 
 | input               | default           |                                             |
@@ -231,7 +233,7 @@ With [pre-commit](https://pre-commit.com):
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/sayansr26/rulegate
-    rev: v0.1.0
+    rev: v0.4.1
     hooks:
       - id: rulegate-check
 ```
