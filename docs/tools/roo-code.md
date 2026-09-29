@@ -74,6 +74,16 @@ Reads only the Agent Skills frontmatter fields.
 
 Source: [Roo Code — Skills](https://roocodeinc.github.io/Roo-Code/features/skills) — retrieved 2026-09-29
 
+## Commands
+
+Rulegate writes each command to `.roo/commands/<name>.md`, as Markdown with YAML frontmatter.
+
+No argument syntax is documented, so a command using `$ARGUMENTS` is not written here.
+
+Frontmatter it reads beyond `description`: `argument-hint`, `mode`.
+
+Source: [Roo Code — Slash Commands](https://roocodeinc.github.io/Roo-Code/features/slash-commands) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Roo Code sorts rule files by basename only, case-insensitively, and that ordering knows nothing about Rulegate’s `order` field. Generated filenames therefore carry a zero-padded index; renaming or reordering rules renames files, which is the cost of making Roo’s sort agree with the canonical one.
@@ -88,3 +98,4 @@ Source: [Roo Code — Skills](https://roocodeinc.github.io/Roo-Code/features/ski
 - [Roo Code — Custom Instructions](https://roocodeinc.github.io/Roo-Code/features/custom-instructions) — retrieved 2026-09-04
 - [Roo Code — Using MCP in Roo](https://roocodeinc.github.io/Roo-Code/features/mcp/using-mcp-in-roo) — retrieved 2026-09-04
 - [Roo Code — Skills](https://roocodeinc.github.io/Roo-Code/features/skills) — retrieved 2026-09-29
+- [Roo Code — Slash Commands](https://roocodeinc.github.io/Roo-Code/features/slash-commands) — retrieved 2026-09-29

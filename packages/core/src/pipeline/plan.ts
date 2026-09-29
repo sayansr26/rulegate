@@ -3,6 +3,7 @@ import { escapesRoot, normalizeRelative } from '../fs/paths.js';
 import { isCanonicalSource } from '../model/canonical.js';
 import { STATE_PATH } from '../model/paths.js';
 import { planSkills } from '../render/skills.js';
+import { planCommands } from '../render/commands.js';
 import { finalizeArtifact } from '../render/finalize.js';
 import { scanTextForSecrets } from '../render/secrets.js';
 import { sortArtifacts } from '../render/order.js';
@@ -303,13 +304,18 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
     }
 
     if (!nested) {
-      const skills = planSkills(
-        canonical.skills,
-        eligible.filter((a) => a.apiVersion === ADAPTER_API_VERSION),
-        canonical.manifest.options.marker,
-      );
+      const current = eligible.filter((a) => a.apiVersion === ADAPTER_API_VERSION);
+      const skills = planSkills(canonical.skills, current, canonical.manifest.options.marker);
       warnings.push(...skills.warnings);
       for (const raw of skills.artifacts) accept(raw, raw.adapter);
+      const commands = planCommands(
+        canonical.commands,
+        canonical.skills,
+        current,
+        canonical.manifest.options.marker,
+      );
+      warnings.push(...commands.warnings);
+      for (const raw of commands.artifacts) accept(raw, raw.adapter);
     } else {
       const own = canonical.skills.filter((sk) => sk.path.startsWith(`${level.dir}/`));
       if (own.length > 0) {
@@ -319,6 +325,17 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
             message: `skills in ${level.dir}/.rulegate/skills/ are not rendered yet: ${own.map((sk) => `\`${sk.id}\``).join(', ')}`,
             source: { file: own[0]!.path },
             hint: 'move them to the root .rulegate/skills/ and scope them with `tools:` if needed',
+          }),
+        );
+      }
+      const ownCommands = canonical.commands.filter((c) => c.path.startsWith(`${level.dir}/`));
+      if (ownCommands.length > 0) {
+        warnings.push(
+          new RulegateError({
+            code: 'W_COMMAND_NESTED',
+            message: `commands in ${level.dir}/.rulegate/commands/ are not rendered yet: ${ownCommands.map((c) => `\`${c.id}\``).join(', ')}`,
+            source: { file: ownCommands[0]!.path },
+            hint: 'move them to the root .rulegate/commands/ and scope them with `tools:` if needed',
           }),
         );
       }

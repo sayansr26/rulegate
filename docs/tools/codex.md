@@ -79,6 +79,8 @@ Source: [Codex — Build skills](https://learn.chatgpt.com/docs/build-skills) �
 - **info** — AGENTS.md is a cross-vendor format, not a Codex format: VS Code, Cursor, Copilot, Jules, Zed and others read it too. Enabling this adapter alongside claude-code or gemini therefore hands some tools the same rules twice, from two files. That is not an error, but it is worth knowing before it shows up as a doubled token count.
   Source: [AGENTS.md — a simple, open format for guiding coding agents](https://agents.md/) — retrieved 2026-09-02
 - **info** — Codex has no per-glob rule mechanism, so a glob-scoped canonical rule is rendered with an "Applies to:" line stating its scope in prose. Lossy, but visibly so; dropping the scope silently would turn a component-only rule into a repo-wide one.
+- **info** — Codex has no project commands. Custom prompts live only in `~/.codex/prompts/`, outside the repository, and are deprecated in favour of skills — so Rulegate renders no commands for Codex; put a reusable prompt in `.rulegate/skills/` instead.
+  Source: [Codex — Custom prompts](https://learn.chatgpt.com/docs/custom-prompts) — retrieved 2026-09-29
 
 ## Sources
 
@@ -87,4 +89,5 @@ Source: [Codex — Build skills](https://learn.chatgpt.com/docs/build-skills) �
 - [Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts) — retrieved 2026-09-20
 - [Codex — Build skills](https://learn.chatgpt.com/docs/build-skills) — retrieved 2026-09-29
 - [Codex — Config reference](https://learn.chatgpt.com/docs/config-file/config-reference) — retrieved 2026-09-04
+- [Codex — Custom prompts](https://learn.chatgpt.com/docs/custom-prompts) — retrieved 2026-09-29
 - [Codex — Extend with MCP servers](https://learn.chatgpt.com/docs/extend/mcp) — retrieved 2026-09-04

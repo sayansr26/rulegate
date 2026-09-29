@@ -145,6 +145,16 @@ export const docs: AdapterDocs = {
       message:
         'Codex has no per-glob rule mechanism, so a glob-scoped canonical rule is rendered with an "Applies to:" line stating its scope in prose. Lossy, but visibly so; dropping the scope silently would turn a component-only rule into a repo-wide one.',
     },
+    {
+      level: 'info',
+      message:
+        'Codex has no project commands. Custom prompts live only in `~/.codex/prompts/`, outside the repository, and are deprecated in favour of skills — so Rulegate renders no commands for Codex; put a reusable prompt in `.rulegate/skills/` instead.',
+      source: {
+        url: 'https://learn.chatgpt.com/docs/custom-prompts',
+        title: 'Codex — Custom prompts',
+        retrieved: '2026-09-29',
+      },
+    },
   ],
   // Codex reads `.agents/skills/`, walking up to the repository root. Its extra UI data lives in a skill's `agents/openai.yaml`, which Rulegate carries as an asset.
   skills: {

@@ -22,6 +22,24 @@ export type RulegateErrorCode =
   // A tool's skill `init` could not import as-is — invalid as an Agent Skill, or a copy that
   // differs from the one imported under the same name (T052). It is left where it is.
   | 'W_SKILL_IMPORT'
+  // A command file Rulegate cannot render for every tool it selects (T053): no frontmatter or
+  // `description`, a name no tool accepts, a folder, or a positional placeholder (`$1`) that
+  // means a different argument in different tools.
+  | 'E_COMMAND_INVALID'
+  // A command uses `$ARGUMENTS` and a tool it selects documents no argument syntax, so that
+  // tool does not get it (T053).
+  | 'W_COMMAND_ARGUMENTS'
+  // A command's frontmatter key a tool does not read was left out of its copy (T053).
+  | 'W_COMMAND_FIELD_DROPPED'
+  // A rendered command is longer than a tool's documented per-file cap (T053).
+  | 'W_COMMAND_OVER_LIMIT'
+  // A command and a skill share a name in a tool that has both, so two answer `/<name>` (T053).
+  | 'W_COMMAND_SHADOWED'
+  // Commands in a nested `.rulegate/` are not rendered yet (T053), as for skills.
+  | 'W_COMMAND_NESTED'
+  // A tool's command `init` could not import as-is — invalid here, or a copy that differs from
+  // the one imported under the same name (T053). It is left where it is.
+  | 'W_COMMAND_IMPORT'
   | 'E_UNKNOWN_TOOL'
   | 'E_ARTIFACT_PATH_CONFLICT'
   | 'E_ARTIFACT_OVERWRITES_SOURCE'

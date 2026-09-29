@@ -109,6 +109,16 @@ Reads only the Agent Skills frontmatter fields.
 
 Source: [Kilo Code — Skills](https://kilo.ai/docs/agent-behavior/skills) — retrieved 2026-09-29
 
+## Commands
+
+Rulegate writes each command to `.kilo/commands/<name>.md`, as Markdown with YAML frontmatter.
+
+No argument syntax is documented, so a command using `$ARGUMENTS` is not written here.
+
+Frontmatter it reads beyond `description`: `agent`, `model`, `variant`, `subtask`.
+
+Source: [Kilo Code — Workflows](https://kilo.ai/docs/customize/workflows) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Rulegate writes .kilocode/rules/, which Kilo documents as legacy and loads only for backward compatibility; its docs recommend moving rules into kilo.jsonc instructions. Rulegate cannot follow that advice without owning kilo.jsonc, which Kilo's own Settings UI edits. If Kilo drops the legacy loader, the generated rules stop loading and nothing reports it.
@@ -126,4 +136,5 @@ Source: [Kilo Code — Skills](https://kilo.ai/docs/agent-behavior/skills) — r
 - [Kilo Code — Skills](https://kilo.ai/docs/agent-behavior/skills) — retrieved 2026-09-29
 - [Kilo Code — AGENTS.md](https://kilo.ai/docs/customize/agents-md) — retrieved 2026-09-26
 - [Kilo Code — Custom rules](https://kilo.ai/docs/customize/custom-rules) — retrieved 2026-09-26
+- [Kilo Code — Workflows](https://kilo.ai/docs/customize/workflows) — retrieved 2026-09-29
 - [Kilo Code — Settings and config files](https://kilo.ai/docs/getting-started/settings) — retrieved 2026-09-26

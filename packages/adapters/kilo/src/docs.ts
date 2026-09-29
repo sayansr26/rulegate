@@ -187,4 +187,16 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // Legacy `.kilocode/workflows/` is migrated to `.kilo/commands/` on startup. The page documents no argument placeholder, so a command using one is not rendered here.
+  commands: {
+    dir: '.kilo/commands',
+    extension: '.md',
+    format: 'markdown',
+    extensions: ['agent', 'model', 'variant', 'subtask'],
+    source: {
+      url: 'https://kilo.ai/docs/customize/workflows',
+      title: 'Kilo Code — Workflows',
+      retrieved: '2026-09-29',
+    },
+  },
 };

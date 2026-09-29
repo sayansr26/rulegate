@@ -8,6 +8,7 @@ import { MANIFEST_PATH, MCP_SERVERS_PATH, SKILL_FILE, ruleIdToPath } from './pat
 import { DEFAULT_MCP_SCOPE, formatEnvRef, type McpServer, type SecretValue } from './mcp.js';
 import type { Canonical } from './canonical.js';
 import type { RuleDocument } from './rule.js';
+import type { Command } from './command.js';
 import type { Skill } from './skill.js';
 import type { JsonValue } from './ids.js';
 
@@ -30,6 +31,7 @@ export function serializeCanonical(canonical: Canonical): ReadonlyMap<string, st
   if (canonical.mcpServers.length > 0) {
     out.set(MCP_SERVERS_PATH, serializeMcpServers(canonical.mcpServers));
   }
+  for (const command of canonical.commands) out.set(command.path, serializeCommand(command));
   return new Map([...out].sort(([a], [b]) => compareCodepoint(a, b)));
 }
 
@@ -192,6 +194,14 @@ export function serializeSkill(skill: Skill): ReadonlyMap<string, string | Uint8
   out.set(`${skill.path}/${SKILL_FILE}`, renderSkillFile(skill.frontmatter, skill.body, false));
   for (const asset of skill.assets) out.set(`${skill.path}/${asset.path}`, asset.bytes);
   return new Map([...out].sort(([a], [b]) => compareCodepoint(a, b)));
+}
+
+/**
+ * A canonical command -> its `.rulegate/commands/<id>.md` (RFC-0001 §13). The same shape as
+ * `SKILL.md` — ordered frontmatter, `tools` kept, then the body — so it is the same function.
+ */
+export function serializeCommand(command: Command): string {
+  return renderSkillFile(command.frontmatter, command.body, false);
 }
 
 /**

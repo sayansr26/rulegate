@@ -81,6 +81,16 @@ Frontmatter it reads beyond the Agent Skills fields: `when_to_use`, `argument-hi
 
 Source: [Claude Code — Extend Claude with skills](https://code.claude.com/docs/en/skills) — retrieved 2026-09-29
 
+## Commands
+
+Rulegate writes each command to `.claude/commands/<name>.md`, as Markdown with YAML frontmatter.
+
+`$ARGUMENTS` is written as `$ARGUMENTS`.
+
+Frontmatter it reads beyond `description`: `argument-hint`, `arguments`, `when_to_use`, `allowed-tools`, `disallowed-tools`, `disable-model-invocation`, `user-invocable`, `model`, `effort`, `context`, `agent`, `background`, `hooks`, `shell`.
+
+Source: [Claude Code — Extend Claude with skills (custom commands)](https://code.claude.com/docs/en/slash-commands) — retrieved 2026-09-29
+
 ## Notes
 
 - **info** — Claude Code expands ${NAME} and ${NAME:-default} in command, args, url, and in env and headers values. Cursor spells the same substitution ${env:NAME}, so a canonical `env:NAME` reference renders differently for each tool — copying an .mcp.json into .cursor/mcp.json by hand produces a config that looks right and does not resolve.
@@ -100,5 +110,6 @@ Source: [Claude Code — Extend Claude with skills](https://code.claude.com/docs
 - [Claude Code — Model Context Protocol (MCP)](https://code.claude.com/docs/en/mcp) — retrieved 2026-09-04
 - [Claude Code — How Claude remembers your project](https://code.claude.com/docs/en/memory) — retrieved 2026-09-26
 - [Claude Code — Extend Claude with skills](https://code.claude.com/docs/en/skills) — retrieved 2026-09-29
+- [Claude Code — Extend Claude with skills (custom commands)](https://code.claude.com/docs/en/slash-commands) — retrieved 2026-09-29
 - [Claude Code — Settings](https://docs.claude.com/en/docs/claude-code/settings) — retrieved 2026-09-01
 - [Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts) — retrieved 2026-09-20

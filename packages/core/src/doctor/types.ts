@@ -117,6 +117,11 @@ export interface ToolDiagnosis {
    * listed under two directories is loaded twice, which `W_DUPLICATE_LOAD` reports.
    */
   readonly skills?: readonly SkillDiagnosis[];
+  /**
+   * The project commands on disk in the folder this tool's `AdapterDocs.commands` names
+   * (T053), as their `/name`s, sorted. Absent for a tool Rulegate writes no commands for.
+   */
+  readonly commands?: readonly string[];
   /** Set when the adapter's `detect()` threw or its `apiVersion` is unreadable. */
   readonly failed?: RulegateError;
 }

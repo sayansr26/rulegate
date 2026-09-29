@@ -16,7 +16,7 @@ const rfcPath = fileURLToPath(
  * core may not import adapters, and rendering is what makes the claim checkable (T070).
  */
 
-/** The example's canonical source, transcribed from §14. */
+/** The example's canonical source, transcribed from §15. */
 const EXAMPLE = new Map([
   ['.rulegate/rulegate.yaml', 'schemaVersion: 1\ntools:\n  - claude-code\n  - cursor\n'],
   [
@@ -33,15 +33,15 @@ const EXAMPLE = new Map([
   ],
 ]);
 
-/** Every `**\`path\`**` heading after "rulegate sync produces:" in §14. */
+/** Every `**\`path\`**` heading after "rulegate sync produces:" in §15. */
 async function claimedArtifactPaths(): Promise<string[]> {
   const rfc = await readFile(rfcPath, 'utf8');
-  // §14's own sample output contains `## Style` and friends inside fenced blocks, so a
+  // §15's own sample output contains `## Style` and friends inside fenced blocks, so a
   // naive section split ends at the first one and silently reads almost nothing. Blank
   // the fences first, keeping line structure intact.
   const defenced = rfc.replace(/```[\s\S]*?```/g, (block) => block.replace(/[^\n]/g, ''));
   const produced = defenced.split('`rulegate sync` produces:')[1];
-  expect(produced, '§14 must still say what sync produces').toBeDefined();
+  expect(produced, '§15 must still say what sync produces').toBeDefined();
   const section = produced!.split(/^## /m)[0]!;
   return [...section.matchAll(/^\*\*`([^`]+)`\*\*/gm)].map((m) => m[1]!);
 }
@@ -61,7 +61,7 @@ describe('RFC-0001 predicts its own output', () => {
 
     expect(plan.errors).toEqual([]);
     const produced = new Set(plan.artifacts.map((a) => a.path));
-    // §14 shows a representative subset, not every artifact, so this is containment
+    // §15 shows a representative subset, not every artifact, so this is containment
     // rather than equality — but every path it does name must be real.
     expect(claimed.filter((p) => !produced.has(p))).toEqual([]);
   });

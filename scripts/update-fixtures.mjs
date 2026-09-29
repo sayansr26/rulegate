@@ -96,6 +96,8 @@ const NOT_ADAPTER_FIXTURES = new Set([
   'rulesync-import',
   // Rendered through core's skills planner from the whole registry, not one adapter (T052).
   'skills-sync',
+  // Likewise through core's commands renderer (T053).
+  'commands-sync',
 ]);
 
 /** Every `fixtures/<dir>` that has both `input/` and `expected/`. */

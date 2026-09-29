@@ -6,6 +6,7 @@ export const MCP_DIR = `${RULEGATE_DIR}/mcp`;
 export const MCP_SERVERS_PATH = `${MCP_DIR}/servers.yaml`;
 export const SKILLS_DIR = `${RULEGATE_DIR}/skills`;
 export const SKILL_FILE = 'SKILL.md';
+export const COMMANDS_DIR = `${RULEGATE_DIR}/commands`;
 export const STATE_PATH = `${RULEGATE_DIR}/state.json`;
 export const BACKUP_DIR = `${RULEGATE_DIR}/backup`;
 export const AGENTS_MD = 'AGENTS.md';

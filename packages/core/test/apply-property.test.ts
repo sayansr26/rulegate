@@ -63,6 +63,7 @@ function canonicalFor(): Canonical {
     rules: [],
     mcpServers: [],
     skills: [],
+    commands: [],
   };
 }
 

@@ -29,6 +29,7 @@ export type {
   PrecedenceEntry,
   ReadOnlyFileSystem,
   SkillsSupport,
+  CommandsSupport,
   SourceLink,
   VerifiedAgainst,
 } from '@rulegate/core';
@@ -64,6 +65,8 @@ export type { EnvRef, McpScope, McpServer, McpTransport, SecretValue } from '@ru
 // Skills (T051/T052). Core renders them from `AdapterDocs.skills`; the types are exported
 // so an adapter can read `Canonical.skills` and so `SkillsSupport` can be written against.
 export type { Skill, SkillAsset } from '@rulegate/core';
+// Commands (T053), rendered by core from `AdapterDocs.commands` for the same reason.
+export type { Command } from '@rulegate/core';
 export { DEFAULT_MCP_SCOPE, envRef, formatEnvRef, parseEnvRef } from '@rulegate/core';
 // `selectMcpServers` is here for the reason `slugForId` is (T011): which servers a tool
 // gets is one rule made of three refusals — disabled, `scope: global`, and the `tools`

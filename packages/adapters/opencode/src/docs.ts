@@ -182,4 +182,17 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // `command/` (singular) is still read for backwards compatibility; the plural is documented.
+  commands: {
+    dir: '.opencode/commands',
+    extension: '.md',
+    format: 'markdown',
+    arguments: '$ARGUMENTS',
+    extensions: ['agent', 'model', 'subtask'],
+    source: {
+      url: 'https://opencode.ai/docs/commands/',
+      title: 'OpenCode — Commands',
+      retrieved: '2026-09-29',
+    },
+  },
 };

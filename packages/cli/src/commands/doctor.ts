@@ -122,6 +122,11 @@ function printReport(
     if (skills.length > 0) {
       out.log(`  ${c.dim('skills')}  ${skills.map((s) => s.id).join(', ')}`);
     }
+    // Commands (T053), by the `/name` each answers to.
+    const commands = tool.commands ?? [];
+    if (commands.length > 0) {
+      out.log(`  ${c.dim('commands')}  ${commands.map((id) => `/${id}`).join(', ')}`);
+    }
   }
 
   const plugin =

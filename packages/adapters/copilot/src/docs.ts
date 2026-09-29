@@ -163,4 +163,17 @@ export const docs: AdapterDocs = {
       retrieved: '2026-09-29',
     },
   },
+  // Prompt files, read by VS Code, Visual Studio and JetBrains — not by Copilot CLI or github.com. The prompt file's own `tools:` key cannot be expressed: canonical `tools` selects adapters and is never rendered.
+  commands: {
+    dir: '.github/prompts',
+    extension: '.prompt.md',
+    format: 'markdown',
+    arguments: '${input:args}',
+    extensions: ['argument-hint', 'agent', 'model'],
+    source: {
+      url: 'https://code.visualstudio.com/docs/copilot/customization/prompt-files',
+      title: 'Visual Studio Code — Use prompt files',
+      retrieved: '2026-09-29',
+    },
+  },
 };

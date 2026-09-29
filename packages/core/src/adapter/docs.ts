@@ -55,6 +55,36 @@ export interface SkillsSupport {
   readonly source: SourceLink;
 }
 
+/**
+ * How a tool reads **project commands** — prompts invoked as `/<name>` (RFC-0001 §13, T053).
+ *
+ * Every tool spells a command differently, so everything that differs is here and core's
+ * renderer holds none of it.
+ */
+export interface CommandsSupport {
+  /** The one project folder Rulegate writes, repo-relative POSIX. */
+  readonly dir: string;
+  /** Appended to the command id: `.md`, `.prompt.md`, `.toml`. */
+  readonly extension: string;
+  /**
+   * `markdown`: YAML frontmatter, then the body. `markdown-plain`: no frontmatter is
+   * documented, so `description` becomes the body's first paragraph. `toml`: a TOML table
+   * with `description` and `prompt`.
+   */
+  readonly format: 'markdown' | 'markdown-plain' | 'toml';
+  /**
+   * How this tool spells the whole argument string, which canonical writes `$ARGUMENTS`.
+   * Absent means the tool documents no argument syntax, and a command using one is not
+   * rendered for it.
+   */
+  readonly arguments?: string;
+  /** Frontmatter keys beyond `description` that this tool reads, `argument-hint` included. */
+  readonly extensions: readonly string[];
+  /** A documented per-file cap, in characters. */
+  readonly maxChars?: number;
+  readonly source: SourceLink;
+}
+
 export interface DocNote {
   readonly level: 'info' | 'warn';
   readonly message: string;
@@ -114,6 +144,12 @@ export interface AdapterDocs {
    * Absent means the tool has no skills.
    */
   readonly skills?: SkillsSupport;
+  /**
+   * Where this tool reads **project commands** and how it spells one (RFC-0001 §13, T053).
+   * Data for the reason `skills` is: core renders commands generically. Absent means the
+   * tool has none Rulegate writes — the adapter's `notes` say why when a tool has some.
+   */
+  readonly commands?: CommandsSupport;
   /**
    * Who looks after this adapter, for the generated registry page (T060).
    *

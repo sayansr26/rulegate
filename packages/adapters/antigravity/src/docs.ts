@@ -141,6 +141,16 @@ export const docs: AdapterDocs = {
         'Antigravity also reads AGENTS.md and GEMINI.md in every directory. With codex or gemini enabled as well, the same rules reach Antigravity from two or three files and are billed each time.',
       source: RULES_DOCS,
     },
+    {
+      level: 'info',
+      message:
+        'Rulegate renders no workflows for Antigravity: the vendor page names no project folder, and workflows are deprecated in favour of Agent Skills by November 2026. Put a reusable prompt in `.rulegate/skills/` instead.',
+      source: {
+        url: 'https://antigravity.google/docs/ide/workflows/',
+        title: 'Google Antigravity — Workflows',
+        retrieved: '2026-09-29',
+      },
+    },
   ],
   // `.agents/skills/` is the default; `.agent/skills/` is kept for backward compatibility.
   skills: {

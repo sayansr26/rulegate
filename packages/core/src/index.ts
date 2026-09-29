@@ -4,6 +4,7 @@ export * from './model/selector.js';
 export * from './model/rule.js';
 export * from './model/mcp.js';
 export * from './model/skill.js';
+export * from './model/command.js';
 export * from './model/lint.js';
 export * from './model/canonical.js';
 export * from './model/paths.js';
