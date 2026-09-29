@@ -3,10 +3,11 @@ import { compareCodepoint } from '../render/order.js';
 import { ensureSingleTrailingNewline } from '../render/eol.js';
 import { CANONICAL_SCHEMA_VERSION, DEFAULT_MANIFEST_OPTIONS } from './canonical.js';
 import { DEFAULT_RULE_ORDER } from './rule.js';
-import { MANIFEST_PATH, MCP_SERVERS_PATH, ruleIdToPath } from './paths.js';
+import { MANIFEST_PATH, MCP_SERVERS_PATH, SKILL_FILE, ruleIdToPath } from './paths.js';
 import { DEFAULT_MCP_SCOPE, formatEnvRef, type McpServer, type SecretValue } from './mcp.js';
 import type { Canonical } from './canonical.js';
 import type { RuleDocument } from './rule.js';
+import type { Skill } from './skill.js';
 import type { JsonValue } from './ids.js';
 
 /**
@@ -173,4 +174,25 @@ function serializeSecrets(
   const out: Record<string, JsonValue> = {};
   for (const key of keys) out[key] = formatEnvRef(map[key]!);
   return out;
+}
+
+/**
+ * A canonical skill -> its files under `.rulegate/skills/<id>/` (RFC-0001 §12).
+ *
+ * Kept out of `serializeCanonical`, whose map holds text: an asset is bytes and must reach
+ * disk unmodified, which no string can promise. `SKILL.md` is text; every other file is
+ * returned as the exact bytes it was read as.
+ *
+ * Frontmatter keys are written in the order they were authored — `tools` included, since
+ * this is the canonical source and not a tool's copy — so a round trip moves nothing.
+ */
+export function serializeSkill(skill: Skill): ReadonlyMap<string, string | Uint8Array> {
+  const out = new Map<string, string | Uint8Array>();
+  const doc: Record<string, JsonValue> = {};
+  for (const [key, value] of skill.frontmatter) doc[key] = value;
+  const yaml = ensureSingleTrailingNewline(stringifyYaml(doc, { lineWidth: 0 }));
+  const body = ensureSingleTrailingNewline(skill.body);
+  out.set(`${skill.path}/${SKILL_FILE}`, `---\n${yaml}---\n\n${body}`);
+  for (const asset of skill.assets) out.set(`${skill.path}/${asset.path}`, asset.bytes);
+  return new Map([...out].sort(([a], [b]) => compareCodepoint(a, b)));
 }

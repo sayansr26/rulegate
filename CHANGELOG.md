@@ -5,6 +5,16 @@ All notable changes to this project are recorded here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- **Canonical skills.** `.rulegate/skills/<name>/` holds a skill in the
+  [Agent Skills](https://agentskills.io/specification) format that every tool with skills
+  reads: a `SKILL.md` plus any files, which are carried as raw bytes, so a PNG or a CRLF script
+  is never altered. `sync` and `check` now read and validate it — `name` must match the
+  directory, the spec's limits apply, and each problem is reported with its file and line
+  (`E_SKILL_INVALID`). A `tools:` key picks which tools get the skill, as it does for rules.
+  Generating each tool's copy comes next; until then nothing is written from it.
+
 ## [0.4.1] — 2026-09-29
 
 ### Fixed
