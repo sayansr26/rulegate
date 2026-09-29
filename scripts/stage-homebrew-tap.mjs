@@ -5,11 +5,11 @@
 //   node scripts/stage-homebrew-tap.mjs <dir> <version> <sha256> --check   exit 1 if stale
 //
 // The formula installs the exact tarball npm serves for <version>, pinned by <sha256>, which
-// the release workflow computes from the registry's bytes after `verify-published.mjs` has
-// confirmed the version is live and signed — so the formula can never name a version npm does
-// not have. This script is the one definition of what the tap contains, so every release
-// refreshes it the same way. It touches no git and no network: fetching the tarball and pushing
-// the tap are the workflow's.
+// homebrew.yml computes from the registry's bytes once `verify-published.mjs --settled` says
+// every package of the version is live, signed and older than Homebrew's cooldown — so the
+// formula never names a version `brew` cannot install. This script is the one definition of
+// what the tap contains, so every update refreshes it the same way. It touches no git and no
+// network: fetching the tarball and pushing the tap are the workflow's.
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
