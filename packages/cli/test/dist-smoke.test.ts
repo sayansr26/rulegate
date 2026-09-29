@@ -16,7 +16,7 @@ const fixtures = fileURLToPath(new URL('../../../fixtures/', import.meta.url));
  * `execFile` resolves with `{ stdout, stderr }` and rejects with an error carrying
  * `code`, so `.catch(e => e)` produces a union whose success arm has no `code` at all.
  * Every call site here then read `.code` off that union — which typechecked nowhere,
- * because no test file was typechecked until T080.
+ * because no test file was typechecked until T079.
  *
  * Returning `code: 0` on success rather than casting keeps the failure honest: a command
  * that unexpectedly succeeds now fails the `toBe(1)` assertion, instead of reading
@@ -61,7 +61,7 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
   });
 
   /**
-   * The commander `--cwd` default is the one code path T069 lives on, and calling
+   * The commander `--cwd` default is the one code path T068 lives on, and calling
    * `runSync` directly never reaches it — every unit test passes an explicit cwd. Only
    * a spawned process with a real working directory exercises the walk-up.
    */
@@ -105,7 +105,7 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
 
       expect(stdout).toContain('repo  ');
       expect(stdout).toContain('GitHub Copilot');
-      // The T073 finding has to survive the real binary, not just the aliased source.
+      // The T072 finding has to survive the real binary, not just the aliased source.
       expect(stderr).toContain('carry content that also arrives from another file');
       const after = await stat(path.join(repo, 'CLAUDE.md'));
       expect(after.mtimeMs).toBe(before.mtimeMs);
@@ -121,7 +121,7 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
    * of bug this lane exists for, and the one that would only surface on publish day.
    */
   /**
-   * T072's fix, checked through the real resolver.
+   * T071's fix, checked through the real resolver.
    *
    * `rulegate init` was hinted by two error messages and by RFC §8 for the whole of M0
    * while it was unregistered, so following the only instruction a new user ever received
@@ -180,7 +180,7 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
   });
 
   /**
-   * `--staged` is registered as of T047, and the built binary is the only place that can
+   * `--staged` is registered as of T046, and the built binary is the only place that can
    * be proved: the source lane calls `runCheck` directly, so a flag missing from
    * `program.ts` would still pass every test in `staged.test.ts`. This is the same gap the
    * dist lane caught at T009, when a dropped `exitOverride` made usage errors exit 1.
@@ -266,7 +266,7 @@ describe.runIf(process.env['RULEGATE_TEST_DIST'] === '1')('built dist', () => {
   });
 
   /**
-   * T075. Piping into a reader that closes early — `rulegate check | head` — used to end
+   * T074. Piping into a reader that closes early — `rulegate check | head` — used to end
    * in a Node stack trace for `EPIPE`, which is not an error: a C program in the same
    * position gets SIGPIPE and dies quietly. Only a real process with a real pipe can show
    * it, because the failure is an asynchronous stream event, not a thrown value.

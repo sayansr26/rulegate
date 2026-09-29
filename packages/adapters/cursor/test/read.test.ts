@@ -18,7 +18,7 @@ describe('cursor read() (T017)', () => {
 });
 
 /**
- * T092, found on a real Python repository during the T032 rehearsals.
+ * T091, found on a real Python repository during the T032 rehearsals.
  *
  * Cursor's docs show `globs` as a bare comma-joined string, as a flow sequence and as a
  * quoted flow sequence, and a repository carries whichever one its author copied. The flow
@@ -30,7 +30,7 @@ describe('cursor read() (T017)', () => {
  * what missed it: a Cursor-only round trip reproduced the original bytes by coincidence, so
  * a golden could hold the broken value and still pass.
  */
-describe('cursor .mdc globs, in every spelling Cursor accepts (T092)', () => {
+describe('cursor .mdc globs, in every spelling Cursor accepts (T091)', () => {
   it.each([
     ['bare comma-joined', 'globs: **/*.py,src/**/*.ts'],
     ['flow sequence', 'globs: ["**/*.py", "src/**/*.ts"]'],

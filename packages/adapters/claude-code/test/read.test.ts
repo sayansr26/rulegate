@@ -25,7 +25,7 @@ describe('claude-code read() (T017)', () => {
   // The harness's coverage check does not read YAML block-list items (`  - "glob"`), so
   // the two block-list files are covered here: every glob in globs, every other line in
   // a body, a description or an unknown value.
-  it('loses no user content from block-list rule files (T103)', async () => {
+  it('loses no user content from block-list rule files (T102)', async () => {
     const dir = importFixture('claude-code').input;
     const rules = (await claudeCode.read(importContextFor(dir))).rules ?? [];
     const input = await readInput(dir);

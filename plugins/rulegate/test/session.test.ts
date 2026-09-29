@@ -21,7 +21,7 @@ const opts = (): { root: string; claudeDir: string; now: number } => ({
   now: NOW,
 });
 
-describe('SessionStart (T100)', () => {
+describe('SessionStart (T099)', () => {
   it('prints only the one-line suggestion outside a git repository with no setup', async () => {
     const text = await sessionStart(opts());
     expect(text).toContain('suggest `/rulegate:init` once');
@@ -101,7 +101,7 @@ describe('SessionStart (T100)', () => {
   });
 });
 
-describe('SessionStart against a hostile repository (T100 audit)', () => {
+describe('SessionStart against a hostile repository (T099 audit)', () => {
   it('says the tree is unknown, never clean, when git status does not answer', async () => {
     await sb.put('a.txt', 'x');
     sb.commit('2026-09-20');

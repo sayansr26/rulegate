@@ -12,7 +12,7 @@ const manifest = (...tools: readonly string[]): string =>
     : `schemaVersion: 1\ntools:\n${tools.map((t) => `  - ${t}\n`).join('')}`;
 
 /**
- * A three-package monorepo, which is T056's validation fixture.
+ * A three-package monorepo, which is T055's validation fixture.
  *
  * - root        — manifest + two rules (`10-style`, `20-security`)
  * - packages/a  — manifest + one new rule and one that redefines `10-style`

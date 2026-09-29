@@ -163,7 +163,7 @@ function makeRepo(seed: number): Repo {
     artifacts: sorted,
     state: buildState(sorted),
     enabledAdapters: ['claude-code'],
-    // The single root level a repository without nested `.rulegate/` has (T057).
+    // The single root level a repository without nested `.rulegate/` has (T056).
     levels: [
       { dir: '', skippedTools: [], ownRuleIds: [], overriddenRuleIds: [], inheritedFrom: [] },
     ],

@@ -25,7 +25,7 @@ function server(over: Partial<McpServer> & Pick<McpServer, 'id' | 'transport'>):
   };
 }
 
-/** T036's validation: five servers, covering every field and all three transports. */
+/** T035's validation: five servers, covering every field and all three transports. */
 const fiveServers: readonly McpServer[] = [
   server({
     id: 'github',
@@ -221,7 +221,7 @@ describe('mcp transport inference', () => {
   });
 });
 
-describe('selectMcpServers (T039)', () => {
+describe('selectMcpServers (T038)', () => {
   const parsed = (yaml: string) => parseMcpServers(yaml).servers;
 
   const SERVERS = parsed(
@@ -262,7 +262,7 @@ describe('selectMcpServers (T039)', () => {
 
   it('sorts by id whatever order it is handed', () => {
     // The parser already sorts, so a round-tripped fixture never reaches this — which is
-    // exactly how T036's sort went inert. Reversing the input is what supplies it.
+    // exactly how T035's sort went inert. Reversing the input is what supplies it.
     const reversed = [...SERVERS].reverse();
     expect(selectMcpServers(reversed, 'cursor').map((s) => s.id)).toEqual([
       'alpha',

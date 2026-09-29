@@ -26,8 +26,8 @@ const paths = (p: Awaited<ReturnType<typeof plan>>): readonly string[] =>
   p.artifacts.map((a) => a.path);
 
 /**
- * Root plus two packages, one of them rules-only, exactly the shape T056 resolved and
- * T057 has to emit for.
+ * Root plus two packages, one of them rules-only, exactly the shape T055 resolved and
+ * T056 has to emit for.
  */
 const monorepo = (): MemoryFileSystem =>
   new MemoryFileSystem([
@@ -40,7 +40,7 @@ const monorepo = (): MemoryFileSystem =>
     ['packages/b/.rulegate/rules/40-b.md', rule('Package b: no default exports.', 40)],
   ]);
 
-describe('computePlan across nested levels (T057)', () => {
+describe('computePlan across nested levels (T056)', () => {
   it('writes a nested level to a prefixed path, and the root to an unprefixed one', async () => {
     const result = await plan(monorepo());
 
@@ -138,7 +138,7 @@ describe('computePlan across nested levels (T057)', () => {
 
     // The warning follows the artifact that carries the overridden id. `10-style` is
     // repo-wide, so for Claude Code it lands in the `nearest-wins` CLAUDE.md, where the
-    // override works — even though `.claude/rules/` beside it is `all-merged` (T103).
+    // override works — even though `.claude/rules/` beside it is `all-merged` (T102).
     expect(warning?.source?.file).toBe('packages/a/GEMINI.md');
     expect(result.warnings.filter((w) => w.message.includes('claude-code'))).toEqual([]);
 

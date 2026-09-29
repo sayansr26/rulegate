@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ignoreCovers } from '../src/init/formatters.js';
 
 /**
- * T067. The interesting half of the formatter warning is not which formatters it knows
+ * T066. The interesting half of the formatter warning is not which formatters it knows
  * about but whether it can read an ignore file that a human wrote — directory entries,
  * bare names, roots and negations rather than one literal path per line. Exact-line
  * matching was the original implementation and it reported this repository's own

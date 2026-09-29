@@ -9,7 +9,7 @@ import { applyScope, BACKUP_SUFFIX } from '../src/settings-writer/apply.js';
 import { sandbox, type Sandbox } from './helpers.js';
 
 /**
- * The settings writer (T102). Every case runs over a sandbox whose project root and Claude
+ * The settings writer (T101). Every case runs over a sandbox whose project root and Claude
  * config dir are separate temp directories, so nothing here can reach the real `~/.claude`;
  * the spawned-bundle cases point HOME and CLAUDE_CONFIG_DIR into the sandbox as well.
  */

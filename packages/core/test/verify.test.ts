@@ -41,7 +41,7 @@ function planOf(...artifacts: Artifact[]): Plan {
     artifacts,
     state: buildState(artifacts),
     enabledAdapters: [],
-    // The single root level a repository without nested `.rulegate/` has (T057).
+    // The single root level a repository without nested `.rulegate/` has (T056).
     levels: [
       { dir: '', skippedTools: [], ownRuleIds: [], overriddenRuleIds: [], inheritedFrom: [] },
     ],

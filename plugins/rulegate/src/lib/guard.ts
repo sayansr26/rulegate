@@ -4,7 +4,7 @@ import { pluginConfig } from './config.js';
 import { featureOf, findMap, mapFiles, tracked } from './features.js';
 
 /**
- * The PreToolUse hook's two jobs (T101), both at the moment an edit happens — a CLAUDE.md
+ * The PreToolUse hook's two jobs (T100), both at the moment an edit happens — a CLAUDE.md
  * sentence read an hour ago loses to whatever else is in context:
  *
  *   1. **Generated-file guard (blocks).** An edit to a path `.rulegate/state.json` records

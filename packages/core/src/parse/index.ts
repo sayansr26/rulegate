@@ -33,7 +33,7 @@ export interface ParseInput {
   /**
    * Repo-relative POSIX directory holding the `.rulegate/` to read. Root when absent.
    *
-   * For nested canonical sources in a monorepo (T056). A prefix rather than a re-rooted
+   * For nested canonical sources in a monorepo (T055). A prefix rather than a re-rooted
    * filesystem because every path this function reports — `sourceFiles`, error `source`
    * refs, the rule `path` that becomes an artifact's provenance — has to stay
    * repo-relative. Re-rooting would make them relative to the package instead, and
@@ -88,7 +88,7 @@ export async function parse(input: ParseInput): Promise<ParseResult> {
     manifest = syntheticManifest(at(RULES_DIR), input.knownTools ?? [], []);
     // A nested level says something different from the root. The synthetic manifest is
     // only what this function can see on its own; `resolveNested` then replaces it with
-    // the nearest ancestor's, which is the whole point of a rules-only package (T056). A
+    // the nearest ancestor's, which is the whole point of a rules-only package (T055). A
     // message promising "every detected tool" there would describe a tool list the run
     // does not use, and would send the reader off to write a manifest they do not need.
     warnings.push(

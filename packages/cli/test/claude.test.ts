@@ -24,7 +24,7 @@ import { readVersion } from '../src/version.js';
 import { buildProgram } from '../src/program.js';
 
 /**
- * T108: `init`'s Claude Code section and `rulegate claude settings`. Hermetic by
+ * T107: `init`'s Claude Code section and `rulegate claude settings`. Hermetic by
  * construction — `HOME` and `CLAUDE_CONFIG_DIR` point into a sandbox, and `PATH` holds only
  * the sandbox's `bin/`, where a stub `claude` (a Node script keeping its state in a JSON
  * file) may or may not be placed. The real binary and the real `~/.claude` are unreachable.
@@ -180,7 +180,7 @@ const PROBES = ['--version', 'plugin list --json', 'plugin marketplace list --js
 // The stub is a shebang script; Windows runs neither it nor, without a shell, `claude.cmd`.
 const posix = it.skipIf(process.platform === 'win32');
 
-describe('rulegate init — Claude Code section (T108)', () => {
+describe('rulegate init — Claude Code section (T107)', () => {
   posix('prints the setup state and the plugin commands, and runs nothing', async () => {
     await seedClaude();
     await stubClaude({ installed: null, markets: [], serves: VERSION });
@@ -629,7 +629,7 @@ describe('rulegate init — Claude Code section (T108)', () => {
   });
 });
 
-describe('rulegate claude settings (T108, D2)', () => {
+describe('rulegate claude settings (T107, D2)', () => {
   const projectSettings = () => path.join(repo, '.claude/settings.json');
   const userSettings = () => path.join(claudeDir, 'settings.json');
 
@@ -726,7 +726,7 @@ describe('rulegate claude settings (T108, D2)', () => {
   });
 });
 
-describe('the commands as registered (T108)', () => {
+describe('the commands as registered (T107)', () => {
   const cli = async (...args: string[]): Promise<number> => {
     await buildProgram().parseAsync(['--cwd', repo, '--no-color', ...args], { from: 'user' });
     const code = process.exitCode ?? 0;

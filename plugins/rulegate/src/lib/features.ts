@@ -23,7 +23,7 @@ export const DEFAULT_PARENTS = [
 /**
  * Where the cartographer's memory may be, most specific first. A plugin agent's memory
  * directory carries the plugin's name; the `agent-os-` directory is what an agent-os
- * install left behind — `/rulegate:init` moves it (T107), and it is read here until then,
+ * install left behind — `/rulegate:init` moves it (T106), and it is read here until then,
  * so an unmigrated project keeps its maps; the bare name is a standalone copy.
  */
 export const CARTOGRAPHER_DIRS = [

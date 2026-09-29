@@ -5,7 +5,7 @@ import { applyMemoryMigration } from './migrate/memory.js';
 
 /**
  * `node dist/migrate-memory.js [--root <dir>] [--apply]` — moves agent-os's agent memory to
- * the names this plugin's agents read (T107). Previews by default; `--apply` copies,
+ * the names this plugin's agents read (T106). Previews by default; `--apply` copies,
  * verifies, and only then removes each source (`src/migrate/`).
  *
  * Exit codes follow the CLI's: 0 ok, 1 when any agent was refused or stopped (its memory

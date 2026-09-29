@@ -78,7 +78,7 @@ interface Group {
  *
  * With all five adapters enabled this is not an optimization: `CLAUDE.md`, `AGENTS.md`
  * and `GEMINI.md` are byte-identical in a synced repository (measured on this one at
- * T073), so a first-run import without this step writes the user's rule set out three or
+ * T072), so a first-run import without this step writes the user's rule set out three or
  * four times over.
  *
  * The exact pass does the collapsing and the fuzzy pass does not collapse anything — it

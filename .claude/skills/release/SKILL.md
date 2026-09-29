@@ -24,7 +24,7 @@ The SessionStart hook prints the short form of this. Read:
 
 - `due` — commits since the last tag **and** entries under `[Unreleased]`. Not due → stop
   and say so.
-- `blockers` — release gates (`RELEASE_GATES` in the hook; currently T110, M5's
+- `blockers` — release gates (`RELEASE_GATES` in the hook; currently T109, M5's
   GO/NO-GO), manifests that disagree, or a bump already in flight. Any blocker → stop, name
   it, and say what clears it. Do not work around a gate; the maintainer moves it.
 - `uncommittedFiles` — must be 0 before you start, so the release diff is only the release.
@@ -121,6 +121,6 @@ and what follows the push:
   nothing, so fix forward with a new commit and re-tag only if nothing was published.
 - After it succeeds: `npm view rulegate version` shows `<x.y.z>`; in Claude Code,
   `/plugin marketplace update rulegate` then `/plugin update rulegate@rulegate` picks up the
-  plugin; draft a GitHub Release from the CHANGELOG section (T112).
-- Provenance: T093 records that `--provenance` has not signed a release yet. Do not claim
+  plugin; draft a GitHub Release from the CHANGELOG section (T111).
+- Provenance: T092 records that `--provenance` has not signed a release yet. Do not claim
   the release is signed.

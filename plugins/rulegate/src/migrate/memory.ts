@@ -20,7 +20,7 @@ import {
 } from '@rulegate/claude';
 
 /**
- * The memory migration's writer (T107) — the plugin's third writer under the amended P3,
+ * The memory migration's writer (T106) — the plugin's third writer under the amended P3,
  * pinned in `invariants.test.ts` by shape. Only `src/migrate-memory.ts` imports it, so no
  * hook bundle and neither the audit nor the state script can carry its calls.
  *

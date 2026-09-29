@@ -51,7 +51,7 @@ function serializeManifest(canonical: Canonical): string {
   if (manifest.options.backup !== DEFAULT_MANIFEST_OPTIONS.backup) {
     options['backup'] = manifest.options.backup;
   }
-  // T079. This was missing while `marker` and `backup` were emitted, so a manifest
+  // T078. This was missing while `marker` and `backup` were emitted, so a manifest
   // carrying an `ignore` lost it through any model -> serialize -> parse trip — including
   // the one `init` writes through. The round-trip test could not see it: its fixture uses
   // `DEFAULT_MANIFEST_OPTIONS`, so the trip held whether or not the key was written. The
@@ -98,7 +98,7 @@ function serializeRule(rule: RuleDocument): string {
 
   const body = ensureSingleTrailingNewline(rule.body);
   // A body that opens with a `---` line — a Markdown rule, or a block another tool wrote —
-  // would be read back as the file's frontmatter, so it always gets a real one (T116).
+  // would be read back as the file's frontmatter, so it always gets a real one (T115).
   if (Object.keys(doc).length === 0 && body.split('\n', 1)[0]?.trim() === '---') {
     doc['order'] = fm.order;
   }
@@ -109,7 +109,7 @@ function serializeRule(rule: RuleDocument): string {
 }
 
 /**
- * Canonical MCP servers -> `.rulegate/mcp/servers.yaml` (T036, RFC-0001 §11).
+ * Canonical MCP servers -> `.rulegate/mcp/servers.yaml` (T035, RFC-0001 §11).
  *
  * Defaults are omitted, like the manifest's: `scope: project`, `enabled: true` and
  * `tools` meaning every tool are what you get by saying nothing, and writing them out
@@ -118,7 +118,7 @@ function serializeRule(rule: RuleDocument): string {
  *
  * Secrets go back as `env:NAME` because that is the only form the model can hold — a
  * literal cannot reach here, since `SecretValue` is `EnvRef` and the parser refuses
- * anything else (T037).
+ * anything else (T036).
  */
 export function serializeMcpServers(servers: readonly McpServer[]): string {
   const doc: Record<string, JsonValue> = { schemaVersion: CANONICAL_SCHEMA_VERSION };

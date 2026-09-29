@@ -1,6 +1,6 @@
 # `copilot-mcp`
 
-The MCP half of the Copilot adapter (T040). `input/` is byte-identical to
+The MCP half of the Copilot adapter (T039). `input/` is byte-identical to
 `claude-code-mcp/` and `cursor-mcp/` apart from `rulegate.yaml`, deliberately: the three
 goldens are meant to be read side by side, because what differs between them is the whole
 point of having three adapters.

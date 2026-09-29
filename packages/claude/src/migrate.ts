@@ -6,7 +6,7 @@ import { ls, read } from './read.js';
 import { blocked, inside } from './refusals.js';
 
 /**
- * The memory migration's planner (T107) — pure, so the preview and the writer (the
+ * The memory migration's planner (T106) — pure, so the preview and the writer (the
  * plugin's `src/migrate/`) share one answer, and the writer re-plans rather than trusting a
  * preview the tree may have moved on from.
  *

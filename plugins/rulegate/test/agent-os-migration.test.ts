@@ -22,7 +22,7 @@ import { buildProgram } from 'rulegate';
 import { sandbox, type Sandbox } from './helpers.js';
 
 /**
- * T107's acceptance test: an agent-os project, migrated the way `/rulegate:init` migrates
+ * T106's acceptance test: an agent-os project, migrated the way `/rulegate:init` migrates
  * it, ends `SETUP HEALTHY` with every map under its new name.
  *
  * `fixtures/agent-os-project/` holds three layers, copied into a sandbox whose project root
@@ -76,7 +76,7 @@ const MOVES = [
   ['.claude/agent-memory-local', 'agent-os-builder', 'rulegate-builder'],
 ] as const;
 
-describe('migrating an agent-os project (T107)', () => {
+describe('migrating an agent-os project (T106)', () => {
   it('ends SETUP HEALTHY with every map under the new name', async () => {
     // ---- before: an agent-os project is a repair, not a fresh setup
     const before = await setupState(sb.root, sb.claudeDir, { expect: VERSION });
@@ -197,7 +197,7 @@ describe('migrating an agent-os project (T107)', () => {
     expect(post).toContain('.agent-os/ is already imported into .rulegate/ — safe to delete');
     expect(post).toContain('SETUP  HEALTHY');
     // The import kept CLAUDE.md's lines sending the agent to `.agent-os/rules/` and agent-os's
-    // `sync` (T146): named by rule and line, with what to say instead.
+    // `sync` (T145): named by rule and line, with what to say instead.
     expect(post).toContain(
       'WARN  .rulegate/rules/claude.md lines 9, 10 still send the agent to agent-os',
     );

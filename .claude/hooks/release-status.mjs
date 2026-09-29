@@ -3,7 +3,7 @@
 //
 // A release here is a tag push that `release.yml` turns into 18 npm packages and a
 // marketplace version, and npm versions are immutable — so the two failure modes are
-// releasing too early (before a milestone gate like T110 has passed) and forgetting to
+// releasing too early (before a milestone gate like T109 has passed) and forgetting to
 // release at all while CHANGELOG's [Unreleased] grows. This reports both, offline: it
 // reads the tree and runs read-only git, never npm, because a hook that needs the network
 // fails exactly when it is least wanted.
@@ -17,8 +17,8 @@ import { pathToFileURL } from 'node:url';
 
 // Tasks in task-breakdown.md that must be COMPLETED before the next release. Edit as
 // milestones change. Empty for v0.4.0 by maintainer decision (2026-09-28): it ships
-// unannounced so T032's recruits get the T125/T116/T149 fixes, before T110 has proven the
-// agent-os migration; T110 still gates the announced launch (T035 onwards).
+// unannounced so T032's recruits get the T124/T115/T148 fixes, before T109 has proven the
+// agent-os migration; T109 still gates the announced launch (T156 onwards).
 const RELEASE_GATES = [];
 
 export const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();

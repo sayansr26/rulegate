@@ -35,7 +35,7 @@ function link(pattern: string, description: string): PrecedenceEntry {
  * produces, and precisely the question `rulegate doctor` exists to answer.
  *
  * `resolution: 'first-match'` is what encodes that, and it had to be added to the frozen
- * kit for this adapter (T045a). `'override'` — which the seeded issue prescribed — gets the
+ * kit for this adapter (T044a). `'override'` — which the seeded issue prescribed — gets the
  * *shadowing* right and the *loading* wrong: under it `doctor` counts all nine as loaded,
  * because for Claude Code a shadowed file genuinely is still sent and still costs tokens.
  * Here it is not sent at all, and reporting otherwise would bill the user for eight files

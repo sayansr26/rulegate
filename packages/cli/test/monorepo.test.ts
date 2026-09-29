@@ -27,7 +27,7 @@ const read = (rel: string): Promise<string> => readFile(path.join(repo, rel), 'u
 
 const rule = (body: string, order = 10): string => `---\norder: ${String(order)}\n---\n\n${body}\n`;
 
-/** Root plus two packages, one rules-only — T057's validation fixture. */
+/** Root plus two packages, one rules-only — T056's validation fixture. */
 const buildMonorepo = async (): Promise<void> => {
   await mkdir(path.join(repo, '.git'), { recursive: true });
   await write('.rulegate/rulegate.yaml', 'schemaVersion: 1\ntools:\n  - claude-code\n  - cursor\n');
@@ -40,7 +40,7 @@ const buildMonorepo = async (): Promise<void> => {
   await write('packages/b/.rulegate/rules/40-b.md', rule('Package b: no default exports.', 40));
 };
 
-describe('rulegate on a monorepo (T057)', () => {
+describe('rulegate on a monorepo (T056)', () => {
   beforeEach(buildMonorepo);
 
   it('syncs every level and then checks clean', async () => {

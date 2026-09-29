@@ -14,7 +14,7 @@ import {
 import type { Colors } from '../ui/report.js';
 
 /**
- * The Claude Code plugin line in `doctor` (T108). Everything here is a file read of Claude
+ * The Claude Code plugin line in `doctor` (T107). Everything here is a file read of Claude
  * Code's own records — `plugins/installed_plugins.json`, the marketplace clone under
  * `plugins/marketplaces/`, and `enabledPlugins` in each settings file — through the same
  * `@rulegate/claude` readers `/rulegate:init` uses, so the two cannot disagree about whether

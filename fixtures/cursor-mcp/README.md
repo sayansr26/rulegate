@@ -1,6 +1,6 @@
 # `cursor-mcp`
 
-The MCP half of the Cursor adapter (T039). Same input as `claude-code-mcp/`, different
+The MCP half of the Cursor adapter (T038). Same input as `claude-code-mcp/`, different
 expectations, and the difference is the point:
 
 - Cursor's documented interpolation is `${env:NAME}`; Claude Code's is `${NAME}`.

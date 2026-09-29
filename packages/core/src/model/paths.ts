@@ -21,7 +21,7 @@ export function deriveRuleId(relPath: string): string {
   // The prefix is stripped wherever it appears, not only at the start, so a rule id is
   // relative to **its own level**: `packages/a/.rulegate/rules/10-style.md` is `10-style`,
   // the same id the root's `10-style` carries. That is what lets a nested source override
-  // an inherited rule (T056) — an id that embedded the package path could never collide
+  // an inherited rule (T055) — an id that embedded the package path could never collide
   // with the rule it is meant to replace, and inheritance would silently accumulate two.
   const marker = `${RULES_DIR}/`;
   const idx = relPath.lastIndexOf(marker);

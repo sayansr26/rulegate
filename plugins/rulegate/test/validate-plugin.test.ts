@@ -61,7 +61,7 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-describe('validate-plugin (T096)', () => {
+describe('validate-plugin (T095)', () => {
   it('passes on this repository', () => {
     // The CI step runs the script; this keeps a red validator from first showing up there.
     expect(validatePlugin(repoRoot).failures).toEqual([]);

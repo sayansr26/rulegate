@@ -58,7 +58,7 @@ export async function compareToDisk(
   // Asked once per comparison, of the filesystem in hand. On APFS and NTFS a recorded
   // `CLAUDE.md` and a planned `claude.md` are one physical file, and keying these two
   // exactly is what made that file `unmanaged` (so `sync` refused to write it) *and*
-  // `orphaned` (so the same run deleted it). See fs/case.ts (T078).
+  // `orphaned` (so the same run deleted it). See fs/case.ts (T077).
   const caseInsensitive = await probeCaseInsensitive(fs);
   const key = pathKeyFor(caseInsensitive);
 

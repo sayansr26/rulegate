@@ -4,19 +4,19 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 /**
- * Bundle the plugin's hook and skill scripts into the committed `dist/` (T097).
+ * Bundle the plugin's hook and skill scripts into the committed `dist/` (T096).
  *
  * Claude Code runs a plugin's hooks from its plugin cache, a copy of this directory with
  * no `npm install` ever run in it, so a hook cannot import `@rulegate/core` or anything
  * else at run time. The choice was dependency-free `.mjs` or TypeScript bundled here, and
  * it is bundled: the PreToolUse guard has to answer "did Rulegate generate this path?"
- * exactly as `sync` does — `state.json` parsing, and T078's case-insensitive path identity
+ * exactly as `sync` does — `state.json` parsing, and T077's case-insensitive path identity
  * — and a hand-written second copy of that in a hook is a second ownership model, which is
  * the thing that eventually disagrees with the first.
  *
  * **Every top-level `src/*.ts` is an entry**, bundled on its own to `dist/<name>.js`;
  * subdirectories of `src/` are libraries the entries import. A hook is added by adding a
- * file, not by editing this script. With no entries yet (T100/T101 add the first), the
+ * file, not by editing this script. With no entries yet (T099/T100 add the first), the
  * build produces nothing and `--check` asserts `dist/` holds nothing.
  *
  * Same discipline as `action/build.mjs`, for the same reasons: `absWorkingDir` is pinned

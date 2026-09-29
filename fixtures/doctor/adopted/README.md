@@ -3,7 +3,7 @@
 A repository with **all five adapters enabled and synced**. Its point is that
 `CLAUDE.md`, `AGENTS.md` and `GEMINI.md` come out byte-identical and
 `.github/copilot-instructions.md` is a fourth near-copy — correct output from four correct
-adapters, which is exactly why T073 belongs to inspection rather than to generation.
+adapters, which is exactly why T072 belongs to inspection rather than to generation.
 
 Five adapters is the minimum that reproduces it. With two, the outputs have different
 shapes and never overlap.

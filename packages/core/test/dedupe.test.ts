@@ -17,7 +17,7 @@ function rule(id: string, body: string, description?: string) {
  * predates them cannot silently mean "no MCP" — `carriesMcp: false` says the tool was
  * never asked, which is the distinction `dedupeMcpServers` is built around. Every
  * fixture in this file goes through here: three inline literals had drifted from
- * `ImportSource` and still compiled, because no test file was typechecked (T080).
+ * `ImportSource` and still compiled, because no test file was typechecked (T079).
  */
 const source = (tool: string, ...rules: ReturnType<typeof rule>[]): ImportSource => ({
   tool,

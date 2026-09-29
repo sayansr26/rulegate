@@ -72,7 +72,7 @@ describe('isLiteralSecret', () => {
     expect(isLiteralSecret('hash', 'd77bd461e691')).toBe(false);
   });
 
-  it('reads a key that names an environment variable as a name, not a value (T040)', () => {
+  it('reads a key that names an environment variable as a name, not a value (T039)', () => {
     // Codex has no variable substitution, so an `env:NAME` reference maps to a key that
     // holds the *name*: `bearer_token_env_var`. That key flattens to `bearertokenenvvar`,
     // which contains both `bearer` and `token`, so every other rule here condemns it — and
@@ -93,7 +93,7 @@ describe('isLiteralSecret', () => {
 
   it('catches a credential in TOML, the form it claimed to handle and had never seen', () => {
     // `scanTextForSecrets` is line-oriented "so it works on JSON, on TOML and on whatever
-    // the next MCP format turns out to be" — written at T037, and until T040 every input
+    // the next MCP format turns out to be" — written at T036, and until T039 every input
     // it had ever been given was JSON. A preserved unknown key is the path a literal takes
     // into generated output, and in TOML that key is unquoted, which is a different shape
     // for the pair regex than the `"key": "value"` it was tuned on.
@@ -215,7 +215,7 @@ describe('the plan refuses to render one', () => {
 
 describe('generated output carries no secrets', () => {
   /**
-   * T037's stated validation, run over every golden this repository ships. The goldens
+   * T036's stated validation, run over every golden this repository ships. The goldens
    * are the bytes the adapters are asserted to produce, so a scan of them is a scan of
    * generated output — and it is the check that would catch a fixture updated from a
    * developer's real config.
@@ -247,7 +247,7 @@ describe('generated output carries no secrets', () => {
   });
 
   /**
-   * T089. `[mcp_servers.x.env_http_headers]` maps a header name to the *variable* holding
+   * T088. `[mcp_servers.x.env_http_headers]` maps a header name to the *variable* holding
    * its value, so `Authorization = "DOCS_API_KEY_PRODUCTION"` is secret-free — and every
    * other rule here condemns it, since `Authorization` contains `auth` and a long variable
    * name looks generated. The `bearer_token_env_var` false positive, arriving by a new route.
@@ -281,14 +281,14 @@ describe('generated output carries no secrets', () => {
 
 describe('literalToEnvRef', () => {
   it('names the variable after the key it was found under', () => {
-    // The conversion T037 asks import to perform. Wired up by MCP import (T041), which
+    // The conversion T036 asks import to perform. Wired up by MCP import (T040), which
     // is where a literal can first arrive from somebody else's config file.
     expect(literalToEnvRef('api-key')).toEqual({ kind: 'env', name: 'api_key' });
     expect(literalToEnvRef('1password')).toEqual({ kind: 'env', name: '_1password' });
   });
 
   it('preserves case, so an identifier-shaped key converts to its own name', () => {
-    // T041. The Codex writer expresses a reference as `env_vars = ["NAME"]` — one string
+    // T040. The Codex writer expresses a reference as `env_vars = ["NAME"]` — one string
     // that is both the key and the variable — and refuses when the two differ. Upper-casing
     // here made the secret conversion abort `init` on an ordinary `.mcp.json` wherever
     // codex is detected: the feature breaking the command it runs inside.

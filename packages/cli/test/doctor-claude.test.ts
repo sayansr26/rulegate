@@ -7,7 +7,7 @@ import { ExitCode } from '../src/ui/exit.js';
 import type { ClaudePluginReport } from '../src/commands/doctor-claude.js';
 
 /**
- * T108: doctor's Claude Code plugin line. The fixtures below copy the layout of a real
+ * T107: doctor's Claude Code plugin line. The fixtures below copy the layout of a real
  * `~/.claude/plugins/` (Claude Code 2.x, read 2026-09-28): `installed_plugins.json` at
  * `version: 2` with an array of install records per `<plugin>@<marketplace>`, and each
  * marketplace cloned under `marketplaces/<name>/`, where the plugin's own manifest carries
@@ -129,7 +129,7 @@ async function text(extra: { noGlobal?: boolean } = {}): Promise<{ out: string; 
   return { out: stdout.join(''), err: stderr.join('') };
 }
 
-describe('rulegate doctor — Claude Code plugin line (T108)', () => {
+describe('rulegate doctor — Claude Code plugin line (T107)', () => {
   it('pins the JSON shape', async () => {
     await install('rulegate@rulegate', [{ scope: 'project', version: '0.2.0' }]);
     await marketplace('0.3.0');

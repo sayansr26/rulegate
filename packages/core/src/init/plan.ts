@@ -38,7 +38,7 @@ export interface InitInput {
   readonly fs: ReadOnlyFileSystem;
   readonly adapters: readonly Adapter[];
   /**
-   * Read-only importers for competing rule-sync tools (T049).
+   * Read-only importers for competing rule-sync tools (T048).
    *
    * A separate list from `adapters`, and never merged into one: an adapter is a tool
    * Rulegate *generates for*, an interop importer is a tool it takes over *from*. Passing
@@ -88,7 +88,7 @@ export interface InitPlan {
   readonly plan: Plan;
   readonly conflicts: readonly ImportConflict[];
   /**
-   * Server ids one tool defined differently from another (T041).
+   * Server ids one tool defined differently from another (T040).
    *
    * Separate from `conflicts` because the two are resolved differently and a caller must
    * not print them the same way: a rule conflict keeps both variants and asks, while a
@@ -96,11 +96,11 @@ export interface InitPlan {
    * divergence is reported.
    */
   readonly mcpConflicts: readonly McpImportConflict[];
-  /** Competing rule-sync tools found in the repository and imported from (T049). */
+  /** Competing rule-sync tools found in the repository and imported from (T048). */
   readonly interop: readonly string[];
   /**
    * Paths in `plan` that already exist with other bytes and that nothing was imported from
-   * (T125). Applying backs each up and replaces it like every other file init takes over;
+   * (T124). Applying backs each up and replaces it like every other file init takes over;
    * listed so the caller can say so beside the path, because nothing in it reached
    * `.rulegate/`.
    */
@@ -147,7 +147,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   // the files the adapters import from, so without masking the observed outputs every rule
   // arrives twice — once from the source the user edits, once from the copy built out of it.
   const interopRules: RuleDocument[] = [];
-  // Every file anything was imported from, for T125's check of what init replaces.
+  // Every file anything was imported from, for T124's check of what init replaces.
   const importedFrom = new Set<string>();
   // Path -> the importer that generated it, for the warning about outputs left behind.
   const generated = new Map<string, string>();
@@ -234,7 +234,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
 
   // Import warnings are warnings and never errors. `runInit` returns without writing while
   // `errors` is non-empty, so one odd server in somebody's `.mcp.json` would otherwise make
-  // a new user's very first command fail on a file Rulegate merely read — T072's shape.
+  // a new user's very first command fail on a file Rulegate merely read — T071's shape.
   for (const source of collected.sources) {
     for (const message of source.mcpWarnings) {
       warnings.push(new RulegateError({ code: 'W_MCP_IMPORT', message }));
@@ -242,7 +242,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   }
 
   // The plan is rendered from the canonical files as `check` will read them, not from the
-  // model they were serialized out of (T116). Rendering the in-memory model applied a plan
+  // model they were serialized out of (T115). Rendering the in-memory model applied a plan
   // that the written `.rulegate/` did not describe whenever the trip lost something — two
   // rules on one path, a preserved `order` key read back as a string — and the first
   // `check` after `init --yes` exited 1. What is lost on the trip is refused below.
@@ -314,7 +314,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
 }
 
 /**
- * Rendered paths that exist with other bytes and that init did not import from (T125).
+ * Rendered paths that exist with other bytes and that init did not import from (T124).
  *
  * `init` applies with `force`, on the premise that everything it overwrites is a file it
  * just imported from — so its content is in `.rulegate/` and the copy in
@@ -358,7 +358,7 @@ async function unimportedPaths(
 
 /**
  * Rendered paths that no file can be written to: a directory stands there, or a file stands
- * where one of its parent directories must go (T149).
+ * where one of its parent directories must go (T148).
  *
  * Detection counts a directory as evidence as readily as a file — `.rules/` enables Zed, a
  * legacy `.clinerules` file enables Cline, whose output is the `.clinerules/` directory — and
@@ -476,7 +476,7 @@ async function canonicalInTheWay(
 }
 
 /**
- * A canonical file `init` would write that does not parse back (T116). Always Rulegate's
+ * A canonical file `init` would write that does not parse back (T115). Always Rulegate's
  * bug, never the user's — they have not written anything yet — so it names the file and
  * stops before anything is written, instead of leaving a `.rulegate/` no command can read.
  */
@@ -492,7 +492,7 @@ function unreadableCanonical(error: RulegateError): RulegateError {
 
 /**
  * Generated files whose render from the written `.rulegate/` differs from the render of
- * what was imported (T116).
+ * what was imported (T115).
  *
  * The applied plan is the first; a difference means the trip through `.rulegate/` changed
  * a rule, and applying it would take ownership of the user's files with content that is

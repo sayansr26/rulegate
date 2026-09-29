@@ -30,7 +30,7 @@ export interface PrecedenceEntry {
  * assumption is cheaper than a field every adapter has to set.
  *
  * The three are genuinely different, and the distinction between the first two is the one
- * that took a real tool to surface (T045a):
+ * that took a real tool to surface (T044a):
  *
  * - `'additive'` — every present file is sent. Ordering ranks specificity, not authority.
  * - `'override'` — every present file is still **sent**, and the nearest one wins a
@@ -41,7 +41,7 @@ export interface PrecedenceEntry {
  *   first of these in the roster, and modelling it as `'override'` would make `doctor`
  *   report eight files as loaded that Zed never opens, and bill the user for them.
  *
- * Added 2026-09-04 (T045a). A new union member is a non-breaking addition per
+ * Added 2026-09-04 (T044a). A new union member is a non-breaking addition per
  * `docs/adapter-api-v1.md`: no existing adapter declares it, and every existing value keeps
  * its meaning.
  */
@@ -61,7 +61,7 @@ export interface DocNote {
  * written down what each tool truly loads. Treat it as versioned data, not comments:
  * every claim carries a source URL and the tool version it was verified against, so a
  * reviewer can check it and a stale entry is visible rather than silently wrong.
- * Powers `doctor` (T026/T027) and the per-tool docs pages (T060).
+ * Powers `doctor` (T026/T027) and the per-tool docs pages (T059).
  */
 export interface AdapterDocs {
   readonly toolName: string;
@@ -79,7 +79,7 @@ export interface AdapterDocs {
    * cannot explain why a rule they deleted still applies.
    *
    * The distinction is what `doctor` needs to answer "which files are all being sent at
-   * once", which is the question T073 records: with all five adapters enabled, `CLAUDE.md`,
+   * once", which is the question T072 records: with all five adapters enabled, `CLAUDE.md`,
    * `AGENTS.md` and `GEMINI.md` are byte-identical here and Copilot loads three of them
    * together. Deriving that warning from this field rather than hardcoding it for Copilot
    * is what makes a sixth adapter covered without a code change.
@@ -97,7 +97,7 @@ export interface AdapterDocs {
   };
   readonly notes?: readonly DocNote[];
   /**
-   * Who looks after this adapter, for the generated registry page (T061).
+   * Who looks after this adapter, for the generated registry page (T060).
    *
    * Optional, and **unset on every adapter this repository ships** — the org name is not
    * settled until T033/T034 claim it, and a plausible-looking handle would be exactly the

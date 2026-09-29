@@ -24,7 +24,7 @@ import { compareCodepoint } from './order.js';
  * **The sort is invisible to both v0.2 writers, and that is not a reason to drop it.**
  * `stableJsonStringify` sorts every object key deeply, so a JSON target comes out ordered
  * whatever order it was handed — a mutation deleting this line passes every golden. The
- * first target that does not sort for itself is T040's Codex `config.toml`, where insertion
+ * first target that does not sort for itself is T039's Codex `config.toml`, where insertion
  * order *is* the file order. Its only guard is the unit test in `core/test/mcp.test.ts`,
  * which reverses the input; nothing at the adapter level can see it.
  */

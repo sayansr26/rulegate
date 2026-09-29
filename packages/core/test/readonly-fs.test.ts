@@ -58,7 +58,7 @@ describe('createReadOnlyFileSystem', () => {
 /**
  * `.clinerules` is Cline's legacy file and its current directory, and importers probe it by
  * name. A directory there is not that tool's file, and must not throw EISDIR out of `init`
- * (T149).
+ * (T148).
  */
 describe('filesOnly', () => {
   let root: string;

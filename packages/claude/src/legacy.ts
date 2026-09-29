@@ -11,7 +11,7 @@ import {
 } from './settings.js';
 
 /**
- * What an agent-os install left in this project (T107) — one detector, so the audit, the
+ * What an agent-os install left in this project (T106) — one detector, so the audit, the
  * setup state and the session hook cannot disagree about whether there is anything to
  * migrate. Read-only.
  */
@@ -104,7 +104,7 @@ export function disableCommand(scope: PluginScope): string {
  * What names agent-os as the place to edit rules: its source directory and its package.
  * `rulegate init` copies a hand-written CLAUDE.md into a canonical rule as it is, so a line
  * telling the agent to edit `.agent-os/rules/` and run agent-os's `sync` survives the
- * migration and sends it to a directory nothing reads any more (T146). The importer's
+ * migration and sends it to a directory nothing reads any more (T145). The importer's
  * twin of this pattern is `AGENT_OS_MENTION` in `@rulegate/interop`.
  */
 export const AGENT_OS_MENTION = /\.agent-os\/|@sayansr26\/agent-os\b/;

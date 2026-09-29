@@ -15,7 +15,7 @@ const RULES_DOCS: SourceLink = {
  * `cline` alongside `codex` sends Cline the same canonical rules twice, and alongside
  * `cursor` and `windsurf` as well, four times. Every one of those is declared here with
  * `managed: false`, which is what lets `doctor`'s `duplicateLoadWarnings` fire from adapter
- * data with no Cline-specific code anywhere in the codebase (T073).
+ * data with no Cline-specific code anywhere in the codebase (T072).
  *
  * **The order below is not a ranking the vendor publishes.** `AdapterDocs.files` is an
  * ordered field, so listing them at all asserts something — the vendor documents a rank only

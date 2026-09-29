@@ -25,7 +25,7 @@ async function initPlan(name: string) {
   return computeInitPlan({ repoRoot, fs: new NodeFileSystem(repoRoot), adapters: ADAPTERS });
 }
 
-describe('MCP import — T041', () => {
+describe('MCP import — T040', () => {
   it('imports the same three servers in four formats as three canonical servers', async () => {
     const init = await initPlan('mcp-four-formats');
 

@@ -32,7 +32,7 @@ async function rulegateRepo(): Promise<void> {
 
 const at = (rel: string): string => path.join(sb.root, rel);
 
-describe('generated-file guard (T101)', () => {
+describe('generated-file guard (T100)', () => {
   it('denies an edit to a path state.json records, naming the recovery', async () => {
     await rulegateRepo();
     const d = await guard(at('CLAUDE.md'));
@@ -108,7 +108,7 @@ describe('generated-file guard (T101)', () => {
     expect(await guard(at('fixtures/x/CLAUDE.md'))).toBeUndefined();
   });
 
-  // T078: on APFS and NTFS `claude.md` IS `CLAUDE.md`, and the guard must say so exactly
+  // T077: on APFS and NTFS `claude.md` IS `CLAUDE.md`, and the guard must say so exactly
   // where the filesystem does — which `probeCaseInsensitive` asks of the disk itself.
   const caseInsensitive = existsSync(fileURLToPath(new URL('../PACKAGE.JSON', import.meta.url)));
   it.runIf(caseInsensitive)(
@@ -127,7 +127,7 @@ describe('generated-file guard (T101)', () => {
   );
 });
 
-describe('cartographer reminder (T101)', () => {
+describe('cartographer reminder (T100)', () => {
   const once = (): ((s: string, k: string) => boolean) => {
     const seen = new Set<string>();
     return (s, k) => !seen.has(`${s}|${k}`) && Boolean(seen.add(`${s}|${k}`));

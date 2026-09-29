@@ -35,11 +35,11 @@ nothing, a `.mdc` description containing `:` and `#`, a doubled quote inside Cop
 single-quoted YAML, and a legacy `.cursorrules` carrying a rule that exists nowhere else.
 Each is a way a plausible importer loses somebody's content silently.
 
-An **mcp** fixture (T039, T040) is a second `write()` fixture in the same shape as the
+An **mcp** fixture (T038, T039) is a second `write()` fixture in the same shape as the
 first, kept separate for one reason: its `input/` has **no rules at all**. That is what it
-is for. Both T039 writers opened `write()` with `if (rules.length === 0) return []`, so a
+is for. Both T038 writers opened `write()` with `if (rules.length === 0) return []`, so a
 repository whose only canonical content was MCP servers generated nothing — parsed,
-validated and silently unreachable — and the T040 adapters had the same return, Codex's in
+validated and silently unreachable — and the T039 adapters had the same return, Codex's in
 the sharper form where using `AGENTS.md` as canonical suppressed the config too. A fixture
 with rules in it cannot catch that.
 

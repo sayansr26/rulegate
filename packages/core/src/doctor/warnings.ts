@@ -9,7 +9,7 @@ import type { Measured } from './resolve.js';
 import type { DoctorWarning, ToolDiagnosis } from './types.js';
 
 /**
- * T073: one tool loading the same content more than once.
+ * T072: one tool loading the same content more than once.
  *
  * Derived from the tool's declared `files`, the `managed` claims of *every* adapter, and
  * the bytes on disk — never from a list of tools known to have the problem. That is the
@@ -24,7 +24,7 @@ import type { DoctorWarning, ToolDiagnosis } from './types.js';
 /**
  * What makes two loaded files the same context, twice.
  *
- * **Byte identity was the wrong question, and using it was the bug (T044).** It catches
+ * **Byte identity was the wrong question, and using it was the bug (T043).** It catches
  * `CLAUDE.md` / `AGENTS.md` / `GEMINI.md`, which are identical concatenations, and misses
  * every adapter that writes one file per rule: Cline reads `AGENTS.md` on top of
  * `.clinerules/*.md`, and Roo Code reads it on top of `.roo/rules/*.md` — the same canonical
@@ -194,7 +194,7 @@ export function toolNoteWarnings(tool: ToolDiagnosis, docs: AdapterDocs): Doctor
  *
  * Two senses, and both are needed. `comparison.orphaned` is the *record* sense:
  * `state.json` says Rulegate generated it and no enabled adapter produces it now. The
- * shape sense catches what the record sense structurally cannot — T068's bug is that the
+ * shape sense catches what the record sense structurally cannot — T067's bug is that the
  * failing run *drops* the state entry, so by the time anyone looks, `state.json` no longer
  * mentions the file it abandoned. Only a scan of the disk finds those.
  *
@@ -203,7 +203,7 @@ export function toolNoteWarnings(tool: ToolDiagnosis, docs: AdapterDocs): Doctor
  * automatically. A file is an orphan when it has the shape of an instruction file and sits
  * where no detected tool's expanded pattern would ever look.
  *
- * `options.ignore` narrows the *shape* sense only (T076). Some directories hold instruction
+ * `options.ignore` narrows the *shape* sense only (T075). Some directories hold instruction
  * files as data — a golden fixture tree above all, where a `CLAUDE.md` is test input rather
  * than a rule anything loads — and there is no way to tell that from the file. The record
  * sense is never narrowed: `state.json` says Rulegate wrote those, and a tool that can be
@@ -275,7 +275,7 @@ export async function orphanWarnings(
  * — but this list answers a different question: not "what could be a misplaced copy" but
  * "where does the tool actually look". An entry declaring `nesting` is the tool saying it
  * walks up from the file it is working on, so `packages/a/.cursor/rules/10-style.mdc` is
- * read, not stranded. Rulegate now writes exactly those paths (T057), and before this the
+ * read, not stranded. Rulegate now writes exactly those paths (T056), and before this the
  * files it had just generated were reported as sitting where nothing reads them.
  */
 function expand(pattern: string): string {

@@ -1,5 +1,5 @@
 # Deliberately not in id order, and it makes no difference — which is itself the finding.
-# T039 expected this file to be the first golden that could see `selectMcpServers`' sort,
+# T038 expected this file to be the first golden that could see `selectMcpServers`' sort,
 # because TOML tables have no canonical order and nothing downstream re-sorts them. But
 # `parseMcpServers` sorts by id at parse time, so every fixture reaches every adapter
 # already ordered. The sort's guards are unit tests that reverse the input by hand; see
@@ -21,8 +21,8 @@ servers:
     # A header reference becomes an `env_http_headers` entry, which sets the header to the
     # variable's raw value — the same thing a canonical header reference means everywhere
     # else. Not `bearer_token_env_var`: Codex supplies the `Bearer ` scheme for that one, so
-    # its variable holds a bare token while `.mcp.json` needs the whole value (T089). The
-    # name is >= 16 characters on purpose: that is the input the T037 secret scan's false
+    # its variable holds a bare token while `.mcp.json` needs the whole value (T088). The
+    # name is >= 16 characters on purpose: that is the input the T036 secret scan's false
     # positive needs, now reached through the `env_http_headers` section rather than the key.
     headers:
       Authorization: env:DOCS_API_KEY_PRODUCTION

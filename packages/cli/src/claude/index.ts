@@ -9,7 +9,7 @@ import {
 } from '@rulegate/claude';
 
 /**
- * The CLI's one door to the `claude` CLI (D3, T108) — the third directory
+ * The CLI's one door to the `claude` CLI (D3, T107) — the third directory
  * `invariants.test.ts` allows to spawn, pinned to the command set below the way the git
  * modules are pinned to their subcommands.
  *

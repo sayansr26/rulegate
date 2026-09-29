@@ -6,7 +6,7 @@ import { NodeFileSystem } from '../src/io/node.js';
 import { RulegateError } from '../src/model/errors.js';
 
 /**
- * Symlinks, and the two things Rulegate got wrong about them (T064).
+ * Symlinks, and the two things Rulegate got wrong about them (T063).
  *
  * Both are **platform-independent bugs** found while auditing for Windows, which is the
  * useful half of that audit: path separators and CRLF were already handled everywhere, and

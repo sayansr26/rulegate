@@ -8,13 +8,13 @@ const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
 /**
  * A hint is advice we tell the user to follow. `sync` used to hint at
- * `rulegate sync --import`, which is T046 and unimplemented, so following it produced
- * usage help and exit 2 — the code reserved for "you made a mistake" (T070). A README
+ * `rulegate sync --import`, which is T045 and unimplemented, so following it produced
+ * usage help and exit 2 — the code reserved for "you made a mistake" (T069). A README
  * promise decays; this does not.
  *
  * Subcommands are covered too, as of T019. They could not be until then: two hints and
  * RFC §8 named `rulegate init` while it was unregistered, so following the only
- * instruction a user with no `.rulegate/` ever received exited **2** (T072). Widening
+ * instruction a user with no `.rulegate/` ever received exited **2** (T071). Widening
  * this guard is how that stays fixed.
  */
 
@@ -105,7 +105,7 @@ describe('hints only name things that exist', () => {
   });
 
   it('never advertises a subcommand the CLI does not register', async () => {
-    // T072: `run: rulegate init` was the first instruction a new user got, and it was
+    // T071: `run: rulegate init` was the first instruction a new user got, and it was
     // the first thing that failed.
     const registered = registeredSubcommands();
     const offenders: string[] = [];
