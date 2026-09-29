@@ -9,7 +9,7 @@ import type { ReadOnlyFileSystem } from '../fs/types.js';
 import type { ToolId } from '../model/ids.js';
 
 /**
- * T143: a generated file `init` would grow past a cap a tool that reads it documents.
+ * T142: a generated file `init` would grow past a cap a tool that reads it documents.
  *
  * Found on the first real migration. agent-os writes `AGENTS.md` as a short index of its
  * scoped rules; the codex adapter inlines every rule it is sent, so lmsfront's went from

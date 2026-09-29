@@ -61,7 +61,7 @@ describe('collectImports', () => {
   });
 
   it('renames a preserved key canonical would interpret, and never onto a key already there', async () => {
-    // T116. `unknown` is serialized into the same frontmatter as `order` and `tools`, so a
+    // T115. `unknown` is serialized into the same frontmatter as `order` and `tools`, so a
     // native file's own `order: 1` came back from .rulegate/ as the rule's order — a string,
     // which fails every later `check` — and its `tools:` moved the rule between tools.
     const native = adapter('x', () =>

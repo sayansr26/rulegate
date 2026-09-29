@@ -22,7 +22,7 @@ import { createKitProgram } from './program.js';
  * required field. That is `contract-shape.test.ts`, and it is why the two exist.
  */
 const FROZEN_V1 = [
-  // Added at T038 (MCP). Additions cost one line each and no `ADAPTER_API_VERSION` bump,
+  // Added at T037 (MCP). Additions cost one line each and no `ADAPTER_API_VERSION` bump,
   // which is the compatibility policy in `docs/adapter-api-v1.md` being exercised for the
   // second time after `slugForId`.
   'DEFAULT_MCP_SCOPE (value)',
@@ -35,11 +35,11 @@ const FROZEN_V1 = [
   'envRef (value)',
   'formatEnvRef (value)',
   'parseEnvRef (value)',
-  // Added at T039, the third exercise of the additions policy.
+  // Added at T038, the third exercise of the additions policy.
   'selectMcpServers (value)',
   'stableJsonStringify (value)',
   'withJsonMarker (value)',
-  // Added 2026-09-04 (T041), MCP import. Eight exports, none removed, so no
+  // Added 2026-09-04 (T040), MCP import. Eight exports, none removed, so no
   // `ADAPTER_API_VERSION` bump. `read()`'s return widened by one OPTIONAL field
   // (`ImportResult`), which every v1 adapter already satisfies — the same reason
   // `Exact<A, B>` cannot see an added optional member (T011). Fourth exercise of the policy.
@@ -51,7 +51,7 @@ const FROZEN_V1 = [
   'ReferenceParse (type)',
   'importMcpJson (value)',
   'importedServer (value)',
-  // Added 2026-09-26 (T104): the JSONC reader for OpenCode's and Kilo's config files.
+  // Added 2026-09-26 (T103): the JSONC reader for OpenCode's and Kilo's config files.
   'stripJsonc (value)',
   'ADAPTER_API_VERSION (value)',
   'ALL_TOOLS (value)',
@@ -178,10 +178,10 @@ describe('the frozen adapter API (T011)', () => {
       'WritableFileSystem',
       'findRepoRoot',
       'resolveRepoRoot',
-      // T036/T052 stubs: `Canonical` carries these fields, but naming their element types
+      // T035/T051 stubs: `Canonical` carries these fields, but naming their element types
       // would let an adapter declare against a shape that is not frozen yet.
-      // `McpServer` came off this list at T038: T036 settled its shape, so it is exported
-      // and frozen. `Skill` stays until T052 does the same.
+      // `McpServer` came off this list at T037: T035 settled its shape, so it is exported
+      // and frozen. `Skill` stays until T051 does the same.
       'Skill',
     ];
     const names = publicSurface(entry).map((entryName) => entryName.split(' ')[0]);

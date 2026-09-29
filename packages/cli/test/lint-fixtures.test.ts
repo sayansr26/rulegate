@@ -16,7 +16,7 @@ const fixtures = fileURLToPath(new URL('../../../fixtures/', import.meta.url));
  */
 const DELIBERATELY_BROKEN = new Set([
   'malformed',
-  // The T113 seed, captured verbatim: agent-os imported this repository's generated
+  // The T112 seed, captured verbatim: agent-os imported this repository's generated
   // CLAUDE.md, so AGENTS.md and .agent-os/AGENTS.md are genuinely oversized for Codex,
   // Antigravity and Windsurf. It is a real broken state kept as evidence, not a
   // repository that is fine.
@@ -48,7 +48,7 @@ async function inputRoots(): Promise<string[]> {
 const describeFindings = (findings: readonly LintFinding[]): string =>
   findings.map((f) => `${f.rule} ${f.paths.join(',')} — ${f.message}`).join('\n');
 
-describe('T059 — zero false positives on repositories that are fine', () => {
+describe('T058 — zero false positives on repositories that are fine', () => {
   it('finds fixture roots to lint at all', async () => {
     // The control that makes every assertion below mean something. A glob that matched
     // nothing would give a suite of vacuously passing cases, which is the exact shape

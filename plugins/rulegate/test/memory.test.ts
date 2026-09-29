@@ -10,7 +10,7 @@ afterEach(async () => {
   await sb.dispose();
 });
 
-describe('runMemory (T099)', () => {
+describe('runMemory (T098)', () => {
   it('reports no memory on a fresh project', async () => {
     const text = (await runMemory({ root: sb.root, claudeDir: sb.claudeDir })).join('\n');
     expect(text).toContain('no agent memory yet');

@@ -16,7 +16,7 @@ async function render(mutate: (c: Canonical) => Canonical = (c) => c): Promise<s
   return artifacts.find((a) => a.path === MCP_FILE)?.contents;
 }
 
-describe('copilot MCP output (T040)', () => {
+describe('copilot MCP output (T039)', () => {
   it('matches the hand-written golden byte for byte', async () => {
     await expectFixtureMatch(FIXTURE, copilot);
   });
@@ -27,7 +27,7 @@ describe('copilot MCP output (T040)', () => {
 
   it('generates MCP for a repository with servers and no rules', async () => {
     // The regression guard for the demoted `rules.length === 0` early return. Before
-    // T040 this adapter returned `[]` for the whole fixture.
+    // T039 this adapter returned `[]` for the whole fixture.
     const actual = await renderFixture(FIXTURE, copilot);
     expect([...actual.keys()]).toEqual([MCP_FILE]);
   });
@@ -109,7 +109,7 @@ describe('copilot MCP output (T040)', () => {
     // Deliberately not a test of `selectMcpServers`' sort — `stableJsonStringify` sorts
     // deeply, so that sort is invisible to any JSON golden. What this pins is that the
     // bytes `state.json` hashes do not depend on input order. The sort's real guard is
-    // `core/test/mcp.test.ts` and, as of T040, the codex TOML golden.
+    // `core/test/mcp.test.ts` and, as of T039, the codex TOML golden.
     const ctx = await contextFor(`${FIXTURE}/input`, copilot);
     const reversed: readonly McpServer[] = [...ctx.canonical.mcpServers].reverse();
     const rendered = async (servers: readonly McpServer[]) =>

@@ -172,7 +172,7 @@ export class StagedFileSystem implements ReadOnlyFileSystem {
       // staged on Windows would compare unequal to the identical file read from disk, and
       // `--staged` would report drift that `check` does not — the two commands describing
       // one file two ways, which is the thing this codebase spends the most effort
-      // preventing (T074).
+      // preventing (T073).
       return normalizeText(raw);
     } catch {
       return undefined;

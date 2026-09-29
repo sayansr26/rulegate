@@ -157,7 +157,7 @@ export async function runAudit({
     say('  cost:  `npx --no rulegate doctor` reports what each tool loads and its token estimate');
     // An import copies a hand-written CLAUDE.md as it is, including the lines that tell the
     // agent to edit `.agent-os/rules/` and run agent-os's `sync` — an edit that now changes
-    // nothing (T146). Named by file and line; the lines themselves stay out of the output.
+    // nothing (T145). Named by file and line; the lines themselves stay out of the output.
     for (const m of agentOsMentions(root)) {
       const one = m.lines.length === 1;
       flag(

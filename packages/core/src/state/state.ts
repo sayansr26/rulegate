@@ -142,7 +142,7 @@ export async function loadState(
  *
  * `key` is how a path is identified, not how it is stored: on a case-insensitive
  * filesystem a recorded `CLAUDE.md` and a queried `claude.md` are one file, and matching
- * them exactly is what made Rulegate call its own artifact somebody else's (T078). The
+ * them exactly is what made Rulegate call its own artifact somebody else's (T077). The
  * default is exact, so a caller that has not asked the filesystem gets the old answer
  * rather than a guess.
  */

@@ -8,9 +8,9 @@ import { isRecord, readInRepo, hasControl } from '@rulegate/claude';
  *
  *   {
  *     "features": ["src/features/*", "apps/*"],   // each direct subdirectory is a feature
- *     "cartographerReminder": true,              // T101's advisory note on first edit
- *     "handoff": ["HANDOFF.md"],                 // T100: the resume note, first found wins
- *     "activeTask": [".claude/active-task.md"]   // T100: the task in flight, title only
+ *     "cartographerReminder": true,              // T100's advisory note on first edit
+ *     "handoff": ["HANDOFF.md"],                 // T099: the resume note, first found wins
+ *     "activeTask": [".claude/active-task.md"]   // T099: the task in flight, title only
  *   }
  *
  * Every key is optional and a malformed file reads as `{}`: a typo in a settings file

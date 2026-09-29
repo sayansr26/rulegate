@@ -17,13 +17,13 @@ export interface ManifestOptions {
   /** Copy originals into `.rulegate/backup/` before overwriting (T020). */
   readonly backup: boolean;
   /**
-   * Repo-relative POSIX globs `doctor` will not treat as instruction files (T076).
+   * Repo-relative POSIX globs `doctor` will not treat as instruction files (T075).
    *
    * Narrow on purpose: it suppresses nothing Rulegate generates and nothing `state.json`
    * records — those are ours, and hiding them is how a tool comes to forget a file it
    * owns. It exists for the directories that hold instruction *files as data*, a golden
    * fixture tree above all, where `CLAUDE.md` is test input rather than a rule anything
-   * loads, and subtrees nested discovery must not treat as canonical levels (T057). A
+   * loads, and subtrees nested discovery must not treat as canonical levels (T056). A
    * repository that holds `.rulegate/` trees as test data needs both: without the second,
    * `sync` generates artifacts into its own fixtures and `check` fails on a deliberately
    * malformed one.
@@ -64,7 +64,7 @@ export interface RulegateManifest {
    */
   readonly canonicalSources: readonly string[];
   /**
-   * Configuration for `rulegate lint` (T058).
+   * Configuration for `rulegate lint` (T057).
    *
    * Nothing renders it, so it is not part of any artifact's input — see `LintConfig`.
    */

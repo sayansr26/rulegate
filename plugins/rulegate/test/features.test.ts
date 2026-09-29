@@ -17,7 +17,7 @@ afterEach(async () => {
   await sb.dispose();
 });
 
-describe('features (T099)', () => {
+describe('features (T098)', () => {
   it('uses the first default parent that exists', async () => {
     await sb.put('src/modules/billing/index.ts', '');
     await sb.put('src/modules/.hidden/x.ts', '');
@@ -73,7 +73,7 @@ describe('features (T099)', () => {
       expect.objectContaining({ name: 'auth', changed: '2026-02-01' }),
     ]);
   });
-  it("never counts an index as a map, including agent-os's kept index (T107)", async () => {
+  it("never counts an index as a map, including agent-os's kept index (T106)", async () => {
     const dir = '.claude/agent-memory/rulegate-feature-cartographer';
     await sb.put('src/features/billing/index.ts', 'x');
     await sb.put('src/features/orders/index.ts', 'x');

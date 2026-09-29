@@ -11,7 +11,7 @@ export interface MemoryFileSystemOptions {
    * Resolve two names differing only in case to one file, the way APFS and NTFS do.
    *
    * Off by default, and that default is the control condition: every existing test runs
-   * against a case-sensitive filesystem, and the case-sensitive branch of T078's fix has
+   * against a case-sensitive filesystem, and the case-sensitive branch of T077's fix has
    * to stay exercised. Turning it on is what makes the *other* branch reachable in
    * memory — without it the only way to run it is on a macOS or Windows laptop, which is
    * how the defect survived 801 green tests.

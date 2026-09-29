@@ -23,7 +23,7 @@ export type FileSyncStatus =
    *
    * It exists because `doctor` used to answer this case from `compareToDisk` alone, which
    * asks whether the bytes match the *record*, and so reported a stale artifact as
-   * `generated` while `check` called it `stale` (T074).
+   * `generated` while `check` called it `stale` (T073).
    */
   | 'stale'
   /** Rulegate would generate it and it is not on disk. */
@@ -122,7 +122,7 @@ export type DoctorWarningCode =
   | 'W_OVER_LIMIT'
   /** A config path is a symlink — the workaround `doctor` exists to name. */
   | 'W_SYMLINK'
-  /** One tool loads the same content more than once (T073). */
+  /** One tool loads the same content more than once (T072). */
   | 'W_DUPLICATE_LOAD'
   /** A `warn`-level `DocNote` from the tool's own encoded documentation. */
   | 'W_TOOL_NOTE';

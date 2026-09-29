@@ -31,7 +31,7 @@ async function init(name: string) {
   });
 }
 
-describe('interop — T049', () => {
+describe('interop — T048', () => {
   it('keeps interop importers out of the adapter set entirely', () => {
     // The structural claim. An id in both lists would put a tool Rulegate never generates
     // for into rulegate.yaml, doctor's table, and every rule's `tools:` selector —
@@ -151,7 +151,7 @@ describe('interop — T049', () => {
 
   // rulesync writes no marker, so its "generated" list is every known output that exists.
   // A hand-written CLAUDE.md in a repository whose rulesync never targeted Claude Code is
-  // masked from the import all the same — so init must still name it before replacing it (T125).
+  // masked from the import all the same — so init must still name it before replacing it (T124).
   it('names a rulesync output it only inferred, when its bytes differ from the render', async () => {
     const repo = await mkdtemp(path.join(tmpdir(), 'rulegate-rulesync-'));
     try {
@@ -194,8 +194,8 @@ describe('interop — T049', () => {
 
 // `.clinerules` is a file in Cline's legacy layout and a directory in its current one. Ruler
 // lists it among its outputs and OpenCode's `instructions` may name it, and reading the
-// directory as a file threw EISDIR out of `init` before anything was planned (T149).
-describe('interop — a directory where a file may stand (T149)', () => {
+// directory as a file threw EISDIR out of `init` before anything was planned (T148).
+describe('interop — a directory where a file may stand (T148)', () => {
   let repo = '';
   const put = async (rel: string, contents: string) => {
     await mkdir(path.dirname(path.join(repo, rel)), { recursive: true });
@@ -280,10 +280,10 @@ describe('interop — a directory where a file may stand (T149)', () => {
   });
 });
 
-// The other side of T149: the tool a directory (or a legacy file) enabled renders onto that
+// The other side of T148: the tool a directory (or a legacy file) enabled renders onto that
 // very path once another tool's rules arrive unscoped. Refused by name, with nothing written,
 // instead of a bare EISDIR or ENOTDIR from the reads after planning.
-describe('interop — a generated path something else stands on (T149)', () => {
+describe('interop — a generated path something else stands on (T148)', () => {
   let repo = '';
   const put = async (rel: string, contents: string) => {
     await mkdir(path.dirname(path.join(repo, rel)), { recursive: true });
@@ -410,7 +410,7 @@ const AGENT_OS_OUTPUTS = [
   'AGENTS.md',
 ];
 
-describe('interop — agent-os (T106)', () => {
+describe('interop — agent-os (T105)', () => {
   it('writes the hand-written .rulegate/ golden, byte for byte', async () => {
     // The fixture-first assertion: `expected/` was written from agent-os's documented
     // source format before the importer existed. It pins the rules (`.agent-os/AGENTS.md`
@@ -475,7 +475,7 @@ describe('interop — agent-os (T106)', () => {
     expect(messages).toContainEqual(
       expect.stringContaining('.agents/skills/review, .claude/skills/review, .cline/skills/review'),
     );
-    // The exact `.claude/rulegate.json` payload, so /rulegate:init (T107) or a person can
+    // The exact `.claude/rulegate.json` payload, so /rulegate:init (T106) or a person can
     // write it: `rulegate init` never does, because the file's existence is how the plugin
     // knows a project has been set up.
     const claude = messages.find((m) => m.includes('.claude/rulegate.json'));
@@ -494,7 +494,7 @@ describe('interop — agent-os (T106)', () => {
     }
   });
 
-  it('refuses a .agent-os/ that agent-os built out of Rulegate output (T113)', async () => {
+  it('refuses a .agent-os/ that agent-os built out of Rulegate output (T112)', async () => {
     const found = await readWith(agentOs, 'agent-os-import-adopted');
     expect(found.rules).toEqual([]);
     // AGENTS.md carries both banners; either makes it derived.
@@ -534,7 +534,7 @@ describe('interop — agent-os (T106)', () => {
   });
 });
 
-describe('interop — agent-os edge cases (T106)', () => {
+describe('interop — agent-os edge cases (T105)', () => {
   let repo = '';
   const setup = async () => {
     repo = await mkdtemp(path.join(tmpdir(), 'rulegate-agent-os-'));
@@ -888,7 +888,7 @@ describe('interop — agent-os edge cases (T106)', () => {
     }
   });
 
-  it('notes every imported line still naming agent-os, and imports it unchanged (T146)', async () => {
+  it('notes every imported line still naming agent-os, and imports it unchanged (T145)', async () => {
     // lmsfront's CLAUDE.md sends the agent to `.agent-os/rules/` and agent-os's `sync`. The
     // import keeps the author's words; the note says which lines to change once it has run.
     await setup();
@@ -939,7 +939,7 @@ describe('interop — agent-os edge cases (T106)', () => {
   });
 });
 
-describe('interop — agent-os project body (T142)', () => {
+describe('interop — agent-os project body (T141)', () => {
   let repo = '';
   const cleanup = () => rm(repo, { recursive: true, force: true });
   const seed = async (name: string) => {

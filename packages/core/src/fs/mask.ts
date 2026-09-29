@@ -11,7 +11,7 @@ import type { DirEntry, ReadOnlyFileSystem } from './types.js';
  *
  * A decorator rather than a flag on `collectImports`: the adapters must not know that this
  * is happening, and a filesystem is the seam that already exists for showing them a
- * different view of the tree — `StagedFileSystem` (T047) does the same thing for the git
+ * different view of the tree — `StagedFileSystem` (T046) does the same thing for the git
  * index. It carries no write methods, so nothing here can widen what an importer may do.
  */
 export function maskPaths(fs: ReadOnlyFileSystem, hidden: Iterable<string>): ReadOnlyFileSystem {

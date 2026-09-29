@@ -38,7 +38,7 @@ export interface InteropResult {
   readonly generated: readonly string[];
   /**
    * The paths in `generated` taken as this tool's output on its presence alone, without
-   * reading anything in the file that says so (T125).
+   * reading anything in the file that says so (T124).
    *
    * rulesync writes no marker, so a hand-written `CLAUDE.md` in a repository that uses
    * rulesync only for Cursor is listed in `generated` all the same. Masking it is still
@@ -57,7 +57,7 @@ export interface InteropResult {
    */
   readonly notImported: readonly string[];
   /**
-   * Rulegate tool ids the other tool was configured to generate for (T106).
+   * Rulegate tool ids the other tool was configured to generate for (T105).
    *
    * A repository's detected tools are only what is on disk today; a config naming its
    * targets is the user's own statement of which tools they use, and dropping it would
@@ -73,7 +73,7 @@ export interface InteropResult {
    */
   readonly notes?: readonly { readonly path: string; readonly message: string }[];
   /**
-   * Reasons the import cannot go ahead at all (T106, T113).
+   * Reasons the import cannot go ahead at all (T105, T112).
    *
    * A source tree built out of some generator's output has no honest import: the real
    * source is gone, and canonical made from its rendering would carry the rendering's

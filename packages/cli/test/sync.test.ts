@@ -213,7 +213,7 @@ describe('rulegate sync', () => {
   });
 
   it('acts on the repository root when run from a subdirectory', async () => {
-    // T069. The walk-up chooses the root; writing relative to the subdirectory instead
+    // T068. The walk-up chooses the root; writing relative to the subdirectory instead
     // would scatter a second set of configs into every package a developer runs from.
     await mkdir(path.join(repo, 'packages/core'), { recursive: true });
 
@@ -339,14 +339,14 @@ describe('check and sync cannot diverge', () => {
 });
 
 /**
- * T020's deletion half and all of T068.
+ * T020's deletion half and all of T067.
  *
  * Before this existed, deleting a rule exited 0, printed `wrote CLAUDE.md`, and said
  * nothing about the `.cursor/rules/*.mdc` still on disk — Cursor kept loading a rule the
  * user had deleted, and the tool reported success. Concatenating adapters are immune,
  * which is why the whole class was invisible in this repository's most-watched artifact.
  */
-describe('orphaned artifacts (T020 deletion, T068)', () => {
+describe('orphaned artifacts (T020 deletion, T067)', () => {
   const rule = (id: string) => path.join(repo, '.rulegate/rules', `${id}.md`);
   const statePaths = async (): Promise<string[]> => {
     const state = JSON.parse(await read(STATE_PATH)) as { artifacts: { path: string }[] };
@@ -403,7 +403,7 @@ describe('orphaned artifacts (T020 deletion, T068)', () => {
   });
 
   /**
-   * T068's second and worse defect, verbatim from its validation.
+   * T067's second and worse defect, verbatim from its validation.
    *
    * The abandoning run used to *drop* the orphan's state entry, so Rulegate forgot it
    * had written the file. Restoring the rule then made `sync` refuse the path with

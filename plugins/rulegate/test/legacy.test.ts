@@ -14,7 +14,7 @@ const enable = (value: boolean): object => ({
   enabledPlugins: { 'agent-os@sayan-plugins': value },
 });
 
-describe('agentOsInstall (T107)', () => {
+describe('agentOsInstall (T106)', () => {
   it('finds nothing in a project agent-os never touched', () => {
     expect(agentOsInstall(sb.root, sb.claudeDir)).toMatchObject({
       plugin: undefined,

@@ -36,7 +36,7 @@ export type SkipReason =
    * bytes on disk are no longer the bytes we wrote. Somebody edited it after we
    * generated it, and deleting an edit is the one outcome worse than leaving a stale
    * file behind. Refused, and its `state.json` entry is kept so the next run can still
-   * recognise it as ours (T068).
+   * recognise it as ours (T067).
    */
   | 'orphan-hand-edited';
 
@@ -97,7 +97,7 @@ interface OrphanOutcome {
  * their *previous* record, because we do own them and the recorded hash is what makes
  * the next run report the edit rather than silently adopt it.
  *
- * The mirror-image rule is `retainOrphans`, and it is T068's second defect. `plan.state`
+ * The mirror-image rule is `retainOrphans`, and it is T067's second defect. `plan.state`
  * holds only *currently planned* artifacts, so a file we generated and no longer
  * generate falls out of state simply by not being mentioned — Rulegate forgets it
  * wrote it, deletion is disarmed against exactly the files it exists to reclaim, and a
@@ -154,7 +154,7 @@ export async function applyPlan(
   const comparison = await compareToDisk(previous, plan.artifacts, fs);
   // The comparison already asked the filesystem whether it folds case; reuse its answer
   // rather than probing again, so every layer of one run identifies paths identically
-  // (T078). Two layers disagreeing is how a file gets refused as somebody else's by the
+  // (T077). Two layers disagreeing is how a file gets refused as somebody else's by the
   // write loop and deleted as ours by the orphan loop, in the same run.
   const key = pathKeyFor(comparison.caseInsensitive);
   const handEdited = new Set(comparison.changed);
@@ -191,10 +191,10 @@ export async function applyPlan(
     }
 
     if (handEdited.has(artifact.path) && onDisk !== undefined && backupEnabled) {
-      // T070's remaining half. `--force` covered only `unmanaged` paths, so a hand-edited
+      // T069's remaining half. `--force` covered only `unmanaged` paths, so a hand-edited
       // generated file had no flag-based escape hatch at all — the only way forward was to
       // delete the file by hand, and nothing in the output said so. Widening it waited for
-      // the backup (T020) and for a recovery that keeps the edit (`--import`, T046), so
+      // the backup (T020) and for a recovery that keeps the edit (`--import`, T045), so
       // that discarding one is now a choice between two stated options rather than the
       // only door.
       if (!options.dryRun) await fs.copyFile(artifact.path, backupPathFor(artifact.path));
@@ -284,7 +284,7 @@ export function assertDeletable(
  *
  * Before this existed, deleting a rule left its `.cursor/rules/*.mdc` on disk at exit 0
  * with nothing printed, so Cursor kept loading a rule the user had deleted — a wrong
- * answer, not a missing one (T068).
+ * answer, not a missing one (T067).
  */
 async function reclaimOrphans(
   candidates: readonly string[],

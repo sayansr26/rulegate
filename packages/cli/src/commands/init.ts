@@ -21,7 +21,7 @@ export interface InitOptions {
   readonly quiet?: boolean;
   readonly color?: boolean;
   /**
-   * The Claude Code section (T108). Unset: shown when claude-code is enabled, commands
+   * The Claude Code section (T107). Unset: shown when claude-code is enabled, commands
    * printed. `true`: shown, and with `yes` the `claude plugin …` commands run. `false`
    * (`--no-plugin`): hidden.
    */
@@ -113,7 +113,7 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
   if (init.plan.artifacts.length > 0) {
     out.log('');
     out.log(`then \`rulegate sync\` would write ${pluralize(init.plan.artifacts.length, 'file')}:`);
-    // Named on the line itself as well as in its warning (T125): the list is what a reader
+    // Named on the line itself as well as in its warning (T124): the list is what a reader
     // scans, and "would write" beside a file nothing was imported from reads as a create.
     const unimported = new Set(init.unimported);
     for (const artifact of init.plan.artifacts) {
@@ -175,7 +175,7 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
   const canonicalWritten = await applyCanonicalFiles(init.canonicalFiles, fs, { dryRun: false });
 
   // `force` because every file this plan touches is one `init` just imported *from*, or
-  // one `init.unimported` named above (T125). Taking ownership is exactly what the user
+  // one `init.unimported` named above (T124). Taking ownership is exactly what the user
   // asked for, and `applyPlan` copies each original into `.rulegate/backup/` before
   // overwriting it — which is the difference between taking ownership and taking
   // someone's work.

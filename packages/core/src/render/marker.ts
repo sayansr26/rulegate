@@ -19,7 +19,7 @@ export function withHashMarker(body: string, enabled = true): string {
 }
 
 /**
- * The key a generated JSON file carries its marker under (T036/T038).
+ * The key a generated JSON file carries its marker under (T035/T037).
  *
  * JSON has no comments, and MCP artifacts are JSON — so without this, `kind: 'mcp'`
  * output would be the one generated shape with no marker in it, and every place that

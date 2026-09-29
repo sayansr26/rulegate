@@ -10,7 +10,7 @@ const MCP_DOCS = {
 } as const;
 
 // `docs.claude.com/en/docs/claude-code/memory` redirects here; recorded for the same reason
-// as MCP_DOCS. Re-read for T103, which is when `.claude/rules` and the AGENTS.md fallback
+// as MCP_DOCS. Re-read for T102, which is when `.claude/rules` and the AGENTS.md fallback
 // entered this file.
 const CLAUDE_MEMORY_DOCS = {
   url: 'https://code.claude.com/docs/en/memory',
@@ -59,7 +59,7 @@ export const docs: AdapterDocs = {
       managed: true,
       // Nested `.claude/rules/` directories load on demand, like nested CLAUDE.md files, and
       // alongside the root ones rather than instead of them. The vendor page does not say
-      // what a nested rule's `paths` are relative to; T110 is the first real check.
+      // what a nested rule's `paths` are relative to; T109 is the first real check.
       nesting: 'all-merged',
       description:
         'Project rules, discovered recursively. A file with `paths:` frontmatter loads only when Claude reads a file matching one of its globs; a file without it loads at launch with the same priority as `.claude/CLAUDE.md`. Rulegate generates one per glob-scoped canonical rule, and keeps repo-wide rules in CLAUDE.md.',

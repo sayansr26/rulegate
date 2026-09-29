@@ -120,7 +120,7 @@ function normalize(text: string): string {
  *
  * 0.5.0 wrote AGENTS.md without a banner and 0.6.0's `init` adopts an unbannered AGENTS.md
  * as the source, so a project set up on 0.5.0 holds the placeholder followed by the
- * path-scoped index 0.5.0 compiled into it (lmsfront, T110), with a section for each
+ * path-scoped index 0.5.0 compiled into it (lmsfront, T109), with a section for each
  * universal rule ahead of the index — agent-os's text throughout. Line endings, trailing
  * whitespace and blank lines are forgiven; anything else is an edit, and an edited body is
  * somebody's instructions. A section or index entry counts as agent-os's only when a rule in
@@ -153,7 +153,7 @@ export function isAgentOsScaffold(contents: string, compiled: AgentOsCompiled = 
 /**
  * Which generator's banner a file carries, if any: Rulegate's or agent-os's.
  *
- * Either one makes the file derived (T113). agent-os adopted this very repository once and
+ * Either one makes the file derived (T112). agent-os adopted this very repository once and
  * turned Rulegate's generated sections into its own sources, banner and all, then stacked
  * its banner on the generated `AGENTS.md` — so each tool's output can carry the other's
  * banner, and checking for one only is how a rendering gets imported as a source.
@@ -184,7 +184,7 @@ type Note = { readonly path: string; readonly message: string };
  * What names agent-os as the place to edit rules: its source directory and its package. A
  * rule is imported as it is, so a line telling the agent to edit `.agent-os/rules/` and run
  * agent-os's `sync` survives into `.rulegate/rules/` and, once `.agent-os/` is gone, sends
- * it to a directory nothing reads (T146). Reported, never rewritten: the sentence around it
+ * it to a directory nothing reads (T145). Reported, never rewritten: the sentence around it
  * is the author's, and only they know what it should say instead. The plugin audit's twin is
  * `AGENT_OS_MENTION` in `@rulegate/claude`, which checks the canonical rules after the fact.
  */
@@ -488,7 +488,7 @@ async function geminiReadsAgents(
 type AgentsOnDisk = 'missing' | 'output' | 'hand-written';
 
 /**
- * The tools `.agent-os/AGENTS.md` reached, judged by the files on disk (T142).
+ * The tools `.agent-os/AGENTS.md` reached, judged by the files on disk (T141).
  *
  * agent-os puts the project body into AGENTS.md and nowhere else, so imported unscoped it
  * would reach Claude Code through a generated CLAUDE.md for the first time — ahead of the
@@ -609,7 +609,7 @@ async function read(ctx: AdapterContext): Promise<InteropResult> {
     const contents = await ctx.fs.tryReadFile(path);
     if (contents === undefined) continue;
 
-    // Refused, not cleaned: stripping the banner and importing the rest is exactly the T113
+    // Refused, not cleaned: stripping the banner and importing the rest is exactly the T112
     // failure, a rendering promoted to a source.
     const by = derivedFrom(contents);
     if (by !== undefined) {

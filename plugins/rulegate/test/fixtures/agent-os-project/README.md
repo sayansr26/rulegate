@@ -1,6 +1,6 @@
 # agent-os-project
 
-The project `test/agent-os-migration.test.ts` migrates (T107). Not an adapter fixture:
+The project `test/agent-os-migration.test.ts` migrates (T106). Not an adapter fixture:
 it lives under the plugin's tests, so `fixtures:update` never sees it.
 
 - `repo/` — a project as agent-os 0.6 leaves it: `.agent-os/`, and the `AGENTS.md` and
@@ -8,7 +8,7 @@ it lives under the plugin's tests, so `fixtures:update` never sees it.
   `CLAUDE.md` holding the `## Agents in this project (agent-os)` section agent-os's own
   `/init` adds (agent-os never generates a `CLAUDE.md`) and the two lines lmsfront's has
   sending the agent to `.agent-os/rules/` and `npx @sayansr26/agent-os sync`, which the
-  import carries into `claude.md` unchanged and the audit flags (T146); cartographer maps under
+  import carries into `claude.md` unchanged and the audit flags (T145); cartographer maps under
   `agent-os-feature-cartographer/`, a reviewer whose `rulegate-reviewer/` twin already
   exists, machine-local builder memory, and a `.claude/settings.json` that declares
   agent-os's marketplace.

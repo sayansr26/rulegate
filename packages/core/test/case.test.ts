@@ -14,9 +14,9 @@ import type { Plan } from '../src/pipeline/plan.js';
 import type { StateFile } from '../src/state/state.js';
 
 /**
- * Case-insensitive path identity (T078).
+ * Case-insensitive path identity (T077).
  *
- * The defect these guard: `computePlan` has case-folded its conflict key since T064, but
+ * The defect these guard: `computePlan` has case-folded its conflict key since T063, but
  * `state.json` lookups and `compareToDisk` matched exactly. On APFS and NTFS a recorded
  * `CLAUDE.md` and a planned `claude.md` are **one physical file**, so the same run filed it
  * under `unmanaged` (refusing to write it, on the grounds that it was somebody else's) and
@@ -26,7 +26,7 @@ import type { StateFile } from '../src/state/state.js';
  * `CLAUDE.md` and `claude.md` really are two files and the old answers are the right ones.
  * Without the pair a fold that fired everywhere would pass, and that fold is wrong: it
  * would stop reporting a genuinely stale artifact as an orphan on ext4, leaving it on disk
- * at exit 0 for the tool it was written for to keep loading — which is T068's bug.
+ * at exit 0 for the tool it was written for to keep loading — which is T067's bug.
  */
 
 const RENDER = '# rules\n\ngenerated\n';
@@ -59,7 +59,7 @@ function planFor(artifacts: readonly Artifact[]): Plan {
     artifacts,
     state: buildState(artifacts),
     enabledAdapters: ['claude-code'],
-    // The single root level a repository without nested `.rulegate/` has (T057).
+    // The single root level a repository without nested `.rulegate/` has (T056).
     levels: [
       { dir: '', skippedTools: [], ownRuleIds: [], overriddenRuleIds: [], inheritedFrom: [] },
     ],
@@ -80,7 +80,7 @@ function planFor(artifacts: readonly Artifact[]): Plan {
  * or not the query is folded — the two branches produce identical behaviour and the case
  * distinguishes nothing. The first draft of this file used `claude.md` and a mutation
  * deleting the fold from `compareToDisk`'s record lookup passed all eleven tests. Same
- * shape as T077's inert control.
+ * shape as T076's inert control.
  */
 function repoWithCaseRename(caseInsensitive: boolean, diskContents = OLD): MemoryFileSystem {
   const recorded: StateFile = {
@@ -233,7 +233,7 @@ describe('ownership survives a case-only rename', () => {
     // The case that reaches `reconcileState`'s lookup. The file is ours and somebody has
     // edited it, so `sync` refuses to overwrite and must keep the record — the recorded
     // hash is the only thing that makes the *next* run report the edit rather than adopt
-    // it. Matching the record exactly drops it, and a dropped record is T068: Rulegate
+    // it. Matching the record exactly drops it, and a dropped record is T067: Rulegate
     // forgets it owns the file, then calls its own artifact somebody else's.
     const fs = repoWithCaseRename(true, 'somebody edited this by hand\n');
     const report = await applyPlan(planFor([artifact('Claude.md', RENDER)]), fs);

@@ -177,7 +177,7 @@ positive integers. Only files with `role: 'instructions'` count toward the total
 same set `doctor` charges for — settings and permissions files are configuration, not
 context.
 
-### 4.3 Nested `.rulegate/` — normative (T056)
+### 4.3 Nested `.rulegate/` — normative (T055)
 
 A repository may hold more than one `.rulegate/`. Each directory containing one is a
 **level**; the repository root is the level `''`. A `.rulegate/` beneath
@@ -207,7 +207,7 @@ level cannot reach those tools, and a level's rules are therefore skipped for th
 reported rather than written somewhere they would be read repository-wide.
 
 **`sync` and `check` cover the whole tree, and a level's artifacts are written under it**
-(T057). For a level at `packages/a`, each enabled tool's artifact is its ordinary path
+(T056). For a level at `packages/a`, each enabled tool's artifact is its ordinary path
 prefixed with the level's directory: `packages/a/CLAUDE.md`, `packages/a/.cursor/rules/*.mdc`.
 A tool is written at a nested level exactly when its managed entry carries a `nesting`
 value — that is the tool stating, with a source link and a verified version, that it reads
@@ -570,7 +570,7 @@ Such a server is **omitted from `.codex/config.toml`, and named in it**:
 command = "npx"
 ```
 
-It does **not** fail the run, and that changed in T042. Failing was the obvious reading of
+It does **not** fail the run, and that changed in T041. Failing was the obvious reading of
 "refuse where the loss is silent" and it was too blunt by a wide margin: `sync` writes
 nothing while any error stands, so one server Codex could not express produced no
 `CLAUDE.md`, no `AGENTS.md`, no `.mcp.json` and no `.codex/config.toml` — on a repository
@@ -661,7 +661,7 @@ presented as a documented fact.
 ## 12. Reserved: `skills/` (v1)
 
 Canonical skill definitions, a superset of `SKILL.md` frontmatter plus whatever
-Cursor's `.mdc` and `.github/skills` require. Specified when T052 lands.
+Cursor's `.mdc` and `.github/skills` require. Specified when T051 lands.
 
 ## 13. Explicitly deferred
 
@@ -677,7 +677,7 @@ costs nothing and loses nothing.
 | **Templating / variable interpolation**                          | Turns a config format into a language, with the escaping and debugging burden that follows.                                                                                | Demonstrated need that partials cannot meet.                    |
 | **Per-tool body overrides**                                      | The 90% case is per-tool _inclusion_, already covered by `tools`. Divergent bodies per tool undercut the premise that there is one source of truth.                        | Users are demonstrably forking rules by hand to work around it. |
 | **Priority weights beyond one integer**                          | `order` plus an id tiebreak is total and predictable. Multi-key precedence is harder to reason about and no more expressive.                                               | A concrete case `order` cannot express.                         |
-| **Nested `.rulegate/`** (monorepos)                              | Specified in §4.3: resolution as of T056, emission and command semantics as of T057. No longer deferred.                                                                   | Shipped.                                                        |
+| **Nested `.rulegate/`** (monorepos)                              | Specified in §4.3: resolution as of T055, emission and command semantics as of T056. No longer deferred.                                                                   | Shipped.                                                        |
 
 ## 14. Worked example
 

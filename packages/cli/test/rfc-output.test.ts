@@ -13,7 +13,7 @@ const rfcPath = fileURLToPath(
  * the *input* is authorable. It never proved the *output* was predictable, and for the
  * whole of M0 the RFC named files the renderer does not produce — `.cursor/rules/style.mdc`
  * for a rule at `rules/10-style.md`. These assertions live in the CLI package because
- * core may not import adapters, and rendering is what makes the claim checkable (T071).
+ * core may not import adapters, and rendering is what makes the claim checkable (T070).
  */
 
 /** The example's canonical source, transcribed from §14. */

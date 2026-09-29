@@ -3,7 +3,7 @@ import { codex, AGENTS_MD } from '../src/index.js';
 import { contextFor } from '@rulegate/adapter-kit/testing';
 
 /**
- * T086. `next dev` is the one competing writer for this adapter's artifact that cannot be
+ * T085. `next dev` is the one competing writer for this adapter's artifact that cannot be
  * configured away: it ships inside `node_modules` and runs on every dev server start.
  *
  * The docs note on this adapter makes a claim about *why* that is survivable — Next.js

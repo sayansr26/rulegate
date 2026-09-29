@@ -1,9 +1,9 @@
 import type { DirEntry, ReadOnlyFileSystem } from './types.js';
 
 /**
- * Path identity on a case-insensitive filesystem (T078).
+ * Path identity on a case-insensitive filesystem (T077).
  *
- * `computePlan` has case-folded its artifact-path conflict key since T064, because two
+ * `computePlan` has case-folded its artifact-path conflict key since T063, because two
  * artifacts differing only in case are two entries for **one physical file** on APFS and
  * NTFS. Nothing downstream agreed: `state.json` lookups and `compareToDisk` matched paths
  * exactly, so a recorded `CLAUDE.md` and a planned `claude.md` were treated as two files —
@@ -19,7 +19,7 @@ import type { DirEntry, ReadOnlyFileSystem } from './types.js';
  *    and set keys are folded.
  * 2. **Fold only where the filesystem actually folds.** On ext4 `CLAUDE.md` and
  *    `claude.md` are two real files, and treating them as one would leave a stale artifact
- *    on disk at exit 0 — the exact wrong answer T068 exists to fix. So the answer comes
+ *    on disk at exit 0 — the exact wrong answer T067 exists to fix. So the answer comes
  *    from `probeCaseInsensitive`, which asks the filesystem, rather than from
  *    `process.platform`, which is not evidence: a case-sensitive volume can be mounted on
  *    macOS and a case-insensitive one on Linux.
@@ -66,7 +66,7 @@ function flipCase(name: string): string {
  * second file is real there, not an alias for the first, so it proves nothing either way.
  */
 export async function probeCaseInsensitive(
-  // Only the two methods it calls: the Claude Code plugin's PreToolUse guard (T101) asks the
+  // Only the two methods it calls: the Claude Code plugin's PreToolUse guard (T100) asks the
   // same question with a two-method view, rather than bundling a filesystem class whose
   // other half writes.
   fs: Pick<ReadOnlyFileSystem, 'listDir' | 'exists'>,

@@ -11,7 +11,7 @@ export interface NestedTarget {
 }
 
 /**
- * Which artifacts may be written at a nested level, read off `AdapterDocs` (T057).
+ * Which artifacts may be written at a nested level, read off `AdapterDocs` (T056).
  *
  * **Derived, never listed.** A managed entry carrying a `nesting` value is a tool saying,
  * with a source link and a verified-against version, that it reads that file from a
@@ -60,7 +60,7 @@ export function toolsWithoutNesting(adapters: readonly Adapter[]): readonly Tool
  * Prefixing is the whole mechanism, and it is why `nestedTargets` has to gate it: an
  * artifact written at a path no `AdapterDocs` entry declares is one `buildManagedByIndex`
  * cannot attribute, so `doctor` would report Rulegate's own output as somebody else's and
- * the orphan scan would offer to delete it — T068, arriving through a new door.
+ * the orphan scan would offer to delete it — T067, arriving through a new door.
  */
 export function nestedPath(dir: string, pattern: string): string {
   return dir === '' ? pattern : `${dir}/${pattern}`;

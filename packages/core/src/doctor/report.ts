@@ -38,7 +38,7 @@ export interface DoctorInput {
   /**
    * Diagnose this plan instead of computing one.
    *
-   * For `lint` (T058), which needs the same plan this function would build and would
+   * For `lint` (T057), which needs the same plan this function would build and would
    * otherwise walk `.rulegate/` twice for it. The same shape and the same reason as
    * `PlanInput.canonical`: a parameter, not a second assembly path, because everything
    * below derives from `plan` and a caller that built its own some other way could be
@@ -86,7 +86,7 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
 
   // The verdict `check` would give, per planned path. `compareToDisk` above answers the
   // ownership question and cannot answer this one: an artifact whose rule was edited
-  // without a `sync` still matches its recorded hash (T074).
+  // without a `sync` still matches its recorded hash (T073).
   const verify = await verifyPlan(plan, fs);
   const verdicts = new Map(verify.entries.map((e) => [e.path, e.status]));
 
@@ -94,7 +94,7 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
 
   // Which canonical rules produced each generated file. This is what lets the duplicate
   // scan see that `.clinerules/10-style.md` and `AGENTS.md` carry the same rule, which no
-  // byte comparison can (T044).
+  // byte comparison can (T043).
   const provenance = new Map<string, readonly string[]>();
   for (const artifact of plan.artifacts) {
     const ids = artifact.provenance?.ruleIds;

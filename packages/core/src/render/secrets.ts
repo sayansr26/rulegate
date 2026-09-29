@@ -3,7 +3,7 @@ import { compareCodepoint } from './order.js';
 import type { JsonValue } from '../model/ids.js';
 
 /**
- * Never write a literal secret (T037). This is the third of three enforcement points.
+ * Never write a literal secret (T036). This is the third of three enforcement points.
  *
  * The first is the type system — `SecretValue` is `EnvRef`, so an adapter cannot be
  * *handed* a literal. The second is the parser, which refuses one in `env` or `headers`.
@@ -48,7 +48,7 @@ const SECRET_WORDS: readonly string[] = [
  * enough to look generated. `bearer_token_env_var = "DOCS_API_KEY_PRODUCTION"` was
  * reported as a literal credential and failed `sync` on a config that contained no
  * credential at all — and a check that fires on a correct repository is one people mute
- * (the T067 lesson, reached from a different direction).
+ * (the T066 lesson, reached from a different direction).
  *
  * This is not a per-tool exception. `env_var`, `env_variable` and `envvar` all mean the
  * same thing wherever they appear, and the value under one of them is a *name*, which is
@@ -58,7 +58,7 @@ const SECRET_WORDS: readonly string[] = [
 const ENV_VAR_NAME_SUFFIXES: readonly string[] = ['envvar', 'envvariable', 'envvarname'];
 
 /**
- * Sections whose every value is a variable *name* rather than a value (T089).
+ * Sections whose every value is a variable *name* rather than a value (T088).
  *
  * The same idea as `ENV_VAR_NAME_SUFFIXES`, one level up: Codex's
  * `[mcp_servers.x.env_http_headers]` maps a header name to the variable holding its value,
@@ -227,10 +227,10 @@ export function scanTextForSecrets(text: string): string[] {
 }
 
 /**
- * The conversion T037 asks import to perform: a literal becomes a reference named after
+ * The conversion T036 asks import to perform: a literal becomes a reference named after
  * the key it was found under.
  *
- * **Case is preserved, deliberately (T041).** Upper-casing looks like tidying and is not:
+ * **Case is preserved, deliberately (T040).** Upper-casing looks like tidying and is not:
  * the Codex writer can only express `env_vars = ["NAME"]`, which names one string that is
  * both the key and the variable, so it refuses with `E_MCP_UNREPRESENTABLE` whenever the
  * reference name differs from its key. Folding `github_token` to `GITHUB_TOKEN` therefore
@@ -240,7 +240,7 @@ export function scanTextForSecrets(text: string): string[] {
  * but that is a smaller claim than renaming.
  *
  * A key that is not already identifier-shaped (`api-key`) still yields a different name
- * and still meets Codex's refusal. That is T042, not this function's business: the fix
+ * and still meets Codex's refusal. That is T041, not this function's business: the fix
  * there is to exclude the server from codex rather than to invent a name for it.
  */
 export function literalToEnvRef(key: string): EnvRef {

@@ -27,7 +27,7 @@ function serverAt(list: readonly McpServer[], id: string): McpServer {
   return found;
 }
 
-describe('codex MCP output (T040)', () => {
+describe('codex MCP output (T039)', () => {
   it('matches the hand-written golden byte for byte', async () => {
     await expectFixtureMatch(FIXTURE, codex);
   });
@@ -72,7 +72,7 @@ describe('codex MCP output (T040)', () => {
   });
 
   it('writes one order whatever order the servers arrive in', async () => {
-    // **The golden cannot see `selectMcpServers`' sort, and T039 predicted that it could.**
+    // **The golden cannot see `selectMcpServers`' sort, and T038 predicted that it could.**
     // Its note said TOML would be the first target where insertion order is file order and
     // a fixture would therefore guard the sort. It is not: `parseMcpServers` already sorts
     // by id at parse time, so a fixture's servers reach the adapter sorted however the
@@ -83,7 +83,7 @@ describe('codex MCP output (T040)', () => {
     // So the sort's guards are this test and the one in `core/test/mcp.test.ts`, both of
     // which reverse the input by hand. It is still load-bearing: `selectMcpServers` is
     // public API in the frozen kit, and a caller that builds servers programmatically
-    // rather than parsing them — T041's importer, an external adapter — gets whatever
+    // rather than parsing them — T040's importer, an external adapter — gets whatever
     // order it built.
     const list = await servers();
     const reversed: readonly McpServer[] = [...list].reverse();
@@ -120,7 +120,7 @@ describe('codex MCP output (T040)', () => {
   });
 
   /**
-   * T089. `bearer_token_env_var` was the obvious mapping and it was wrong: Codex expands it
+   * T088. `bearer_token_env_var` was the obvious mapping and it was wrong: Codex expands it
    * to `Authorization: Bearer $VAR`, supplying the scheme itself, so the variable holds a
    * bare token — while `.mcp.json` renders the same canonical entry as `"${VAR}"`, whose
    * variable must hold the whole `Bearer <token>`. One canonical header could not be right
@@ -179,8 +179,8 @@ describe('codex MCP output (T040)', () => {
   });
 
   it('generates the config even when AGENTS.md is the canonical source', async () => {
-    // The sharper half of T039's early-return hole. Using AGENTS.md as canonical is the
-    // ordinary way to use Codex, and before T040 that path returned `[]` for the whole
+    // The sharper half of T038's early-return hole. Using AGENTS.md as canonical is the
+    // ordinary way to use Codex, and before T039 that path returned `[]` for the whole
     // adapter — canonical MCP parsed, validated, and silently unreachable.
     const contents = await render((c) => ({
       ...c,
@@ -190,9 +190,9 @@ describe('codex MCP output (T040)', () => {
   });
 });
 
-describe('codex omits what Codex cannot say, and says so (T040, changed by T042)', () => {
+describe('codex omits what Codex cannot say, and says so (T039, changed by T041)', () => {
   it('omits a renamed environment reference and names it in the file', async () => {
-    // **T042 changed this from a refusal to an omission.** Throwing put an error in
+    // **T041 changed this from a refusal to an omission.** Throwing put an error in
     // `computePlan`, and `sync` writes nothing while any error stands — so one server
     // Codex could not express took down the whole run: no CLAUDE.md, no AGENTS.md, and
     // not even the servers every tool *can* express. Reproduced on a hand-written
@@ -226,7 +226,7 @@ describe('codex omits what Codex cannot say, and says so (T040, changed by T042)
   /**
    * This used to be a refusal: `bearer_token_env_var` is Authorization-only, so any other
    * header meant omitting the whole server. `env_http_headers` takes any header name, so the
-   * refusal is gone with the key that caused it (T089) — the case is kept as the proof.
+   * refusal is gone with the key that caused it (T088) — the case is kept as the proof.
    */
   it('writes a reference in any header, not only Authorization', async () => {
     const list = await servers();
@@ -264,8 +264,8 @@ describe('codex omits what Codex cannot say, and says so (T040, changed by T042)
   });
 
   it('names the server and never the value', async () => {
-    // Unchanged by T042 and still the rule that matters most: a message naming the
-    // credential would commit the secret to a different file (T037).
+    // Unchanged by T041 and still the rule that matters most: a message naming the
+    // credential would commit the secret to a different file (T036).
     const list = await servers();
     const renamed: McpServer = {
       ...serverAt(list, 'zebra-stdio'),

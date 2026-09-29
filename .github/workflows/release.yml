@@ -1,4 +1,4 @@
-# Release (T035).
+# Release (T156).
 #
 # The only path that publishes to npm, and the only place `--provenance` can work:
 # provenance is a signed attestation linking a tarball to the workflow run and commit that

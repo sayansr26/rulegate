@@ -23,7 +23,7 @@ import {
 export const MCP_FILE = '.roo/mcp.json';
 
 /**
- * **`streamable-http`, not `http`** — the Roo-shaped version of the divergence T039 found
+ * **`streamable-http`, not `http`** — the Roo-shaped version of the divergence T038 found
  * between Claude Code and Cursor.
  *
  * Every target so far spells streamable HTTP `http` (Claude Code, VS Code) or omits the

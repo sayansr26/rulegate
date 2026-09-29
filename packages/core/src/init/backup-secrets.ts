@@ -5,9 +5,9 @@ import { ignoreCovers } from './formatters.js';
 import type { ReadOnlyFileSystem } from '../fs/types.js';
 
 /**
- * T088, and the one hole T037 leaves open.
+ * T087, and the one hole T036 leaves open.
  *
- * T037 makes "never write a literal secret" a property of the *render* path: `SecretValue`
+ * T036 makes "never write a literal secret" a property of the *render* path: `SecretValue`
  * is `EnvRef`, the parser refuses a literal, and `render/secrets.ts` catches anything that
  * reaches `unknown`. None of that applies here, because taking ownership of a file copies
  * it to `.rulegate/backup/` **verbatim** — which is exactly what it must do for `restore`
@@ -20,7 +20,7 @@ import type { ReadOnlyFileSystem } from '../fs/types.js';
  * in `.gitignore` can end up committing it from a path that line does not cover.
  *
  * **It warns and never edits.** Adding `.rulegate/backup/` to somebody's `.gitignore` is
- * still editing a file Rulegate did not generate, refused at T019 and reaffirmed at T067 —
+ * still editing a file Rulegate did not generate, refused at T019 and reaffirmed at T066 —
  * and the right answer may instead be to move the credential out of the file entirely, which
  * is the user's call and not a line Rulegate can write for them.
  */

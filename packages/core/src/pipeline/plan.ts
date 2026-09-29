@@ -38,7 +38,7 @@ export interface PlanInput {
   readonly canonical?: Canonical;
   /**
    * Whether to plan every nested `.rulegate/` in the tree, or the repository root alone
-   * (T057).
+   * (T056).
    *
    * Three states, and the default is the interesting one. **Unset means "cover whatever
    * the repository has"** — one level in an ordinary repository, every level in a
@@ -51,7 +51,7 @@ export interface PlanInput {
   readonly recursive?: boolean;
 }
 
-/** What one canonical level contributed to the plan (T057). */
+/** What one canonical level contributed to the plan (T056). */
 export interface PlanLevel {
   /** Repo-relative POSIX directory. `''` is the repository root. */
   readonly dir: string;
@@ -100,7 +100,7 @@ export interface Plan {
  * single most important structural constraint, and it is a property of this function
  * being the only renderer rather than a rule anyone has to remember.
  *
- * Nested levels (T057) are rendered by the same loop, at prefixed paths, for exactly
+ * Nested levels (T056) are rendered by the same loop, at prefixed paths, for exactly
  * that reason: a `computeTreePlan` beside this one would be a second renderer, and the
  * two would eventually disagree about a monorepo. One `claimedBy` map, one
  * `sortArtifacts` and one `buildState` span every level, so a cross-level path collision
@@ -131,7 +131,7 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
     const selected = adapters.filter((a) => enabled.includes(a.name));
 
     // Which of this level's enabled tools can actually receive a nested artifact, read
-    // off `AdapterDocs.nesting` rather than a hand-kept list (T057, `adapter/nesting.ts`).
+    // off `AdapterDocs.nesting` rather than a hand-kept list (T056, `adapter/nesting.ts`).
     // Gating is per tool, not per produced path: a tool declaring `nesting` on its
     // managed pattern is the tool saying it reads that artifact from a subdirectory, and
     // matching each rendered filename back against the declared glob would re-derive the
@@ -217,7 +217,7 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
           continue;
         }
 
-        // The last gate in front of a git-committed credential (T037). The parser refuses
+        // The last gate in front of a git-committed credential (T036). The parser refuses
         // a literal in `env`, `headers` and preserved unknown keys, and `SecretValue` keeps
         // an adapter from being handed one — but an adapter renders its own text, and this
         // is the only place that sees what it actually produced. Scoped to `mcp` artifacts
@@ -275,7 +275,7 @@ export async function computePlan(input: PlanInput): Promise<Plan> {
         // only in case are two entries for **one physical file** there, so a plan that is
         // legal on Linux makes `check` fail forever on Windows and macOS. Refusing costs an
         // external adapter a rename; not refusing costs a user a repository that can never be
-        // in sync (T064). The map spans levels, so two levels claiming one path — a nested
+        // in sync (T063). The map spans levels, so two levels claiming one path — a nested
         // level whose `dir` collides with a root artifact's directory — is caught here too.
         const key = path.toLowerCase();
         const other = claimedBy.get(key);

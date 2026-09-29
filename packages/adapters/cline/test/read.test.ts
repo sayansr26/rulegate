@@ -14,7 +14,7 @@ describe('cline read()', () => {
   });
 });
 
-describe('cline docs — the T073 duplicate-load claim (T043b)', () => {
+describe('cline docs — the T072 duplicate-load claim (T042b)', () => {
   it('declares the three cross-tool files other adapters generate, unmanaged', async () => {
     const { cline } = await import('../src/index.js');
     const patterns = cline.docs.files.filter((f) => !f.managed).map((f) => f.pattern);
@@ -22,7 +22,7 @@ describe('cline docs — the T073 duplicate-load claim (T043b)', () => {
     // These are the whole reason this adapter's docs matter. Cline reads three files that
     // *other* Rulegate adapters write, additively — so enabling cline alongside codex
     // sends Cline the same rules twice. `doctor` derives that warning from this data, with
-    // no Cline-specific code anywhere (T073).
+    // no Cline-specific code anywhere (T072).
     for (const pattern of ['.cursorrules', '.windsurfrules', 'AGENTS.md']) {
       expect(patterns).toContain(pattern);
     }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Structural validation for the Claude Code plugin under `plugins/rulegate/` (T096).
+ * Structural validation for the Claude Code plugin under `plugins/rulegate/` (T095).
  *
  * Offline and unauthenticated, so CI can gate every push; `claude plugin validate` needs
  * the Claude Code CLI installed and is the maintainer's local complement, not a
@@ -141,7 +141,7 @@ export function validatePlugin(repoRoot) {
   }
 
   // ---- agents ----
-  // An empty directory is valid until T098 ports the agents; a malformed file never is.
+  // An empty directory is valid until T097 ports the agents; a malformed file never is.
   for (const f of listDir(`${PLUGIN}/agents`).filter((n) => n.endsWith('.md'))) {
     const stem = path.basename(f, '.md');
     const fm = frontmatter(read(`${PLUGIN}/agents/${f}`) ?? '');

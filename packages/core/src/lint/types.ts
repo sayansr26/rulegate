@@ -56,7 +56,7 @@ export interface LintFindingInit {
  * How loud a reported finding is.
  *
  * `info` is not a severity the manifest can set: it is what the engine gives a finding
- * about a tool the repository neither enables nor has configured (T143). The condition is
+ * about a tool the repository neither enables nor has configured (T142). The condition is
  * real — Windsurf would drop the tail of an oversized `AGENTS.md` — but nobody here runs
  * Windsurf, so it is reported and never changes the exit code.
  */

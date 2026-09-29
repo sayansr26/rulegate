@@ -32,7 +32,7 @@ interface StubInit {
   readonly notes?: readonly DocNote[];
   readonly detect?: boolean;
   readonly writes?: readonly (readonly [string, string])[];
-  /** path -> the canonical rule ids that produced it, for the T044 duplicate scan. */
+  /** path -> the canonical rule ids that produced it, for the T043 duplicate scan. */
   readonly provenance?: Readonly<Record<string, readonly string[]>>;
 }
 
@@ -187,7 +187,7 @@ describe('buildDoctorReport — resolution', () => {
     expect(probed.tools[0]?.files[0]?.status).toBe('absent');
   });
   /**
-   * T090. A nested walk is a walk over the *user's* tree. `.rulegate/` is Rulegate's own
+   * T089. A nested walk is a walk over the *user's* tree. `.rulegate/` is Rulegate's own
    * directory, and `.rulegate/backup/GEMINI.md` — the copy `init` took of the original —
    * matches `**` + `/GEMINI.md` exactly. Counting it put a backup and a real artifact in one
    * row, which made the row's aggregate status `unmanaged` for a file Rulegate had generated,
@@ -218,7 +218,7 @@ describe('buildDoctorReport — resolution', () => {
 
 describe('buildDoctorReport — warnings', () => {
   it('W_DUPLICATE_LOAD fires when the same rule arrives from differently-shaped files', async () => {
-    // T044. This is the case byte comparison could never see, and it is the common one:
+    // T043. This is the case byte comparison could never see, and it is the common one:
     // Cline reads AGENTS.md on top of `.clinerules/*.md`, Roo Code on top of
     // `.roo/rules/*.md` — the same canonical rules, sent twice, in different bytes. The
     // warning stayed silent exactly where the token cost was real, and both adapters
@@ -340,7 +340,7 @@ describe('buildDoctorReport — warnings', () => {
   it('is derived: a sixth adapter nobody wrote code for gets the same warning', async () => {
     // The point of this test is the mutation it invites. Add `if (tool.name !== 'reader')
     // return []` to duplicateLoadWarnings and this fails while every other case passes —
-    // which is precisely what T073 forbids and what "derived, not hardcoded" has to mean.
+    // which is precisely what T072 forbids and what "derived, not hardcoded" has to mean.
     const r = await report(
       [
         ['SIXTH.md', 'identical'],
@@ -429,7 +429,7 @@ describe('buildDoctorReport — warnings', () => {
   });
 
   it('first-match reports only the first present file as loaded, and bills only that one', async () => {
-    // T045a. Zed opens the first file in its nine-file list and stops; the rest are never
+    // T044a. Zed opens the first file in its nine-file list and stops; the rest are never
     // read. `override` gets the *shadowing* right and the *loading* wrong — under it a
     // shadowed file still counts as loaded, which is correct for Claude Code (a losing
     // file still costs its tokens) and false here.
@@ -465,7 +465,7 @@ describe('buildDoctorReport — warnings', () => {
   });
 
   it('W_ORPHAN_FILE keys a directory pattern on its directory, not on its extension', async () => {
-    // T077. `orphanWarnings` derived the shape from `basenamePosix(entry.pattern)`, so a
+    // T076. `orphanWarnings` derived the shape from `basenamePosix(entry.pattern)`, so a
     // directory-scoped pattern like `.toolrules/*.md` reduced to `*.md` and claimed every
     // Markdown file in the repository had the shape of a tool instruction file. No shipped
     // adapter had a bare-extension basename, so nothing caught it until an adapter with one
@@ -504,7 +504,7 @@ describe('buildDoctorReport — warnings', () => {
   });
 
   it('options.ignore suppresses the shape sense only, and never the record sense', async () => {
-    // T076. A golden fixture tree holds instruction files as *data*: nothing loads
+    // T075. A golden fixture tree holds instruction files as *data*: nothing loads
     // `fixtures/x/RULES.md`, and nothing is wrong with it being there.
     const adapters = [stub({ name: 'alpha', files: [entry('RULES.md')] })];
     const disk = [
@@ -643,7 +643,7 @@ describe('buildDoctorReport — contract', () => {
   });
 
   it('calls a file stale when the rules moved on, the same word `check` uses', async () => {
-    // T074. `compareToDisk` answers disk-vs-record, and an artifact whose rule was edited
+    // T073. `compareToDisk` answers disk-vs-record, and an artifact whose rule was edited
     // without a `sync` still matches its record — so classifying from it alone reported a
     // stale file as `generated` while `check` called it `stale`. One repository, two
     // commands, opposite verdicts.
@@ -736,7 +736,7 @@ describe('buildDoctorReport — contract', () => {
   });
 
   it('diagnoses a caller-supplied plan identically to one it computes itself', async () => {
-    // The seam `lint` uses to avoid walking `.rulegate/` a second time (T058). Asserting
+    // The seam `lint` uses to avoid walking `.rulegate/` a second time (T057). Asserting
     // only that the new path *works* would not catch the failure that matters: the two
     // paths silently diverging, at which point `lint` and `doctor` describe different
     // repositories. So both are built here and compared whole.

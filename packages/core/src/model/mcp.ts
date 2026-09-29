@@ -10,7 +10,7 @@ export interface EnvRef {
 /**
  * Anywhere a secret could appear, the type is `EnvRef` rather than `string`.
  *
- * That makes "never write a literal secret" (T037, and a hard constraint in the
+ * That makes "never write a literal secret" (T036, and a hard constraint in the
  * project brief) a property the compiler enforces, instead of a runtime check that
  * some future adapter forgets to call. Generated MCP configs are git-committed; a
  * literal token in one is the worst failure this tool could produce.
@@ -29,7 +29,7 @@ export type McpTransport =
   | { readonly kind: 'http'; readonly url: string }
   | { readonly kind: 'sse'; readonly url: string };
 
-/** A server as `.rulegate/mcp/servers.yaml` describes it (T036, RFC-0001 §11). */
+/** A server as `.rulegate/mcp/servers.yaml` describes it (T035, RFC-0001 §11). */
 export interface McpServer {
   /** The key under `servers:`. Unique, and the name every target format writes it under. */
   readonly id: string;

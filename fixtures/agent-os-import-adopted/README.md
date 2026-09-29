@@ -1,7 +1,7 @@
 # `agent-os-import-adopted`
 
-Captured 2026-09-25 when `agent-os init` (0.6.0) was run on this repository (T113). It is
-kept because it is the worst case for T106 and it happened for real, not because anyone
+Captured 2026-09-25 when `agent-os init` (0.6.0) was run on this repository (T112). It is
+kept because it is the worst case for T105 and it happened for real, not because anyone
 designed it.
 
 agent-os adopted a repository that Rulegate already owned, and got both directions wrong:

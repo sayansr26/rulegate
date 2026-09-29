@@ -96,7 +96,7 @@ async function read(ctx: AdapterContext): Promise<Partial<Canonical>> {
  * The MCP half, guarded separately from the rules half.
  *
  * A repository can hold `.cursor/mcp.json` and no rules at all, so folding this into the rules
- * return would import no servers there — the mirror of the bug T039 found on the write
+ * return would import no servers there — the mirror of the bug T038 found on the write
  * side, where one early return covered the whole adapter.
  */
 async function readMcp(ctx: AdapterContext): Promise<ImportResult> {

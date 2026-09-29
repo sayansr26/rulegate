@@ -16,7 +16,7 @@ import {
 } from '@rulegate/claude';
 
 /**
- * The SessionStart block (T100): "where you left off", then "how this project works".
+ * The SessionStart block (T099): "where you left off", then "how this project works".
  *
  * Claude Code injects a SessionStart hook's stdout as context before the first turn, and
  * again after `/clear` and a compaction. Two blocks:
