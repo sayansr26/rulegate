@@ -146,4 +146,14 @@ export const docs: AdapterDocs = {
         'Codex has no per-glob rule mechanism, so a glob-scoped canonical rule is rendered with an "Applies to:" line stating its scope in prose. Lossy, but visibly so; dropping the scope silently would turn a component-only rule into a repo-wide one.',
     },
   ],
+  // Codex reads `.agents/skills/`, walking up to the repository root. Its extra UI data lives in a skill's `agents/openai.yaml`, which Rulegate carries as an asset.
+  skills: {
+    dirs: ['.agents/skills'],
+    extensions: [],
+    source: {
+      url: 'https://learn.chatgpt.com/docs/build-skills',
+      title: 'Codex — Build skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };

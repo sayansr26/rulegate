@@ -73,6 +73,14 @@ Source: [Claude Code — Model Context Protocol (MCP)](https://code.claude.com/d
 
 No byte cap is documented in the Claude Code memory documentation cited above. The practical limit is the model’s context window: every CLAUDE.md on the path is loaded into every request, so cost grows with the file rather than being refused at a threshold.
 
+## Skills
+
+Reads project skills from `.claude/skills/`, preferred first.
+
+Frontmatter it reads beyond the Agent Skills fields: `when_to_use`, `argument-hint`, `arguments`, `disable-model-invocation`, `user-invocable`, `disallowed-tools`, `model`, `effort`, `context`, `agent`, `background`, `hooks`, `paths`, `shell`.
+
+Source: [Claude Code — Extend Claude with skills](https://code.claude.com/docs/en/skills) — retrieved 2026-09-29
+
 ## Notes
 
 - **info** — Claude Code expands ${NAME} and ${NAME:-default} in command, args, url, and in env and headers values. Cursor spells the same substitution ${env:NAME}, so a canonical `env:NAME` reference renders differently for each tool — copying an .mcp.json into .cursor/mcp.json by hand produces a config that looks right and does not resolve.
@@ -91,5 +99,6 @@ No byte cap is documented in the Claude Code memory documentation cited above. T
 
 - [Claude Code — Model Context Protocol (MCP)](https://code.claude.com/docs/en/mcp) — retrieved 2026-09-04
 - [Claude Code — How Claude remembers your project](https://code.claude.com/docs/en/memory) — retrieved 2026-09-26
+- [Claude Code — Extend Claude with skills](https://code.claude.com/docs/en/skills) — retrieved 2026-09-29
 - [Claude Code — Settings](https://docs.claude.com/en/docs/claude-code/settings) — retrieved 2026-09-01
 - [Next.js — generate-agent-files.ts (the `next dev` AGENTS.md writer)](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/generate-agent-files.ts) — retrieved 2026-09-20

@@ -119,4 +119,14 @@ export const docs: AdapterDocs = {
       source: RULES_DOCS,
     },
   ],
+  // Roo Code also reads mode-specific `skills-<mode>/` directories, which Rulegate does not generate.
+  skills: {
+    dirs: ['.roo/skills', '.agents/skills'],
+    extensions: [],
+    source: {
+      url: 'https://roocodeinc.github.io/Roo-Code/features/skills',
+      title: 'Roo Code — Skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };

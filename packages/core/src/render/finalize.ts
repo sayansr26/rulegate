@@ -8,6 +8,7 @@ export interface ArtifactDraft {
   readonly adapter: ToolId;
   readonly kind: ArtifactKind;
   readonly provenance?: { readonly ruleIds: readonly RuleId[] };
+  readonly bytes?: Uint8Array;
 }
 
 /**
@@ -19,6 +20,8 @@ export interface ArtifactDraft {
  * be mutating user content — the exact failure this project treats as unacceptable.
  */
 export function finalizeArtifact(draft: ArtifactDraft): Artifact {
+  // A binary artifact is bytes by definition: normalising it would corrupt it (T052).
+  if (draft.bytes !== undefined) return { ...draft, contents: '' };
   const contents = ensureSingleTrailingNewline(normalizeEol(stripBom(draft.contents)));
   return {
     path: draft.path,

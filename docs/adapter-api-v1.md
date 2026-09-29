@@ -84,12 +84,9 @@ removal was still free: it is the type someone would reach for to write
 
 ### Reserved
 
-`Canonical.skills` holds canonical skills since T051 (RFC-0001 §12), but its **element type is
-not yet part of the frozen surface** and may change without a major bump until the skills
-adapters (T052) consume it; `Skill` is
-deliberately not exported, so an adapter cannot declare against a shape that is not
-settled. The field itself — present, and an array — is frozen. Reading it is allowed and
-unsupported.
+`Canonical.skills` **is no longer reserved.** T051 settled `Skill` and T052 exported it with
+`SkillAsset` and `SkillsSupport`; all three are frozen and pinned in `test/shape/pins.ts`.
+An adapter supports skills by declaring `AdapterDocs.skills`; it never renders them itself.
 
 `Canonical.mcpServers` **is no longer reserved.** T035 settled the shape and T037 exported
 it, so `McpServer`, `McpTransport`, `EnvRef`, `SecretValue` and `McpScope` are part of the
@@ -164,6 +161,9 @@ still 1.
 | 2026-09-28 (T124, T115) | `RulegateErrorCode` gains `'W_INIT_NOT_IMPORTED'`, `'E_INIT_CANONICAL_MISMATCH'` and `'E_INIT_CANONICAL_EXISTS'`                    | `init` names an existing file it would back up and replace without having imported from it; refuses a `.rulegate/` that would not render, once read back, what it imported; and refuses to overwrite or render beside hand-written canonical files in a `.rulegate/` with no manifest. Non-breaking for the same reason as `W_INTEROP_OUTPUT_LEFT`.                                                                                                                                               |
 | 2026-09-28 (T148)       | `RulegateErrorCode` gains `'E_INIT_NOT_A_FILE'`                                                                                     | `init` refuses, by path and before writing anything, a plan that generates a file where a directory stands or beneath a path that is a file. Non-breaking for the same reason as `W_INTEROP_OUTPUT_LEFT`.                                                                                                                                                                                                                                                                                         |
 | 2026-09-29 (T051)       | `RulegateErrorCode` gains `'E_SKILL_INVALID'`                                                                                       | `.rulegate/skills/` is parsed and validated against the Agent Skills rules (RFC-0001 §12). Non-breaking for the same reason as `W_INTEROP_OUTPUT_LEFT`. `Canonical.skills`' element type is now settled in core but stays unexported from the kit until the skills adapters consume it (T052).                                                                                                                                                                                                    |
+| 2026-09-29 (T052)       | `Artifact` gains optional `bytes: Uint8Array`                                                                                       | A binary artifact — a skill's asset — written byte for byte and hashed over its raw bytes (`sha256-raw:` in `state.json`), because every text path normalises EOL and strips a BOM. Optional, so an adapter that never sets it is unaffected and every existing text hash is unchanged.                                                                                                                                                                                                           |
+| 2026-09-29 (T052)       | `AdapterDocs` gains optional `skills: SkillsSupport`; `Skill`, `SkillAsset` and `SkillsSupport` are exported                        | An adapter declares where its tool reads project skills and which frontmatter keys it understands; core renders every skill from that data (RFC-0001 §12.3), so an adapter writes no skill code. Optional, so an adapter without skills is unaffected. `Skill` leaves the forbidden list now that its shape is settled, and all three are pinned key-for-key.                                                                                                                                     |
+| 2026-09-29 (T052)       | `RulegateErrorCode` gains `'W_SKILL_LOAD'`, `'W_SKILL_FIELD_DROPPED'`, `'W_SKILL_NESTED'` and `'W_SKILL_IMPORT'`                    | Warnings from rendering and importing skills: a tool that loads a skill twice or one its `tools:` leaves out, a key no reader of a directory understands, skills in a nested `.rulegate/`, and a skill `init` could not import as-is. Non-breaking for the same reason as `W_INTEROP_OUTPUT_LEFT`.                                                                                                                                                                                                |
 
 ## How v2 would arrive
 

@@ -126,7 +126,7 @@ const NETWORK_PRIMITIVES = [
 
 /** `WRITE_PRIMITIVE` below, for the spawn tests that run before it is declared. */
 const WRITE_PRIMITIVE_ANY =
-  /\b(?:writeFile|appendFile|copyFile|unlink|rm|rmdir|mkdir|rename|symlink|truncate|chmod|utimes)(?:Sync)?\(|\b(?:cp|link)Sync\(|\bcreateWriteStream\(|\bdeleteFile\(/;
+  /\b(?:writeFile|appendFile|copyFile|unlink|rm|rmdir|mkdir|rename|symlink|truncate|chmod|utimes)(?:Sync)?\(|\b(?:cp|link)Sync\(|\bcreateWriteStream\(|\b(?:deleteFile|writeBytes)\(/;
 
 describe('zero network calls', () => {
   it('has no network primitive anywhere in shipped source', async () => {

@@ -1,5 +1,6 @@
 import { stringify as stringifyYaml } from 'yaml';
 import { compareCodepoint } from '../render/order.js';
+import { HTML_MARKER } from '../render/marker.js';
 import { ensureSingleTrailingNewline } from '../render/eol.js';
 import { CANONICAL_SCHEMA_VERSION, DEFAULT_MANIFEST_OPTIONS } from './canonical.js';
 import { DEFAULT_RULE_ORDER } from './rule.js';
@@ -188,11 +189,24 @@ function serializeSecrets(
  */
 export function serializeSkill(skill: Skill): ReadonlyMap<string, string | Uint8Array> {
   const out = new Map<string, string | Uint8Array>();
-  const doc: Record<string, JsonValue> = {};
-  for (const [key, value] of skill.frontmatter) doc[key] = value;
-  const yaml = ensureSingleTrailingNewline(stringifyYaml(doc, { lineWidth: 0 }));
-  const body = ensureSingleTrailingNewline(skill.body);
-  out.set(`${skill.path}/${SKILL_FILE}`, `---\n${yaml}---\n\n${body}`);
+  out.set(`${skill.path}/${SKILL_FILE}`, renderSkillFile(skill.frontmatter, skill.body, false));
   for (const asset of skill.assets) out.set(`${skill.path}/${asset.path}`, asset.bytes);
   return new Map([...out].sort(([a], [b]) => compareCodepoint(a, b)));
+}
+
+/**
+ * A `SKILL.md`: frontmatter from ordered entries, then the body. The canonical file and every
+ * tool's generated copy are both this function, so the two cannot drift in shape. The marker
+ * follows the frontmatter, which must be the file's first bytes, as in `.claude/rules/`.
+ */
+export function renderSkillFile(
+  entries: readonly (readonly [string, JsonValue])[],
+  body: string,
+  marker: boolean,
+): string {
+  const doc: Record<string, JsonValue> = {};
+  for (const [key, value] of entries) doc[key] = value;
+  const yaml = ensureSingleTrailingNewline(stringifyYaml(doc, { lineWidth: 0 }));
+  const text = ensureSingleTrailingNewline(body);
+  return marker ? `---\n${yaml}---\n${HTML_MARKER}\n\n${text}` : `---\n${yaml}---\n\n${text}`;
 }

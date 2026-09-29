@@ -42,10 +42,55 @@ export function hashContents(contents: string): string {
   return `sha256:${createHash('sha256').update(normalized, 'utf8').digest('hex')}`;
 }
 
+/**
+ * The prefix of a hash taken over **raw bytes**: a binary artifact's (T052).
+ *
+ * Its own prefix because every check that re-hashes a file on disk starts from a
+ * `state.json` record alone — the orphan loop has no artifact to ask — and must hash the file
+ * the way the record was made. A text hash normalises EOL and strips a BOM; a raw one must
+ * not, or a PNG's `\r\n` bytes would match a different file's.
+ */
+export const RAW_HASH_PREFIX = 'sha256-raw:';
+
+export function hashBytes(bytes: Uint8Array): string {
+  return `${RAW_HASH_PREFIX}${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+export function isRawHash(hash: string): boolean {
+  return hash.startsWith(RAW_HASH_PREFIX);
+}
+
+export function isBinaryArtifact(artifact: Artifact): boolean {
+  return artifact.bytes !== undefined;
+}
+
+/** What `state.json` records for an artifact: raw bytes for a binary one, text otherwise. */
+export function artifactHash(artifact: Artifact): string {
+  return artifact.bytes === undefined ? hashContents(artifact.contents) : hashBytes(artifact.bytes);
+}
+
+/**
+ * The hash of the file at `path`, taken the way `raw` says — undefined when it is absent.
+ * Every comparison between disk and a render or a record goes through here, so the two
+ * kinds of hash can never be compared across each other.
+ */
+export async function hashOnDisk(
+  fs: ReadOnlyFileSystem,
+  path: string,
+  raw: boolean,
+): Promise<string | undefined> {
+  if (!raw) {
+    const text = await fs.tryReadFile(path);
+    return text === undefined ? undefined : hashContents(text);
+  }
+  if (!(await fs.exists(path))) return undefined;
+  return hashBytes(await fs.readFileRaw(path));
+}
+
 export function buildState(artifacts: readonly Artifact[]): StateFile {
   const entries = artifacts.map((a) => ({
     path: a.path,
-    hash: hashContents(a.contents),
+    hash: artifactHash(a),
     adapter: a.adapter,
     kind: a.kind,
   }));

@@ -10,6 +10,18 @@ export type RulegateErrorCode =
   // A skill directory that is not a valid Agent Skill, or one Rulegate cannot carry (T051):
   // a missing `SKILL.md`, an id or `name` breaking the spec, a nested skill, a symlink.
   | 'E_SKILL_INVALID'
+  // A tool will load a skill twice, from two directories it reads, or loads one its `tools:`
+  // leaves out (T052). A warning: nothing is wrong on disk, and the fix is the user's choice.
+  | 'W_SKILL_LOAD'
+  // A skill's frontmatter key that no tool reading a directory understands was left out of
+  // that directory's copy (T052). Said rather than done silently (RFC-0001 §12.2).
+  | 'W_SKILL_FIELD_DROPPED'
+  // Skills in a nested `.rulegate/` are not rendered yet (T052): only Claude Code and Codex
+  // document how nested skill directories resolve.
+  | 'W_SKILL_NESTED'
+  // A tool's skill `init` could not import as-is — invalid as an Agent Skill, or a copy that
+  // differs from the one imported under the same name (T052). It is left where it is.
+  | 'W_SKILL_IMPORT'
   | 'E_UNKNOWN_TOOL'
   | 'E_ARTIFACT_PATH_CONFLICT'
   | 'E_ARTIFACT_OVERWRITES_SOURCE'

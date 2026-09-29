@@ -117,6 +117,11 @@ function printReport(
     out.log('');
     out.log(`${c.bold(tool.toolName)}  ${c.dim(summary(tool))}`);
     for (const line of fileLines(tool, width, c)) out.log(`  ${line}`);
+    // Skills (T052): listed by name, since a skill costs nothing until it is used.
+    const skills = tool.skills ?? [];
+    if (skills.length > 0) {
+      out.log(`  ${c.dim('skills')}  ${skills.map((s) => s.id).join(', ')}`);
+    }
   }
 
   const plugin =

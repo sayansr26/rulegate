@@ -7,17 +7,17 @@ Rulegate ships 13 adapters. Each one is a pure module — it reads, it returns v
 | Tool | Id | Coverage | Status | Maintainer | Verified against | Precedence |
 |---|---|---|---|---|---|---|
 | Aider | `aider` | rules | not stated | Rulegate maintainers | Aider docs as published 2026-09-04 (2026-09-04) | [which files it reads](tools/aider.md) |
-| Antigravity | `antigravity` | rules | not stated | Rulegate maintainers | Rules docs as published 2026-09-26 (2026-09-26) | [which files it reads](tools/antigravity.md) |
-| Claude Code | `claude-code` | rules, MCP | not stated | Rulegate maintainers | 2.1.283 (2026-09-26) | [which files it reads](tools/claude-code.md) |
-| Cline | `cline` | rules | not stated | Rulegate maintainers | Cline docs as published 2026-09-04 (2026-09-04) | [which files it reads](tools/cline.md) |
-| Codex CLI | `codex` | rules, MCP | not stated | Rulegate maintainers | CLI docs as published 2026-09-02 (2026-09-02) | [which files it reads](tools/codex.md) |
-| GitHub Copilot | `copilot` | rules, MCP | not stated | Rulegate maintainers | GitHub Docs and VS Code docs as published 2026-09-02 (2026-09-02) | [which files it reads](tools/copilot.md) |
-| Cursor | `cursor` | rules, MCP | not stated | Rulegate maintainers | 1.x (2026-09-01) | [which files it reads](tools/cursor.md) |
-| Gemini CLI | `gemini` | rules | not stated | Rulegate maintainers | CLI docs as published 2026-09-02 (2026-09-02) | [which files it reads](tools/gemini.md) |
-| Kilo Code | `kilo` | rules | not stated | Rulegate maintainers | Kilo 1.0.25 (source, main branch) (2026-09-26) | [which files it reads](tools/kilo.md) |
-| OpenCode | `opencode` | rules | not stated | Rulegate maintainers | opencode 1.18.32 (source, dev branch) (2026-09-26) | [which files it reads](tools/opencode.md) |
-| Roo Code | `roo-code` | rules, MCP | not stated | Rulegate maintainers | Roo Code docs as published 2026-09-04 (2026-09-04) | [which files it reads](tools/roo-code.md) |
-| Windsurf | `windsurf` | rules | not stated | Rulegate maintainers | Cascade docs as published 2026-09-04 (2026-09-04) | [which files it reads](tools/windsurf.md) |
+| Antigravity | `antigravity` | rules, skills | not stated | Rulegate maintainers | Rules docs as published 2026-09-26 (2026-09-26) | [which files it reads](tools/antigravity.md) |
+| Claude Code | `claude-code` | rules, MCP, skills | not stated | Rulegate maintainers | 2.1.283 (2026-09-26) | [which files it reads](tools/claude-code.md) |
+| Cline | `cline` | rules, skills | not stated | Rulegate maintainers | Cline docs as published 2026-09-04 (2026-09-04) | [which files it reads](tools/cline.md) |
+| Codex CLI | `codex` | rules, MCP, skills | not stated | Rulegate maintainers | CLI docs as published 2026-09-02 (2026-09-02) | [which files it reads](tools/codex.md) |
+| GitHub Copilot | `copilot` | rules, MCP, skills | not stated | Rulegate maintainers | GitHub Docs and VS Code docs as published 2026-09-02 (2026-09-02) | [which files it reads](tools/copilot.md) |
+| Cursor | `cursor` | rules, MCP, skills | not stated | Rulegate maintainers | 1.x (2026-09-01) | [which files it reads](tools/cursor.md) |
+| Gemini CLI | `gemini` | rules, skills | not stated | Rulegate maintainers | CLI docs as published 2026-09-02 (2026-09-02) | [which files it reads](tools/gemini.md) |
+| Kilo Code | `kilo` | rules, skills | not stated | Rulegate maintainers | Kilo 1.0.25 (source, main branch) (2026-09-26) | [which files it reads](tools/kilo.md) |
+| OpenCode | `opencode` | rules, skills | not stated | Rulegate maintainers | opencode 1.18.32 (source, dev branch) (2026-09-26) | [which files it reads](tools/opencode.md) |
+| Roo Code | `roo-code` | rules, MCP, skills | not stated | Rulegate maintainers | Roo Code docs as published 2026-09-04 (2026-09-04) | [which files it reads](tools/roo-code.md) |
+| Windsurf | `windsurf` | rules, skills | not stated | Rulegate maintainers | Cascade docs as published 2026-09-04 (2026-09-04) | [which files it reads](tools/windsurf.md) |
 | Zed | `zed` | rules | not stated | Rulegate maintainers | Zed docs as published 2026-09-04 (2026-09-04) | [which files it reads](tools/zed.md) |
 
 Coverage is read from each adapter’s own `docs.files`: a row says `MCP` exactly when that adapter declares a managed file with `role: "mcp"`. Nothing here is hand-maintained.

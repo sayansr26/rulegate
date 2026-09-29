@@ -28,15 +28,15 @@ export type {
   FileResolution,
   PrecedenceEntry,
   ReadOnlyFileSystem,
+  SkillsSupport,
   SourceLink,
   VerifiedAgainst,
 } from '@rulegate/core';
 
 export { ADAPTER_API_VERSION, detected, NOT_DETECTED } from '@rulegate/core';
 
-// The model an adapter reads. `Canonical.skills` is still a T051 stub: the freeze covers
-// its presence as an array, not its element shape. `Canonical.mcpServers` is no longer one
-// — T035 settled `McpServer` and it is exported below. See README.
+// The model an adapter reads. `Canonical.skills` holds `Skill` since T051 and is exported
+// below since T052, like `McpServer` since T035. See README.
 export type {
   Canonical,
   RulegateManifest,
@@ -60,6 +60,10 @@ export type {
 // `SecretValue` is `EnvRef` and nothing else, which is what makes "never write a literal
 // secret" a property an adapter cannot violate rather than a rule it has to remember.
 export type { EnvRef, McpScope, McpServer, McpTransport, SecretValue } from '@rulegate/core';
+
+// Skills (T051/T052). Core renders them from `AdapterDocs.skills`; the types are exported
+// so an adapter can read `Canonical.skills` and so `SkillsSupport` can be written against.
+export type { Skill, SkillAsset } from '@rulegate/core';
 export { DEFAULT_MCP_SCOPE, envRef, formatEnvRef, parseEnvRef } from '@rulegate/core';
 // `selectMcpServers` is here for the reason `slugForId` is (T011): which servers a tool
 // gets is one rule made of three refusals — disabled, `scope: global`, and the `tools`

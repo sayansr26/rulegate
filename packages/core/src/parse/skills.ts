@@ -70,7 +70,8 @@ export async function parseSkills(fs: ReadOnlyFileSystem, root: string): Promise
   return { skills, errors, sourceFiles: sourceFiles.sort(compareCodepoint) };
 }
 
-async function parseSkillDir(
+/** One skill directory, anywhere — `.rulegate/skills/<id>/` or a tool's copy `init` imports. */
+export async function parseSkillDir(
   fs: ReadOnlyFileSystem,
   path: string,
   id: string,

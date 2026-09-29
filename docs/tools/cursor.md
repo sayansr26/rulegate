@@ -52,6 +52,14 @@ Source: [Cursor — Model Context Protocol](https://cursor.com/docs/context/mcp)
 
 No byte cap is documented in the Cursor rules documentation cited above. Rules with `alwaysApply: true` enter every request, so the practical limit is the context window rather than a published threshold; glob-scoped `.mdc` files are only loaded when a matching file is open.
 
+## Skills
+
+Reads project skills from `.agents/skills/`, `.cursor/skills/`, `.claude/skills/`, `.codex/skills/`, preferred first.
+
+Frontmatter it reads beyond the Agent Skills fields: `paths`, `disable-model-invocation`, `icon`, `color`, `globs`.
+
+Source: [Cursor — Agent skills](https://cursor.com/docs/context/skills) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Cursor documents no `type` key for a remote MCP server, so an SSE endpoint and a streamable-HTTP one are both written as a bare `url`. A canonical `transport: sse` therefore survives into Claude Code’s .mcp.json and is lost here — the same shape of lossy mapping as the prose “Applies to:” line, recorded rather than left to be discovered.
@@ -66,4 +74,5 @@ No byte cap is documented in the Cursor rules documentation cited above. Rules w
 ## Sources
 
 - [Cursor — Model Context Protocol](https://cursor.com/docs/context/mcp) — retrieved 2026-09-04
+- [Cursor — Agent skills](https://cursor.com/docs/context/skills) — retrieved 2026-09-29
 - [Cursor — Rules](https://docs.cursor.com/context/rules) — retrieved 2026-09-01

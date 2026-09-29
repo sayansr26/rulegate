@@ -23,6 +23,9 @@ import type {
   EnvRef,
   McpScope,
   McpServer,
+  Skill,
+  SkillAsset,
+  SkillsSupport,
   McpTransport,
   SecretValue,
   Canonical,
@@ -53,9 +56,11 @@ interface PinnedArtifact {
   readonly adapter: ToolId;
   readonly kind: ArtifactKind;
   readonly provenance?: { readonly ruleIds: readonly RuleId[] };
+  // T052: a binary artifact (a skill's asset). Optional, so non-breaking by policy.
+  readonly bytes?: Uint8Array;
 }
 pin<Exact<Artifact, PinnedArtifact>>();
-pin<Exact<keyof Artifact, 'path' | 'contents' | 'adapter' | 'kind' | 'provenance'>>();
+pin<Exact<keyof Artifact, 'path' | 'contents' | 'adapter' | 'kind' | 'provenance' | 'bytes'>>();
 
 interface PinnedAdapterContext {
   readonly repoRoot: string;
@@ -106,3 +111,15 @@ pin<
     'readFile' | 'tryReadFile' | 'readFileRaw' | 'exists' | 'listDir' | 'glob'
   >
 >();
+
+// Skills (T051/T052), frozen key-for-key like MCP once their shape settled.
+pin<
+  Exact<
+    keyof Skill,
+    'id' | 'path' | 'name' | 'description' | 'tools' | 'frontmatter' | 'body' | 'assets' | 'source'
+  >
+>();
+pin<Exact<Skill['frontmatter'], readonly (readonly [string, JsonValue])[]>>();
+pin<Exact<keyof SkillAsset, 'path' | 'bytes'>>();
+pin<Exact<SkillAsset['bytes'], Uint8Array>>();
+pin<Exact<keyof SkillsSupport, 'dirs' | 'extensions' | 'source'>>();

@@ -629,14 +629,20 @@ describe('rulegate init — from agent-os (T105)', () => {
     '.windsurf/rules/tests.md',
     'AGENTS.md',
     'CLAUDE.md',
+    // agent-os's skill copies where Rulegate renders the skill (T052).
+    '.agents/skills/review/SKILL.md',
+    '.claude/skills/review/SKILL.md',
   ];
-  /** Reported, never written: merged configs, skill copies, and agent-os's own sources. */
+  /**
+   * Reported, never written: merged configs, agent-os's own sources, and the one skill copy
+   * no render replaces — Cline reads `.claude/skills/` too, so `.cline/skills/` is not
+   * regenerated and init names it instead (T052).
+   */
   const LEFT_ALONE = [
     '.agent-os/AGENTS.md',
     '.agent-os/config.json',
     '.agent-os/rules/api.md',
-    '.agents/skills/review/SKILL.md',
-    '.claude/skills/review/SKILL.md',
+    '.cline/skills/review/SKILL.md',
     '.gemini/settings.json',
     'kilo.json',
     'opencode.json',

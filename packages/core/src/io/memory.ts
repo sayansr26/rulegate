@@ -25,11 +25,24 @@ export interface MemoryFileSystemOptions {
  */
 export class MemoryFileSystem implements WritableFileSystem {
   private readonly files = new Map<string, string>();
+  /** Bytes written by `writeBytes`, which a string cannot hold faithfully. */
+  private readonly binary = new Map<string, Uint8Array>();
   private readonly caseInsensitive: boolean;
 
-  constructor(initial?: Iterable<readonly [string, string]>, options?: MemoryFileSystemOptions) {
+  constructor(
+    initial?: Iterable<readonly [string, string | Uint8Array]>,
+    options?: MemoryFileSystemOptions,
+  ) {
     this.caseInsensitive = options?.caseInsensitive === true;
-    for (const [p, c] of initial ?? []) this.files.set(normalizeRelative(p), c);
+    for (const [p, c] of initial ?? []) {
+      const key = normalizeRelative(p);
+      if (typeof c === 'string') {
+        this.files.set(key, c);
+      } else {
+        this.files.set(key, new TextDecoder().decode(c));
+        this.binary.set(key, new Uint8Array(c));
+      }
+    }
   }
 
   private guard(relPath: string): string {
@@ -82,7 +95,7 @@ export class MemoryFileSystem implements WritableFileSystem {
     if (raw === undefined) {
       throw new RulegateError({ code: 'E_PATH_ESCAPE', message: `no such file: ${relPath}` });
     }
-    return Promise.resolve(new TextEncoder().encode(raw));
+    return Promise.resolve(this.binary.get(this.resolve(relPath)) ?? new TextEncoder().encode(raw));
   }
 
   async exists(relPath: string): Promise<boolean> {
@@ -121,7 +134,16 @@ export class MemoryFileSystem implements WritableFileSystem {
   }
 
   async writeFile(relPath: string, contents: string): Promise<void> {
-    this.files.set(this.resolve(relPath), contents);
+    const p = this.resolve(relPath);
+    this.files.set(p, contents);
+    this.binary.delete(p);
+    return await Promise.resolve();
+  }
+
+  async writeBytes(relPath: string, bytes: Uint8Array): Promise<void> {
+    const p = this.resolve(relPath);
+    this.files.set(p, new TextDecoder().decode(bytes));
+    this.binary.set(p, new Uint8Array(bytes));
     return await Promise.resolve();
   }
 
@@ -130,12 +152,18 @@ export class MemoryFileSystem implements WritableFileSystem {
     if (raw === undefined) {
       throw new RulegateError({ code: 'E_PATH_ESCAPE', message: `no such file: ${fromRelPath}` });
     }
-    this.files.set(this.resolve(toRelPath), raw);
+    const to = this.resolve(toRelPath);
+    this.files.set(to, raw);
+    const bytes = this.binary.get(this.resolve(fromRelPath));
+    if (bytes === undefined) this.binary.delete(to);
+    else this.binary.set(to, bytes);
     return await Promise.resolve();
   }
 
   async deleteFile(relPath: string): Promise<void> {
-    this.files.delete(this.resolve(relPath));
+    const p = this.resolve(relPath);
+    this.files.delete(p);
+    this.binary.delete(p);
     return await Promise.resolve();
   }
 }

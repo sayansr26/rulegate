@@ -83,4 +83,14 @@ export const docs: AdapterDocs = {
       source: GEMINI_CONTEXT_DOCS,
     },
   ],
+  // Within the workspace tier, `.agents/skills/` takes precedence over `.gemini/skills/`.
+  skills: {
+    dirs: ['.agents/skills', '.gemini/skills'],
+    extensions: [],
+    source: {
+      url: 'https://geminicli.com/docs/cli/skills/',
+      title: 'Gemini CLI — Agent skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };

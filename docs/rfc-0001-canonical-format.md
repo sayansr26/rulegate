@@ -744,11 +744,22 @@ What the skills adapters (T052) must hold to, so that `check` stays byte-exact:
 
 ### 12.4 Import
 
-`rulegate init` imports a tool's existing skills from its skills directory into
-`.rulegate/skills/<id>/`: `SKILL.md` as text, every other file as bytes. A skill found in
-several directories with byte-identical contents collapses to one; differing copies stay
-separate and are reported, as rules are. `.agent-os/skills/<id>/**` is an import source too
-(T105).
+`rulegate init` imports the skills the detected tools already have from the directories those
+tools declare, into `.rulegate/skills/<id>/`: `SKILL.md` as text, every other file as bytes,
+parsed exactly as `.rulegate/skills/` is.
+
+- The same skill in several directories, byte for byte, becomes one canonical skill.
+- A copy that differs is not merged or renamed — `name` must equal the directory, so two
+  copies cannot share `.rulegate/skills/<id>/`. The copy in the first directory in codepoint
+  order is imported, and the other is named (`W_SKILL_IMPORT`) and left where it is.
+- `tools:` is set to the tools that were reading the directories it came from, as imported
+  rules keep their origin, and omitted when that is every tool with skills.
+- An invalid skill is not imported or guessed at: it is named (`W_SKILL_IMPORT`) and left in
+  place.
+- A tool directory imported from that the render does not replace stays loaded beside the
+  generated copy, and is named (`W_IMPORT_LEFT_BEHIND`).
+
+`.agent-os/skills/<id>/**` is an import source too (T105).
 
 ### 12.5 Sources, verified 2026-09-29
 

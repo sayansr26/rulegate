@@ -47,6 +47,14 @@ export interface PrecedenceEntry {
  */
 export type FileResolution = 'override' | 'additive' | 'first-match';
 
+export interface SkillsSupport {
+  /** Project skill directories, repo-relative POSIX, the tool's preferred one first. */
+  readonly dirs: readonly string[];
+  /** Frontmatter keys beyond the Agent Skills fields that this tool reads. */
+  readonly extensions: readonly string[];
+  readonly source: SourceLink;
+}
+
 export interface DocNote {
   readonly level: 'info' | 'warn';
   readonly message: string;
@@ -96,6 +104,16 @@ export interface AdapterDocs {
     readonly note?: string;
   };
   readonly notes?: readonly DocNote[];
+  /**
+   * Where this tool reads **project skills**, and which frontmatter keys it understands
+   * beyond the Agent Skills fields (RFC-0001 §12, T052).
+   *
+   * Data rather than a `write()` branch because every tool reads the same `SKILL.md` directory
+   * format: core renders skills once, generically, and decides which directories to fill so
+   * each enabled tool sees one copy. What differs per tool is exactly what this field says.
+   * Absent means the tool has no skills.
+   */
+  readonly skills?: SkillsSupport;
   /**
    * Who looks after this adapter, for the generated registry page (T060).
    *

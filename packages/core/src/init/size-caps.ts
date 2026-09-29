@@ -39,6 +39,8 @@ export async function sizeCapWarnings(input: SizeCapInput): Promise<readonly Rul
   const out: RulegateError[] = [];
 
   for (const artifact of artifacts) {
+    // Caps are on instruction files, which are text; a skill's asset is neither (T052).
+    if (artifact.bytes !== undefined) continue;
     const after = byteLength(artifact.contents);
     // `tryReadFile` is EOL-normalized and BOM-stripped, as `contents` is, so a CRLF
     // checkout of the same file measures what an LF one does.

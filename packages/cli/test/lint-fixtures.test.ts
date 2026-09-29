@@ -21,6 +21,10 @@ const DELIBERATELY_BROKEN = new Set([
   // Antigravity and Windsurf. It is a real broken state kept as evidence, not a
   // repository that is fine.
   'agent-os-import-adopted',
+  // A migration's starting point, and genuinely double-loading: agent-os copies each skill
+  // into `.agents/`, `.claude/` and `.cline/skills/`, and Copilot, Cursor, Cline and others
+  // read two of those. `doctor` says so since T052, and `init` is what clears it.
+  'agent-os-import',
 ]);
 
 async function inputRoots(): Promise<string[]> {

@@ -165,4 +165,29 @@ export const docs: AdapterDocs = {
       },
     },
   ],
+  // Claude Code reads only `.claude/skills/` (and nested and parent copies), and every field below beyond the Agent Skills ones.
+  skills: {
+    dirs: ['.claude/skills'],
+    extensions: [
+      'when_to_use',
+      'argument-hint',
+      'arguments',
+      'disable-model-invocation',
+      'user-invocable',
+      'disallowed-tools',
+      'model',
+      'effort',
+      'context',
+      'agent',
+      'background',
+      'hooks',
+      'paths',
+      'shell',
+    ],
+    source: {
+      url: 'https://code.claude.com/docs/en/skills',
+      title: 'Claude Code — Extend Claude with skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };

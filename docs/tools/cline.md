@@ -52,6 +52,14 @@ Source: [Cline — Cline Rules](https://docs.cline.bot/features/cline-rules) —
 
 Cline publishes no size cap for rule files.
 
+## Skills
+
+Reads project skills from `.cline/skills/`, `.clinerules/skills/`, `.claude/skills/`, preferred first.
+
+Reads only the Agent Skills frontmatter fields.
+
+Source: [Cline — Skills](https://docs.cline.bot/features/skills) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Cline reads .cursorrules, .windsurfrules and AGENTS.md in addition to .clinerules/. These are additive, not an override chain, so enabling cline alongside codex, cursor or windsurf sends Cline the same canonical rules more than once. `rulegate doctor` counts the cost per repository (W_DUPLICATE_LOAD); this note records why it happens.
@@ -64,3 +72,4 @@ Cline publishes no size cap for rule files.
 ## Sources
 
 - [Cline — Cline Rules](https://docs.cline.bot/features/cline-rules) — retrieved 2026-09-04
+- [Cline — Skills](https://docs.cline.bot/features/skills) — retrieved 2026-09-29

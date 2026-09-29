@@ -66,6 +66,14 @@ Source: [Roo Code — Custom Instructions](https://roocodeinc.github.io/Roo-Code
 
 Roo Code publishes no size cap for rule files.
 
+## Skills
+
+Reads project skills from `.roo/skills/`, `.agents/skills/`, preferred first.
+
+Reads only the Agent Skills frontmatter fields.
+
+Source: [Roo Code — Skills](https://roocodeinc.github.io/Roo-Code/features/skills) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Roo Code sorts rule files by basename only, case-insensitively, and that ordering knows nothing about Rulegate’s `order` field. Generated filenames therefore carry a zero-padded index; renaming or reordering rules renames files, which is the cost of making Roo’s sort agree with the canonical one.
@@ -79,3 +87,4 @@ Roo Code publishes no size cap for rule files.
 
 - [Roo Code — Custom Instructions](https://roocodeinc.github.io/Roo-Code/features/custom-instructions) — retrieved 2026-09-04
 - [Roo Code — Using MCP in Roo](https://roocodeinc.github.io/Roo-Code/features/mcp/using-mcp-in-roo) — retrieved 2026-09-04
+- [Roo Code — Skills](https://roocodeinc.github.io/Roo-Code/features/skills) — retrieved 2026-09-29

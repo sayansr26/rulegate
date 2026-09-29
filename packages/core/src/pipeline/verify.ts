@@ -1,4 +1,10 @@
-import { hashContents, loadState } from '../state/state.js';
+import {
+  artifactHash,
+  hashOnDisk,
+  isBinaryArtifact,
+  isRawHash,
+  loadState,
+} from '../state/state.js';
 import { compareToDisk } from '../state/compare.js';
 import { compareCodepoint } from '../render/order.js';
 import type { RulegateError } from '../model/errors.js';
@@ -31,6 +37,11 @@ export interface VerifyEntry {
   readonly expected?: string;
   /** What is on disk, EOL-normalized. Absent for a missing file. */
   readonly actual?: string;
+  /**
+   * A binary file (a skill's asset, T052): `expected` and `actual` are absent, because a line
+   * diff of a PNG says nothing, and `check` reports only that the files differ.
+   */
+  readonly binary?: true;
 }
 
 export interface VerifyReport {
@@ -79,28 +90,40 @@ export async function verifyPlan(plan: Plan, fs: ReadOnlyFileSystem): Promise<Ve
   const entries: VerifyEntry[] = [];
 
   for (const artifact of plan.artifacts) {
-    const actual = await fs.tryReadFile(artifact.path);
-    if (actual === undefined) {
-      entries.push({ path: artifact.path, status: 'missing', expected: artifact.contents });
+    const binary = isBinaryArtifact(artifact);
+    const diskHash = await hashOnDisk(fs, artifact.path, binary);
+    if (diskHash === undefined) {
+      entries.push(
+        binary
+          ? { path: artifact.path, status: 'missing', binary: true }
+          : { path: artifact.path, status: 'missing', expected: artifact.contents },
+      );
       continue;
     }
-    if (hashContents(actual) === hashContents(artifact.contents)) continue;
+    if (diskHash === artifactHash(artifact)) continue;
 
     const status: VerifyStatus = unmanaged.has(artifact.path)
       ? 'unmanaged'
       : handEdited.has(artifact.path)
         ? 'hand-edited'
         : 'stale';
+    if (binary) {
+      entries.push({ path: artifact.path, status, binary: true });
+      continue;
+    }
+    const actual = (await fs.tryReadFile(artifact.path)) ?? '';
     entries.push({ path: artifact.path, status, expected: artifact.contents, actual });
   }
 
   for (const path of comparison.orphaned) {
-    const actual = await fs.tryReadFile(path);
+    const hash = recorded.get(path) ?? '';
+    const raw = isRawHash(hash);
+    const diskHash = await hashOnDisk(fs, path, raw);
     // Already gone: the record is stale, and dropping a record is not a change to the repo.
-    if (actual === undefined) continue;
-    const status: VerifyStatus =
-      hashContents(actual) === recorded.get(path) ? 'orphaned' : 'orphan-hand-edited';
-    entries.push({ path, status, actual });
+    if (diskHash === undefined) continue;
+    const status: VerifyStatus = diskHash === hash ? 'orphaned' : 'orphan-hand-edited';
+    if (raw) entries.push({ path, status, binary: true });
+    else entries.push({ path, status, actual: (await fs.tryReadFile(path)) ?? '' });
   }
 
   // Planned paths and orphans interleave, so one sort over the merged list is the only

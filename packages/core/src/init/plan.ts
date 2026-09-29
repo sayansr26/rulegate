@@ -8,8 +8,15 @@ import {
   emptyCanonical,
 } from '../model/canonical.js';
 import { DEFAULT_LINT_CONFIG } from '../model/lint.js';
-import { MANIFEST_PATH, MCP_SERVERS_PATH, RULES_DIR, RULES_GLOB } from '../model/paths.js';
-import { serializeCanonical } from '../model/serialize.js';
+import {
+  MANIFEST_PATH,
+  MCP_SERVERS_PATH,
+  RULES_DIR,
+  RULES_GLOB,
+  SKILLS_DIR,
+} from '../model/paths.js';
+import { serializeCanonical, serializeSkill } from '../model/serialize.js';
+import { importSkills } from './skills.js';
 import { parse } from '../parse/index.js';
 import { MemoryFileSystem } from '../io/memory.js';
 import { compareCodepoint } from '../render/order.js';
@@ -23,7 +30,7 @@ import { ORDER_STEP, dedupeImported, type ImportConflict } from '../import/dedup
 import { claimRuleId } from '../import/rule.js';
 import { dedupeMcpServers, type McpImportConflict } from '../import/dedupe-mcp.js';
 import { computePlan, type Plan } from '../pipeline/plan.js';
-import { hashContents } from '../state/state.js';
+import { artifactHash, hashOnDisk, isBinaryArtifact } from '../state/state.js';
 import type { Artifact } from '../adapter/artifact.js';
 import type { CanonicalFile } from '../pipeline/apply.js';
 import type { Adapter } from '../adapter/adapter.js';
@@ -64,6 +71,7 @@ export interface InteropLike {
     readonly rules: readonly RuleDocument[];
     readonly generated: readonly string[];
     readonly inferred?: readonly string[];
+    readonly skillSources?: readonly string[];
     readonly notImported: readonly string[];
     readonly tools?: readonly string[];
     readonly notes?: readonly { readonly path: string; readonly message: string }[];
@@ -154,6 +162,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   // The subset of `generated` an importer took on its presence alone, not its content.
   const inferred = new Set<string>();
   const interopTools = new Set<string>();
+  const skillSources: string[] = [];
   const interopFound: string[] = [];
   for (const importer of input.interop ?? []) {
     const ctx = {
@@ -169,6 +178,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
     for (const rule of found.rules) importedFrom.add(rule.source.file);
     for (const path of found.generated) generated.set(path, importer.displayName);
     for (const path of found.inferred ?? []) inferred.add(path);
+    skillSources.push(...(found.skillSources ?? []));
     for (const tool of found.tools ?? []) interopTools.add(tool);
     errors.push(...(found.errors ?? []));
     interopFound.push(importer.displayName);
@@ -206,9 +216,12 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
     .map((a) => a.name)
     .filter((name) => found.includes(name) || interopTools.has(name));
 
+  // A competing tool's generated output is never a source: it is hidden from the adapters and
+  // from the skills importer alike, or its copies arrive beside the source it was built from.
+  const importFs = generated.size === 0 ? fs : maskPaths(fs, generated.keys());
   const collected = await collectImports({
     repoRoot,
-    fs: generated.size === 0 ? fs : maskPaths(fs, generated.keys()),
+    fs: importFs,
     adapters: present,
   });
   errors.push(...collected.errors);
@@ -230,7 +243,10 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
     frontmatter: { ...rule.frontmatter, order: (index + 1) * ORDER_STEP },
   }));
   const { servers: mcpServers, conflicts: mcpConflicts } = dedupeMcpServers(collected.sources);
-  const canonical = canonicalFrom(rules, mcpServers, detected);
+  const imported = await importSkills(filesOnly(importFs), adapters, detected, skillSources);
+  warnings.push(...imported.warnings);
+  for (const file of imported.importedFrom) importedFrom.add(file);
+  const canonical = canonicalFrom(rules, mcpServers, detected, imported.skills);
 
   // Import warnings are warnings and never errors. `runInit` returns without writing while
   // `errors` is non-empty, so one odd server in somebody's `.mcp.json` would otherwise make
@@ -247,10 +263,15 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   // rules on one path, a preserved `order` key read back as a string — and the first
   // `check` after `init --yes` exited 1. What is lost on the trip is refused below.
   const serialized = serializeCanonical(canonical);
-  const canonicalFiles = await classify(serialized, fs);
-  errors.push(...(await canonicalInTheWay(fs, serialized)));
+  // Skills beside the text files: a skill's assets are bytes, which the text map cannot hold.
+  const skillFiles = new Map<string, string | Uint8Array>();
+  for (const skill of canonical.skills) {
+    for (const [path, contents] of serializeSkill(skill)) skillFiles.set(path, contents);
+  }
+  const canonicalFiles = await classify(serialized, skillFiles, fs);
+  errors.push(...(await canonicalInTheWay(fs, serialized, skillFiles)));
   const written = await parse({
-    fs: new MemoryFileSystem(serialized),
+    fs: new MemoryFileSystem([...serialized, ...skillFiles]),
     knownTools: adapters.map((a) => a.name),
   });
   const plan = await computePlan({
@@ -263,8 +284,8 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   errors.push(...plan.errors);
   warnings.push(...plan.warnings);
   if (errors.length === 0) {
-    const imported = await computePlan({ repoRoot, fs, adapters, canonical });
-    errors.push(...lostInWriting(imported.artifacts, plan.artifacts));
+    const fromModel = await computePlan({ repoRoot, fs, adapters, canonical });
+    errors.push(...lostInWriting(fromModel.artifacts, plan.artifacts));
   }
   const generatedPaths = plan.artifacts.map((a) => a.path);
   errors.push(...(await notFiles(fs, plan.artifacts)));
@@ -294,6 +315,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
     })),
   );
   warnings.push(...leftBehindWarnings(collected.sources, generatedPaths));
+  warnings.push(...skillsLeftBehind(imported.copies, generatedPaths, adapters, detected));
   // Only for a plan that will be applied: the hint is "delete it once init has run", and
   // when init refuses, the file it names may be the only copy of the output left.
   if (errors.length === 0) warnings.push(...outputLeftWarnings(generated, generatedPaths));
@@ -348,9 +370,9 @@ async function unimportedPaths(
   for (const artifact of artifacts) {
     if (imported.has(key(artifact.path))) continue;
     if (verified.some((g) => covers(g, artifact.path, key))) continue;
-    const onDisk = await fs.tryReadFile(artifact.path);
+    const onDisk = await hashOnDisk(fs, artifact.path, isBinaryArtifact(artifact));
     if (onDisk === undefined) continue;
-    if (hashContents(onDisk) === hashContents(artifact.contents)) continue;
+    if (onDisk === artifactHash(artifact)) continue;
     out.push(artifact.path);
   }
   return out.sort(compareCodepoint);
@@ -453,13 +475,17 @@ function unimportedWarning(file: string, inferredBy: string | undefined): Rulega
 async function canonicalInTheWay(
   fs: ReadOnlyFileSystem,
   serialized: ReadonlyMap<string, string>,
+  skillFiles: ReadonlyMap<string, string | Uint8Array>,
 ): Promise<readonly RulegateError[]> {
   const onDisk = (await fs.glob(RULES_GLOB)).filter((p) => p.startsWith(`${RULES_DIR}/`));
   if (await fs.exists(MCP_SERVERS_PATH)) onDisk.push(MCP_SERVERS_PATH);
+  // Skills too (T052): an asset is compared as bytes, as it will be written.
+  onDisk.push(...(await fs.glob(`${SKILLS_DIR}/**`)).filter((p) => p.startsWith(`${SKILLS_DIR}/`)));
   const out: RulegateError[] = [];
   for (const file of [...new Set(onDisk)].sort(compareCodepoint)) {
-    const ours = serialized.get(file);
-    if (ours !== undefined && (await fs.tryReadFile(file)) === ours) continue;
+    const ours = serialized.get(file) ?? skillFiles.get(file);
+    if (typeof ours === 'string' && (await fs.tryReadFile(file)) === ours) continue;
+    if (ours instanceof Uint8Array && sameBytes(await fs.readFileRaw(file), ours)) continue;
     out.push(
       new RulegateError({
         code: 'E_INIT_CANONICAL_EXISTS',
@@ -503,9 +529,11 @@ function lostInWriting(
   imported: readonly Artifact[],
   written: readonly Artifact[],
 ): readonly RulegateError[] {
-  const render = new Map(written.map((a) => [a.path, a.contents]));
-  const paths = new Set([...imported.map((a) => a.path), ...render.keys()]);
-  const importedBy = new Map(imported.map((a) => [a.path, a.contents]));
+  // Instruction text only: a binary asset is compared by hash, never as a string (T052).
+  const text = (a: Artifact): boolean => a.bytes === undefined;
+  const render = new Map(written.filter(text).map((a) => [a.path, a.contents]));
+  const paths = new Set([...imported.filter(text).map((a) => a.path), ...render.keys()]);
+  const importedBy = new Map(imported.filter(text).map((a) => [a.path, a.contents]));
   return [...paths]
     .filter((path) => importedBy.get(path) !== render.get(path))
     .sort(compareCodepoint)
@@ -524,6 +552,7 @@ function canonicalFrom(
   rules: Canonical['rules'],
   mcpServers: Canonical['mcpServers'],
   detected: readonly ToolId[],
+  skills: Canonical['skills'],
 ): Canonical {
   const source = { file: MANIFEST_PATH };
   const tools: ToolConfig[] = [...detected]
@@ -546,12 +575,13 @@ function canonicalFrom(
     },
     rules,
     mcpServers,
-    skills: [],
+    skills,
   };
 }
 
 async function classify(
   files: ReadonlyMap<string, string>,
+  skillFiles: ReadonlyMap<string, string | Uint8Array>,
   fs: ReadOnlyFileSystem,
 ): Promise<readonly CanonicalFile[]> {
   const out: CanonicalFile[] = [];
@@ -563,7 +593,65 @@ async function classify(
       kind: existing === undefined ? 'create' : existing === contents ? 'leave-alone' : 'modify',
     });
   }
+  for (const [path, contents] of skillFiles) {
+    if (typeof contents === 'string') {
+      const existing = await fs.tryReadFile(path);
+      out.push({
+        path,
+        contents,
+        kind: existing === undefined ? 'create' : existing === contents ? 'leave-alone' : 'modify',
+      });
+      continue;
+    }
+    const existing = (await fs.exists(path)) ? await fs.readFileRaw(path) : undefined;
+    out.push({
+      path,
+      contents: '',
+      bytes: contents,
+      kind:
+        existing === undefined
+          ? 'create'
+          : sameBytes(existing, contents)
+            ? 'leave-alone'
+            : 'modify',
+    });
+  }
   return out.sort((a, b) => compareCodepoint(a.path, b.path));
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/**
+ * A tool's skill directory init imported from and that no generated file replaces (T052):
+ * the tools reading it still load it, beside the generated copy — the skills half of
+ * `leftBehindWarnings`.
+ */
+function skillsLeftBehind(
+  copies: readonly { readonly dir: string; readonly id: string }[],
+  generated: readonly string[],
+  adapters: readonly Adapter[],
+  detected: readonly ToolId[],
+): readonly RulegateError[] {
+  const written = new Set(generated);
+  const out: RulegateError[] = [];
+  for (const { dir, id } of copies) {
+    if (written.has(`${dir}/${id}/SKILL.md`)) continue;
+    const readers = adapters
+      .filter((a) => detected.includes(a.name) && a.docs.skills?.dirs.includes(dir) === true)
+      .map((a) => a.name)
+      .sort(compareCodepoint);
+    out.push(
+      new RulegateError({
+        code: 'W_IMPORT_LEFT_BEHIND',
+        message: `${dir}/${id}/ was imported and stays on disk: ${readers.join(', ')} will load it beside the generated copy`,
+        source: { file: `${dir}/${id}` },
+        hint: `delete ${dir}/${id}/ once init has run; the skill now lives in .rulegate/skills/${id}/`,
+      }),
+    );
+  }
+  return out;
 }
 
 /**

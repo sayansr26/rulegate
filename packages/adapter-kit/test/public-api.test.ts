@@ -38,6 +38,10 @@ const FROZEN_V1 = [
   // Added at T038, the third exercise of the additions policy.
   'selectMcpServers (value)',
   'stableJsonStringify (value)',
+  // Added at T052: skills are rendered by core from `AdapterDocs.skills`.
+  'Skill (type)',
+  'SkillAsset (type)',
+  'SkillsSupport (type)',
   'withJsonMarker (value)',
   // Added 2026-09-04 (T040), MCP import. Eight exports, none removed, so no
   // `ADAPTER_API_VERSION` bump. `read()`'s return widened by one OPTIONAL field
@@ -178,11 +182,8 @@ describe('the frozen adapter API (T011)', () => {
       'WritableFileSystem',
       'findRepoRoot',
       'resolveRepoRoot',
-      // T035/T051 stubs: `Canonical` carries these fields, but naming their element types
-      // would let an adapter declare against a shape that is not frozen yet.
-      // `McpServer` came off this list at T037: T035 settled its shape, so it is exported
-      // and frozen. `Skill` stays until T051 does the same.
-      'Skill',
+      // `McpServer` came off this list at T037 and `Skill` at T052, each once its shape
+      // settled.
     ];
     const names = publicSurface(entry).map((entryName) => entryName.split(' ')[0]);
     expect(forbidden.filter((name) => names.includes(name))).toEqual([]);

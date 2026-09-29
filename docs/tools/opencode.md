@@ -87,6 +87,14 @@ Source: [OpenCode — Config](https://opencode.ai/docs/config/) — retrieved 20
 
 OpenCode documents no size cap on instruction files. The only documented limit is a 5-second timeout on fetching a remote instruction URL.
 
+## Skills
+
+Reads project skills from `.opencode/skills/`, `.claude/skills/`, `.agents/skills/`, preferred first.
+
+Reads only the Agent Skills frontmatter fields.
+
+Source: [OpenCode — Agent skills](https://opencode.ai/docs/skills/) — retrieved 2026-09-29
+
 ## Notes
 
 - **warn** — Rulegate owns .opencode/opencode.json entirely and writes only $schema and instructions into it. Put every other setting in the root opencode.json: OpenCode merges the two, and a setting added to the generated file is reported by check as a hand-edit and overwritten only with --force.
@@ -106,3 +114,4 @@ OpenCode documents no size cap on instruction files. The only documented limit i
 - [OpenCode source — instruction.ts (systemPaths)](https://github.com/sst/opencode/blob/dev/packages/opencode/src/session/instruction.ts) — retrieved 2026-09-26
 - [OpenCode — Config](https://opencode.ai/docs/config/) — retrieved 2026-09-26
 - [OpenCode — Rules](https://opencode.ai/docs/rules/) — retrieved 2026-09-26
+- [OpenCode — Agent skills](https://opencode.ai/docs/skills/) — retrieved 2026-09-29

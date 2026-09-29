@@ -3,7 +3,8 @@ import { verifyPlan } from '../pipeline/verify.js';
 import { detectTools } from '../detect/engine.js';
 import { compareToDisk } from '../state/compare.js';
 import { EMPTY_STATE, parseState } from '../state/state.js';
-import { STATE_PATH } from '../model/paths.js';
+import { MANIFEST_PATH, STATE_PATH } from '../model/paths.js';
+import { compareCodepoint } from '../render/order.js';
 import { SymlinkProbe, resolveTool } from './resolve.js';
 import {
   buildManagedByIndex,
@@ -19,7 +20,7 @@ import type { FileResolution } from '../adapter/docs.js';
 import type { RulegateError } from '../model/errors.js';
 import type { Plan } from '../pipeline/plan.js';
 import type { ReadOnlyFileSystem } from '../fs/types.js';
-import type { DoctorReport, DoctorWarning, ToolDiagnosis } from './types.js';
+import type { DoctorReport, DoctorWarning, SkillDiagnosis, ToolDiagnosis } from './types.js';
 
 export interface DoctorInput {
   readonly repoRoot: string;
@@ -105,6 +106,7 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
 
   const tools: ToolDiagnosis[] = [];
   const warnings: DoctorWarning[] = [];
+  const explicitManifest = plan.canonical.manifest.source.file === MANIFEST_PATH;
 
   // Sequentially, never `Promise.all`. `detect/engine.ts` records the reason: a loop that
   // appends in settle order produces a different report on a slow disk, which is a
@@ -125,6 +127,7 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
       symlinks,
     });
 
+    const skills = docs.skills === undefined ? undefined : await skillsOnDisk(fs, docs.skills.dirs);
     const diagnosis: ToolDiagnosis = {
       name: detected.name,
       toolName: docs.toolName,
@@ -136,11 +139,18 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
       loadedCount: resolved.loaded.length,
       loadedBytes: resolved.loaded.reduce((n, m) => n + m.bytes, 0),
       loadedTokens: resolved.loaded.reduce((n, m) => n + m.tokens, 0),
+      ...(skills === undefined ? {} : { skills }),
       ...(detected.failed === undefined ? {} : { failed: detected.failed }),
     };
     tools.push(diagnosis);
 
     warnings.push(...duplicateLoadWarnings(diagnosis, resolved.loaded, provenance));
+    // Only for a tool in use: detected, or enabled by a real manifest. Without `.rulegate/`
+    // the plan's manifest is synthetic and enables every tool, which would flag skills for
+    // tools nobody runs here.
+    if (diagnosis.detected || (explicitManifest && diagnosis.enabled)) {
+      warnings.push(...skillDuplicateWarnings(diagnosis));
+    }
     warnings.push(...overLimitWarnings(diagnosis, docs, resolved.loaded));
     warnings.push(...toolNoteWarnings(diagnosis, docs));
   }
@@ -164,4 +174,34 @@ export async function buildDoctorReport(input: DoctorInput): Promise<DoctorRepor
     warnings: sortWarnings(warnings),
     errors,
   };
+}
+
+/** Which skills sit in each of a tool's skill directories on disk (T052). */
+async function skillsOnDisk(
+  fs: ReadOnlyFileSystem,
+  dirs: readonly string[],
+): Promise<readonly SkillDiagnosis[]> {
+  const found = new Map<string, string[]>();
+  for (const dir of dirs) {
+    if (!(await fs.exists(dir))) continue;
+    for (const entry of await fs.listDir(dir)) {
+      if (entry.kind !== 'dir' || !(await fs.exists(`${dir}/${entry.name}/SKILL.md`))) continue;
+      found.set(entry.name, [...(found.get(entry.name) ?? []), dir]);
+    }
+  }
+  return [...found]
+    .sort(([a], [b]) => compareCodepoint(a, b))
+    .map(([id, where]) => ({ id, dirs: where }));
+}
+
+/** A skill a tool finds in two of its directories is loaded twice (T052). */
+function skillDuplicateWarnings(tool: ToolDiagnosis): readonly DoctorWarning[] {
+  return (tool.skills ?? [])
+    .filter((s) => s.dirs.length > 1)
+    .map((s) => ({
+      code: 'W_DUPLICATE_LOAD' as const,
+      tool: tool.name,
+      paths: s.dirs.map((d) => `${d}/${s.id}/SKILL.md`).sort(compareCodepoint),
+      message: `loads the skill \`${s.id}\` twice, from ${s.dirs.join(' and ')}`,
+    }));
 }

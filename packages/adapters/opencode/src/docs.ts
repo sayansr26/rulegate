@@ -172,4 +172,14 @@ export const docs: AdapterDocs = {
       source: INSTRUCTION_SOURCE,
     },
   ],
+  // OpenCode reads all three project directories and ignores frontmatter it does not know.
+  skills: {
+    dirs: ['.opencode/skills', '.claude/skills', '.agents/skills'],
+    extensions: [],
+    source: {
+      url: 'https://opencode.ai/docs/skills/',
+      title: 'OpenCode — Agent skills',
+      retrieved: '2026-09-29',
+    },
+  },
 };
