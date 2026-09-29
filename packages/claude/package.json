@@ -1,6 +1,6 @@
 {
   "name": "@rulegate/claude",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Read-only Claude Code setup state, settings planner and ownership checks, shared by the Rulegate CLI and its Claude Code plugin.",
   "type": "module",
   "license": "MIT",

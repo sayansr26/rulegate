@@ -1,6 +1,6 @@
 {
   "name": "@rulegate/adapter-aider",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Rulegate adapter for aider.",
   "type": "module",
   "license": "MIT",

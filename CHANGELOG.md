@@ -5,6 +5,16 @@ All notable changes to this project are recorded here. This project follows
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-09-29
+
+### Fixed
+
+- **Releases are signed with npm provenance.** 0.3.0 and 0.4.0 were published without it:
+  `pnpm publish` accepted `--provenance` and never passed it on. Each package now carries a
+  provenance attestation linking it to the commit and workflow run that built it, and the
+  release fails unless every package on npm shows one. Check with `npm audit signatures`
+  after installing. No code changed in this release.
+
 ## [0.4.0] — 2026-09-28
 
 ### Added
@@ -317,7 +327,8 @@ never will be.
 - `AGENTS.md` sits at Windsurf's per-file cap with no headroom; the lint rule reports it, the
   adapter does not yet do anything about it.
 
-[unreleased]: https://github.com/sayansr26/rulegate/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/sayansr26/rulegate/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/sayansr26/rulegate/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/sayansr26/rulegate/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sayansr26/rulegate/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sayansr26/rulegate/compare/v0.0.0...v0.2.0
