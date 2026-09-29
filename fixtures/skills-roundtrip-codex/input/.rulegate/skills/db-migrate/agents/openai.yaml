@@ -1,0 +1,5 @@
+interface:
+  display_name: "DB migrate"
+  short_description: "Write a schema migration"
+policy:
+  allow_implicit_invocation: false

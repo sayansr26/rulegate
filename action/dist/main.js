@@ -3044,10 +3044,10 @@ var require_identity = __commonJS({
     var NODE_TYPE = Symbol.for("yaml.node.type");
     var isAlias2 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === ALIAS;
     var isDocument = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === DOC;
-    var isMap5 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === MAP;
+    var isMap6 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === MAP;
     var isPair = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === PAIR;
-    var isScalar5 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SCALAR;
-    var isSeq4 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SEQ;
+    var isScalar6 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SCALAR;
+    var isSeq5 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SEQ;
     function isCollection(node) {
       if (node && typeof node === "object")
         switch (node[NODE_TYPE]) {
@@ -3068,7 +3068,7 @@ var require_identity = __commonJS({
         }
       return false;
     }
-    var hasAnchor = (node) => (isScalar5(node) || isCollection(node)) && !!node.anchor;
+    var hasAnchor = (node) => (isScalar6(node) || isCollection(node)) && !!node.anchor;
     exports.ALIAS = ALIAS;
     exports.DOC = DOC;
     exports.MAP = MAP;
@@ -3080,11 +3080,11 @@ var require_identity = __commonJS({
     exports.isAlias = isAlias2;
     exports.isCollection = isCollection;
     exports.isDocument = isDocument;
-    exports.isMap = isMap5;
+    exports.isMap = isMap6;
     exports.isNode = isNode;
     exports.isPair = isPair;
-    exports.isScalar = isScalar5;
-    exports.isSeq = isSeq4;
+    exports.isScalar = isScalar6;
+    exports.isSeq = isSeq5;
   }
 });
 
@@ -7190,9 +7190,9 @@ var require_resolve_flow_collection = __commonJS({
     var blockMsg = "Block collections are not allowed within flow collections";
     var isBlock = (token) => token && (token.type === "block-map" || token.type === "block-seq");
     function resolveFlowCollection({ composeNode, composeEmptyNode }, ctx, fc, onError, tag) {
-      const isMap5 = fc.start.source === "{";
-      const fcName = isMap5 ? "flow map" : "flow sequence";
-      const NodeClass = tag?.nodeClass ?? (isMap5 ? YAMLMap.YAMLMap : YAMLSeq.YAMLSeq);
+      const isMap6 = fc.start.source === "{";
+      const fcName = isMap6 ? "flow map" : "flow sequence";
+      const NodeClass = tag?.nodeClass ?? (isMap6 ? YAMLMap.YAMLMap : YAMLSeq.YAMLSeq);
       const coll = new NodeClass(ctx.schema);
       coll.flow = true;
       const atRoot = ctx.atRoot;
@@ -7228,7 +7228,7 @@ var require_resolve_flow_collection = __commonJS({
             offset = props.end;
             continue;
           }
-          if (!isMap5 && ctx.options.strict && utilContainsNewline.containsNewline(key))
+          if (!isMap6 && ctx.options.strict && utilContainsNewline.containsNewline(key))
             onError(
               key,
               // checked by containsNewline()
@@ -7268,7 +7268,7 @@ var require_resolve_flow_collection = __commonJS({
             }
           }
         }
-        if (!isMap5 && !sep && !props.found) {
+        if (!isMap6 && !sep && !props.found) {
           const valueNode = value ? composeNode(ctx, value, props, onError) : composeEmptyNode(ctx, props.end, sep, null, props, onError);
           coll.items.push(valueNode);
           offset = valueNode.range[2];
@@ -7291,7 +7291,7 @@ var require_resolve_flow_collection = __commonJS({
             startOnNewline: false
           });
           if (valueProps.found) {
-            if (!isMap5 && !props.found && ctx.options.strict) {
+            if (!isMap6 && !props.found && ctx.options.strict) {
               if (sep)
                 for (const st of sep) {
                   if (st === valueProps.found)
@@ -7323,7 +7323,7 @@ var require_resolve_flow_collection = __commonJS({
           const pair = new Pair.Pair(keyNode, valueNode);
           if (ctx.options.keepSourceTokens)
             pair.srcToken = collItem;
-          if (isMap5) {
+          if (isMap6) {
             const map = coll;
             if (utilMapIncludes.mapIncludes(ctx, map.items, keyNode))
               onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
@@ -7339,7 +7339,7 @@ var require_resolve_flow_collection = __commonJS({
           offset = valueNode ? valueNode.range[2] : valueProps.end;
         }
       }
-      const expectedEnd = isMap5 ? "}" : "]";
+      const expectedEnd = isMap6 ? "}" : "]";
       const [ce, ...ee] = fc.end;
       let cePos = offset;
       if (ce?.source === expectedEnd)
@@ -8625,7 +8625,7 @@ var require_cst = __commonJS({
     var FLOW_END = "";
     var SCALAR = "";
     var isCollection = (token) => !!token && "items" in token;
-    var isScalar5 = (token) => !!token && (token.type === "scalar" || token.type === "single-quoted-scalar" || token.type === "double-quoted-scalar" || token.type === "block-scalar");
+    var isScalar6 = (token) => !!token && (token.type === "scalar" || token.type === "single-quoted-scalar" || token.type === "double-quoted-scalar" || token.type === "block-scalar");
     function prettyToken(token) {
       switch (token) {
         case BOM2:
@@ -8709,7 +8709,7 @@ var require_cst = __commonJS({
     exports.FLOW_END = FLOW_END;
     exports.SCALAR = SCALAR;
     exports.isCollection = isCollection;
-    exports.isScalar = isScalar5;
+    exports.isScalar = isScalar6;
     exports.prettyToken = prettyToken;
     exports.tokenType = tokenType;
   }
@@ -10601,6 +10601,11 @@ function parseEnvRef(raw) {
   return m ? envRef(m[1]) : void 0;
 }
 
+// ../packages/core/dist/model/skill.js
+var SKILL_ID_PATTERN = /^(?!-)(?!.*--)[a-z0-9-]{1,64}(?<!-)$/;
+var SKILL_DESCRIPTION_MAX = 1024;
+var SKILL_COMPATIBILITY_MAX = 500;
+
 // ../packages/core/dist/model/lint.js
 var LINT_SEVERITIES = ["error", "warn", "off"];
 function isLintSeverity(value) {
@@ -10631,6 +10636,8 @@ var RULES_DIR = `${RULEGATE_DIR}/rules`;
 var RULES_GLOB = `${RULES_DIR}/**/*.md`;
 var MCP_DIR = `${RULEGATE_DIR}/mcp`;
 var MCP_SERVERS_PATH = `${MCP_DIR}/servers.yaml`;
+var SKILLS_DIR = `${RULEGATE_DIR}/skills`;
+var SKILL_FILE = "SKILL.md";
 var STATE_PATH = `${RULEGATE_DIR}/state.json`;
 var BACKUP_DIR = `${RULEGATE_DIR}/backup`;
 var AGENTS_MD = "AGENTS.md";
@@ -11241,7 +11248,7 @@ function isLiteralSecret(key, value) {
 }
 function findLiteralSecrets(value, prefix) {
   const found = [];
-  const walk = (node, path4, key) => {
+  const walk2 = (node, path4, key) => {
     if (typeof node === "string") {
       if (isLiteralSecret(key, node))
         found.push(path4);
@@ -11249,17 +11256,17 @@ function findLiteralSecrets(value, prefix) {
     }
     if (Array.isArray(node)) {
       node.forEach((item, i) => {
-        walk(item, `${path4}[${String(i)}]`, key);
+        walk2(item, `${path4}[${String(i)}]`, key);
       });
       return;
     }
     if (node !== null && typeof node === "object") {
       for (const k of Object.keys(node).sort(compareCodepoint)) {
-        walk(node[k], `${path4}.${k}`, k);
+        walk2(node[k], `${path4}.${k}`, k);
       }
     }
   };
-  walk(value, prefix, prefix.split(".").at(-1) ?? prefix);
+  walk2(value, prefix, prefix.split(".").at(-1) ?? prefix);
   return found;
 }
 function scanTextForSecrets(text) {
@@ -11548,6 +11555,163 @@ function parseToolSelector(v, node) {
   return ALL_TOOLS;
 }
 
+// ../packages/core/dist/parse/skills.js
+var import_yaml9 = __toESM(require_dist(), 1);
+var invalid = (file, message, hint) => new RulegateError({
+  code: "E_SKILL_INVALID",
+  message,
+  source: { file },
+  ...hint === void 0 ? {} : { hint }
+});
+async function parseSkills(fs2, root) {
+  const dir = root === "" ? SKILLS_DIR : `${root}/${SKILLS_DIR}`;
+  if (!await fs2.exists(dir))
+    return { skills: [], errors: [], sourceFiles: [] };
+  const skills = [];
+  const errors = [];
+  const sourceFiles = [];
+  for (const entry of await fs2.listDir(dir)) {
+    const path4 = `${dir}/${entry.name}`;
+    if (entry.kind === "symlink") {
+      errors.push(invalid(path4, "a skill may not be a symlink", "replace it with the directory itself"));
+      continue;
+    }
+    if (entry.kind === "file") {
+      errors.push(invalid(path4, `a file directly in ${dir}/ is not a skill`, `move it into ${dir}/<name>/`));
+      continue;
+    }
+    const parsed = await parseSkillDir(fs2, path4, entry.name);
+    errors.push(...parsed.errors);
+    sourceFiles.push(...parsed.sourceFiles);
+    if (parsed.skill !== void 0)
+      skills.push(parsed.skill);
+  }
+  return { skills, errors, sourceFiles: sourceFiles.sort(compareCodepoint) };
+}
+async function parseSkillDir(fs2, path4, id) {
+  const errors = [];
+  const skillFile = `${path4}/${SKILL_FILE}`;
+  const walked = await walk(fs2, path4, "");
+  errors.push(...walked.errors);
+  const sourceFiles = walked.files.map((f) => `${path4}/${f}`);
+  if (!walked.files.includes(SKILL_FILE)) {
+    const nested = walked.files.some((f) => f.endsWith(`/${SKILL_FILE}`));
+    errors.push(invalid(path4, nested ? `skills cannot be nested: ${path4}/ groups skills` : `${path4}/ has no ${SKILL_FILE}`, nested ? `move each skill to its own directory directly under ${SKILLS_DIR}/` : `add ${skillFile}, or remove the directory`));
+    return { errors, sourceFiles };
+  }
+  if (!SKILL_ID_PATTERN.test(id)) {
+    errors.push(invalid(path4, `skill directory \`${id}\` is not a valid Agent Skills name`, "use 1-64 lowercase letters, digits and hyphens, with no leading, trailing or double hyphen"));
+  }
+  const raw = await fs2.readFile(skillFile);
+  const split = splitFrontmatter(raw, skillFile);
+  if (!split.ok)
+    return { errors: [...errors, split.error], sourceFiles };
+  const { yaml, yamlLineOffset, body } = split.value;
+  if (yaml === void 0 || yaml.trim() === "") {
+    errors.push(invalid(skillFile, `${SKILL_FILE} has no frontmatter`, "add `name` and `description` between `---` lines"));
+    return { errors, sourceFiles };
+  }
+  const parsedYaml = parseYaml(yaml, skillFile, yamlLineOffset);
+  if (!parsedYaml.ok)
+    return { errors: [...errors, parsedYaml.error], sourceFiles };
+  const v = new Validator(skillFile, parsedYaml.value, "E_SKILL_INVALID");
+  const root = parsedYaml.value.doc.contents;
+  const map = root === null ? void 0 : v.asMap(root, "frontmatter");
+  const name = v.string(v.get(map, "name"), "name");
+  if (name === void 0) {
+    v.fail(map, "name", "`name` is required", `set \`name: ${id}\``);
+  } else if (name !== id) {
+    v.fail(v.get(map, "name"), "name", `\`name\` is \`${name}\` but the directory is \`${id}\`; the Agent Skills spec requires them to match`, `rename the directory to ${name}/, or set \`name: ${id}\``);
+  }
+  const description = v.string(v.get(map, "description"), "description");
+  if (description === void 0 || description.trim() === "") {
+    v.fail(map, "description", "`description` is required", "say what the skill does and when to use it");
+  } else if ([...description].length > SKILL_DESCRIPTION_MAX) {
+    v.fail(v.get(map, "description"), "description", `\`description\` is ${[...description].length} characters; the limit is ${SKILL_DESCRIPTION_MAX}`);
+  }
+  const compatibility = v.get(map, "compatibility");
+  if (compatibility !== void 0) {
+    const text = v.string(compatibility, "compatibility");
+    if (text !== void 0 && (text.length === 0 || [...text].length > SKILL_COMPATIBILITY_MAX)) {
+      v.fail(compatibility, "compatibility", `\`compatibility\` must be 1-${SKILL_COMPATIBILITY_MAX} characters`);
+    }
+  }
+  if (v.get(map, "license") !== void 0)
+    v.string(v.get(map, "license"), "license");
+  checkMetadata(v, v.get(map, "metadata"));
+  checkAllowedTools(v, v.get(map, "allowed-tools"));
+  const tools = parseToolSelector(v, v.get(map, "tools"));
+  const frontmatter = v.keys(map).map((key) => [key, v.plain(v.get(map, key))]);
+  errors.push(...v.errors);
+  if (errors.length > 0)
+    return { errors, sourceFiles };
+  const assets = [];
+  for (const file of walked.files) {
+    if (file === SKILL_FILE)
+      continue;
+    assets.push({ path: file, bytes: await fs2.readFileRaw(`${path4}/${file}`) });
+  }
+  return {
+    skill: {
+      id,
+      path: path4,
+      name: name ?? id,
+      description: description ?? "",
+      tools: tools ?? ALL_TOOLS,
+      frontmatter,
+      body,
+      assets,
+      source: { file: skillFile }
+    },
+    errors,
+    sourceFiles
+  };
+}
+function checkMetadata(v, node) {
+  if (node === void 0)
+    return;
+  if (!(0, import_yaml9.isMap)(node)) {
+    v.fail(node, "metadata", "`metadata` must be a mapping of strings to strings");
+    return;
+  }
+  for (const item of node.items) {
+    const value = item.value;
+    if (!(0, import_yaml9.isScalar)(value) || typeof value.value !== "string") {
+      const key = (0, import_yaml9.isScalar)(item.key) ? String(item.key.value) : "?";
+      v.fail(value, `metadata.${key}`, `\`metadata.${key}\` must be a string`, 'quote it, as in `version: "1.0"`');
+    }
+  }
+}
+function checkAllowedTools(v, node) {
+  if (node === void 0)
+    return;
+  if ((0, import_yaml9.isScalar)(node) && typeof node.value === "string")
+    return;
+  if ((0, import_yaml9.isSeq)(node)) {
+    v.stringArray(node, "allowed-tools");
+    return;
+  }
+  v.fail(node, "allowed-tools", "`allowed-tools` must be a space-separated string or a list of strings");
+}
+async function walk(fs2, base, rel) {
+  const files = [];
+  const errors = [];
+  const here = rel === "" ? base : `${base}/${rel}`;
+  for (const entry of await fs2.listDir(here)) {
+    const child = rel === "" ? entry.name : `${rel}/${entry.name}`;
+    if (entry.kind === "symlink") {
+      errors.push(invalid(`${base}/${child}`, "a skill may not contain a symlink", "replace it with the file itself"));
+    } else if (entry.kind === "dir") {
+      const inner = await walk(fs2, base, child);
+      files.push(...inner.files);
+      errors.push(...inner.errors);
+    } else {
+      files.push(child);
+    }
+  }
+  return { files: files.sort(compareCodepoint), errors };
+}
+
 // ../packages/core/dist/parse/suggest.js
 function editDistance(a, b) {
   if (a === b)
@@ -11655,6 +11819,13 @@ async function parse(input) {
       errors.push(...parsed.errors);
     }
   }
+  const skills = [];
+  if (mode !== "bare-agents-md") {
+    const parsed = await parseSkills(fs2, dir);
+    skills.push(...parsed.skills);
+    errors.push(...parsed.errors);
+    sourceFiles.push(...parsed.sourceFiles);
+  }
   sourceFiles.sort(compareCodepoint);
   return {
     canonical: {
@@ -11662,7 +11833,7 @@ async function parse(input) {
       manifest,
       rules,
       mcpServers,
-      skills: []
+      skills
     },
     errors,
     warnings,
@@ -12847,7 +13018,7 @@ var NodeFileSystem = class {
       const rel = path2.relative(root, real);
       return rel === "" || !rel.startsWith("..") && !path2.isAbsolute(rel);
     };
-    const walk = async (dir) => {
+    const walk2 = async (dir) => {
       for (const entry of await this.listDir(dir)) {
         const child = dir === "" ? entry.name : `${dir}/${entry.name}`;
         if (entry.name === "node_modules" || entry.name === ".git")
@@ -12869,14 +13040,14 @@ var NodeFileSystem = class {
           if (seen.has(real))
             continue;
           seen.add(real);
-          await walk(child);
+          await walk2(child);
           continue;
         }
         if (matchesGlob(child, pattern))
           out.push(child);
       }
     };
-    await walk("");
+    await walk2("");
     out.sort(compareCodepoint);
     return out;
   }
@@ -16875,13 +17046,13 @@ var rooCode = {
 };
 
 // ../packages/adapters/windsurf/dist/frontmatter.js
-function invalid(what, hint) {
+function invalid2(what, hint) {
   return new RulegateError({ code: "E_FRONTMATTER_INVALID", message: what, hint });
 }
 function renderGlobs2(globs) {
   for (const glob of globs) {
     if (glob.includes(",")) {
-      throw invalid(`glob \`${glob}\` contains a comma, which windsurf cannot express`, "windsurf separates patterns with commas and has no escape for one inside a pattern; split the rule in two");
+      throw invalid2(`glob \`${glob}\` contains a comma, which windsurf cannot express`, "windsurf separates patterns with commas and has no escape for one inside a pattern; split the rule in two");
     }
   }
   return globs.join(",");

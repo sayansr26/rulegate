@@ -7,6 +7,9 @@ export type RulegateErrorCode =
   | 'E_FRONTMATTER_INVALID'
   | 'E_FRONTMATTER_UNTERMINATED'
   | 'E_RULE_ID_CONFLICT'
+  // A skill directory that is not a valid Agent Skill, or one Rulegate cannot carry (T051):
+  // a missing `SKILL.md`, an id or `name` breaking the spec, a nested skill, a symlink.
+  | 'E_SKILL_INVALID'
   | 'E_UNKNOWN_TOOL'
   | 'E_ARTIFACT_PATH_CONFLICT'
   | 'E_ARTIFACT_OVERWRITES_SOURCE'

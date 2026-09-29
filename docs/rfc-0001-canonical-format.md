@@ -45,7 +45,7 @@ format makes.
   rulegate.yaml      manifest: enabled tools and options        v0
   rules/*.md          instructions, Markdown + YAML frontmatter  v0
   mcp/servers.yaml    MCP server definitions                     v0.2
-  skills/             skill definitions                          reserved (v1)
+  skills/<id>/        skill directories: SKILL.md + assets       v1
   state.json          generated-artifact hashes                  generated
   backup/             pre-overwrite copies                       generated
 ```
@@ -658,10 +658,110 @@ file. Comments are therefore stripped, string-aware, before parsing all three JS
 this is a no-op on plain JSON. Recorded here as **unverified against the vendor** rather than
 presented as a documented fact.
 
-## 12. Reserved: `skills/` (v1)
+## 12. `skills/` (v1)
 
-Canonical skill definitions, a superset of `SKILL.md` frontmatter plus whatever
-Cursor's `.mdc` and `.github/skills` require. Specified when T051 lands.
+> **Parsed and validated since T051 (2026-09-29).** Generating each tool's copy is T052; until
+> then `.rulegate/skills/` is read and checked, and nothing is rendered from it.
+
+Canonical skills, generated into each tool's skills directory by the skills adapters (T052).
+Every tool that supports skills reads the same thing — a directory holding a `SKILL.md` —
+defined by the [Agent Skills specification](https://agentskills.io/specification) and
+extended per tool with extra frontmatter. There is no separate Cursor `.mdc` skill format:
+Cursor reads `SKILL.md` like the rest. So the canonical form is that directory, and a
+canonical skill is a valid Agent Skill before Rulegate touches it.
+
+The directory is optional. A repository with no `.rulegate/skills/` has no skills.
+
+```
+.rulegate/skills/
+  pdf-processing/
+    SKILL.md              required
+    scripts/extract.py    any other file: carried as bytes
+    assets/diagram.png
+    agents/openai.yaml    a tool's sidecar is just another file
+```
+
+### 12.1 The skill directory
+
+- **One skill per directory** directly under `skills/`. The directory name is the skill's
+  id. Nested groupings (`skills/team/deploy/`) are an error, not a namespace: no tool reads
+  a nested skill tree.
+- **The id follows the Agent Skills `name` rules**: 1–64 characters, `a-z`, `0-9` and `-`,
+  not starting or ending with `-`, no `--`. Checked case-sensitively, so `Deploy/` is an error
+  rather than a skill that collides with `deploy/` on a case-insensitive filesystem.
+- **`SKILL.md` is required**, as text: UTF-8, EOL normalised to `\n` on read like every
+  canonical text file (§9).
+- **Every other file is an asset, carried as raw bytes** — never decoded, never
+  EOL-normalised, never BOM-stripped. A CRLF script, a PNG, a zip all come out
+  byte-identical. Assets keep their relative path; empty directories are not carried.
+- Symlinks inside a skill directory are an error, as everywhere under `.rulegate/`.
+
+### 12.2 `SKILL.md` frontmatter
+
+```yaml
+---
+name: pdf-processing
+description: Extract text and tables from PDFs and fill forms. Use when a task mentions PDFs.
+license: Apache-2.0
+allowed-tools: Read Bash(python:*)
+tools: [claude-code, codex]
+disable-model-invocation: true
+---
+Skill instructions in Markdown.
+```
+
+Three kinds of key, handled differently:
+
+| Kind                | Keys                                                                                           | Handling                                                                                                                                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agent Skills**    | `name`, `description` (both required), `license`, `compatibility`, `metadata`, `allowed-tools` | Validated to the spec's limits, passed to every tool.                                                                                                                                                                               |
+| **Rulegate**        | `tools`                                                                                        | Which adapters receive the skill, in §6.1's three forms. **Never rendered**: it is removed from every generated `SKILL.md`.                                                                                                         |
+| **Tool extensions** | anything else — `when_to_use`, `paths`, `disable-model-invocation`, `model`, `icon`, …         | Retained verbatim and passed through. Each adapter's `docs` lists the extensions its tool reads; an adapter passes the ones its tool understands and **drops the rest with a warning naming the key and the tool**, never silently. |
+
+- `name` **must equal the directory name** (Agent Skills rule). A mismatch is an error, not
+  a rename.
+- `description`: 1–1024 characters, non-empty. Unlike a rule's, it may span lines.
+- `compatibility`: 1–500 characters if present. `metadata`: a mapping of strings to strings.
+- Key order and values are preserved on serialisation, like §6.2's "any other key".
+
+### 12.3 Rendering contract — normative
+
+What the skills adapters (T052) must hold to, so that `check` stays byte-exact:
+
+- **Render per tool, into that tool's directory** (`.claude/skills/<id>/`,
+  `.agents/skills/<id>/`, …), each file at the same relative path it has in the canonical
+  skill. `SKILL.md` is re-serialised with the frontmatter above (minus `tools`, minus
+  dropped extensions) and the body unchanged. Assets are copied byte for byte.
+- **Binary-safe artifacts.** An asset is a bytes-valued artifact: written unmodified, hashed
+  over its raw bytes, compared through `readFileRaw`, and shown by `check` as
+  `binary files differ` rather than a line diff. Text artifacts and their `state.json`
+  hashes are unchanged by this (T052).
+- **One directory, several readers.** `.agents/skills/` is read by Cursor, Copilot, Codex,
+  Gemini CLI, Windsurf and Antigravity; `.claude/skills/` by Claude Code, Copilot, Cursor
+  (legacy), Windsurf and Cline. A skill generated into both is loaded twice by the tools that
+  read both. The adapters and `doctor` must account for this, and a shared directory has one
+  owner in `state.json` (T052 decides how).
+
+### 12.4 Import
+
+`rulegate init` imports a tool's existing skills from its skills directory into
+`.rulegate/skills/<id>/`: `SKILL.md` as text, every other file as bytes. A skill found in
+several directories with byte-identical contents collapses to one; differing copies stay
+separate and are reported, as rules are. `.agent-os/skills/<id>/**` is an import source too
+(T105).
+
+### 12.5 Sources, verified 2026-09-29
+
+| Tool              | Reads (project)                                                                         | Source                                                                |
+| ----------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Agent Skills spec | —                                                                                       | https://agentskills.io/specification                                  |
+| Claude Code       | `.claude/skills/`, also nested and parent directories                                   | https://code.claude.com/docs/en/skills                                |
+| Cursor            | `.agents/skills/`, `.cursor/skills/`; legacy `.claude/skills/`, `.codex/skills/`        | https://cursor.com/docs/context/skills                                |
+| GitHub Copilot    | `.github/skills/`, `.claude/skills/`, `.agents/skills/`                                 | https://docs.github.com/en/copilot/concepts/agents/about-agent-skills |
+| Codex             | `.agents/skills/`, walking up to the repository root                                    | https://learn.chatgpt.com/docs/build-skills                           |
+| Gemini CLI        | `.agents/skills/` (wins), `.gemini/skills/`                                             | https://geminicli.com/docs/cli/skills/                                |
+| Windsurf          | `.devin/skills/` (preferred), `.windsurf/skills/`, `.agents/skills/`, `.claude/skills/` | https://docs.devin.ai/desktop/cascade/skills                          |
+| Cline             | `.cline/skills/`, `.clinerules/skills/`, `.claude/skills/`                              | https://docs.cline.bot/features/skills                                |
 
 ## 13. Explicitly deferred
 

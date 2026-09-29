@@ -79,7 +79,7 @@ export function defaultFrontmatter(): RuleFrontmatter {
  * misreading a tool selector would send a rule to the wrong tools, which is worse
  * than refusing to proceed.
  */
-function parseToolSelector(v: Validator, node: Node | undefined): ToolSelector {
+export function parseToolSelector(v: Validator, node: Node | undefined): ToolSelector {
   if (node === undefined) return ALL_TOOLS;
 
   if (isSeq(node) || (isScalar(node) && typeof node.value === 'string')) {

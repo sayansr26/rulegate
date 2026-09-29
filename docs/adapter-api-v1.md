@@ -84,8 +84,9 @@ removal was still free: it is the type someone would reach for to write
 
 ### Reserved
 
-`Canonical.skills` is a stub for skills (T051). Its **element type is not part of the
-frozen surface** and may change without a major bump until that lands; `Skill` is
+`Canonical.skills` holds canonical skills since T051 (RFC-0001 §12), but its **element type is
+not yet part of the frozen surface** and may change without a major bump until the skills
+adapters (T052) consume it; `Skill` is
 deliberately not exported, so an adapter cannot declare against a shape that is not
 settled. The field itself — present, and an array — is frozen. Reading it is allowed and
 unsupported.
@@ -162,6 +163,7 @@ still 1.
 | 2026-09-28 (T142)       | `RulegateErrorCode` gains `'W_SIZE_CAP_CROSSED'`                                                                                    | `init` warns when a generated file would grow past a byte cap that a tool reading it documents, naming the tool. Non-breaking for the same reason as `W_INTEROP_OUTPUT_LEFT`: a union member added to an exported type widens what an adapter may receive and never what it must produce; one that switches exhaustively over the codes gains a case to handle.                                                                                                                                   |
 | 2026-09-28 (T124, T115) | `RulegateErrorCode` gains `'W_INIT_NOT_IMPORTED'`, `'E_INIT_CANONICAL_MISMATCH'` and `'E_INIT_CANONICAL_EXISTS'`                    | `init` names an existing file it would back up and replace without having imported from it; refuses a `.rulegate/` that would not render, once read back, what it imported; and refuses to overwrite or render beside hand-written canonical files in a `.rulegate/` with no manifest. Non-breaking for the same reason as `W_INTEROP_OUTPUT_LEFT`.                                                                                                                                               |
 | 2026-09-28 (T148)       | `RulegateErrorCode` gains `'E_INIT_NOT_A_FILE'`                                                                                     | `init` refuses, by path and before writing anything, a plan that generates a file where a directory stands or beneath a path that is a file. Non-breaking for the same reason as `W_INTEROP_OUTPUT_LEFT`.                                                                                                                                                                                                                                                                                         |
+| 2026-09-29 (T051)       | `RulegateErrorCode` gains `'E_SKILL_INVALID'`                                                                                       | `.rulegate/skills/` is parsed and validated against the Agent Skills rules (RFC-0001 §12). Non-breaking for the same reason as `W_INTEROP_OUTPUT_LEFT`. `Canonical.skills`' element type is now settled in core but stays unexported from the kit until the skills adapters consume it (T052).                                                                                                                                                                                                    |
 
 ## How v2 would arrive
 

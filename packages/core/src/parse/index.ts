@@ -19,9 +19,11 @@ import { compareCodepoint } from '../render/order.js';
 import { parseManifest } from './manifest.js';
 import { parseMcpServers } from './mcp.js';
 import { parseRuleFile } from './rules.js';
+import { parseSkills } from './skills.js';
 import { suggest } from './suggest.js';
 import type { McpServer } from '../model/mcp.js';
 import type { RuleDocument } from '../model/rule.js';
+import type { Skill } from '../model/skill.js';
 import type { ReadOnlyFileSystem } from '../fs/types.js';
 
 export type CanonicalMode = 'rulegate-dir' | 'rules-only' | 'bare-agents-md';
@@ -160,6 +162,15 @@ export async function parse(input: ParseInput): Promise<ParseResult> {
     }
   }
 
+  // Skills live beside the rules too (RFC-0001 §12), with the same exception.
+  const skills: Skill[] = [];
+  if (mode !== 'bare-agents-md') {
+    const parsed = await parseSkills(fs, dir);
+    skills.push(...parsed.skills);
+    errors.push(...parsed.errors);
+    sourceFiles.push(...parsed.sourceFiles);
+  }
+
   sourceFiles.sort(compareCodepoint);
 
   return {
@@ -168,7 +179,7 @@ export async function parse(input: ParseInput): Promise<ParseResult> {
       manifest,
       rules,
       mcpServers,
-      skills: [],
+      skills,
     },
     errors,
     warnings,

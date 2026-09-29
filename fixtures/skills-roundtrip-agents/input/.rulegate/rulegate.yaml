@@ -1,0 +1,5 @@
+schemaVersion: 1
+tools:
+  - claude-code
+  - codex
+  - cursor
