@@ -211,7 +211,7 @@ describe('setupState (T098)', () => {
     ]);
   });
 
-  it('names every plugin holding the marketplace in one fix, as a real project needs (T109)', async () => {
+  it('names every plugin holding the marketplace in one fix, as a real migration needs (T109)', async () => {
     await healthy();
     await sb.put('.claude/settings.json', {
       ...(JSON.parse(planSettings(undefined).next!) as object),

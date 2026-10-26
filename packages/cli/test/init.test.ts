@@ -671,12 +671,12 @@ describe('rulegate init', () => {
     expect((await plan()).warnings.map((w) => w.code)).not.toContain('W_BACKUP_SECRET');
   });
 
-  // T140, from a real project's `.claude/rules/theming.md`: prose, not a credential.
+  // T140, from a real project's theming rule: prose, not a credential.
   it('reads a Markdown rule as prose: a backticked value after "token:" is not a credential', async () => {
     await seedNativeConfigs();
     await writeFile(
       path.join(repo, 'CLAUDE.md'),
-      '# Theming\n\nFont family is always a token: `var(--body-font)` (Inter)\n',
+      '# Theming\n\nFont family is always a token: `var(--body-font)` (Serif)\n',
     );
     expect((await plan()).warnings.map((w) => w.code)).not.toContain('W_BACKUP_SECRET');
   });

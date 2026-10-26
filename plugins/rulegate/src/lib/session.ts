@@ -26,7 +26,7 @@ import {
  *   2. The contract — which agent to use for what, which features the cartographer has
  *      mapped, and where rules are edited. This one IS an instruction: without it Claude
  *      uses the agents only when told to, because a CLAUDE.md sentence loses to whatever
- *      else is in context. That is the a real project incident this plugin exists for.
+ *      else is in context. That is the incident this plugin exists for.
  *
  * The snapshot is capped at `MAX_SNAPSHOT_LINES`; the contract is bounded by its own
  * construction. Each block fails on its own: an error in one still prints the other.

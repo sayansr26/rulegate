@@ -165,7 +165,7 @@ describe('interop — T048', () => {
   });
 
   it("never calls a competing tool's own source directory a nested level (T153, T109 preflight)", async () => {
-    // a real project's shape: agent-os's untouched `.agent-os/AGENTS.md` placeholder is not
+    // A real project's shape: agent-os's untouched `.agent-os/AGENTS.md` placeholder is not
     // imported, and Codex's nested AGENTS.md pattern matches it — but it is agent-os's
     // input, which init is migrating, not a file Codex reads for `.agent-os/`.
     const plan = await init('agent-os-import-scaffold');
@@ -1009,7 +1009,7 @@ describe('interop — agent-os edge cases (T105)', () => {
   });
 
   it('notes every imported line still naming agent-os, and imports it unchanged (T145)', async () => {
-    // a real project's CLAUDE.md sends the agent to `.agent-os/rules/` and agent-os's `sync`. The
+    // A real project's CLAUDE.md sends the agent to `.agent-os/rules/` and agent-os's `sync`. The
     // import keeps the author's words; the note says which lines to change once it has run.
     await setup();
     try {
@@ -1093,7 +1093,7 @@ describe('interop — agent-os project body (T141)', () => {
     (notes ?? []).filter((n) => n.path === '.agent-os/AGENTS.md').map((n) => n.message);
 
   it('scopes the body to the tools agent-os sent it to, and leaves a hand-written CLAUDE.md as it was', async () => {
-    // a real project's shape: agent-os targets Claude Code, writes `.claude/rules/` and AGENTS.md,
+    // A real project's shape: agent-os targets Claude Code, writes `.claude/rules/` and AGENTS.md,
     // and somebody wrote CLAUDE.md. The body reached AGENTS.md alone, so it is codex's.
     const plan = await golden('agent-os-import-claude');
     expect(plan.warnings.map((w) => w.message)).toContainEqual(
@@ -1116,7 +1116,7 @@ describe('interop — agent-os project body (T141)', () => {
   });
 
   it('imports nothing from the untouched `agent-os init` placeholder, and says so', async () => {
-    // a real project's `.agent-os/AGENTS.md`, byte for byte: the placeholder plus the path-scoped
+    // A real project's `.agent-os/AGENTS.md`, byte for byte: the placeholder plus the path-scoped
     // index agent-os 0.5.0 compiled into it before 0.6.0 adopted it back as the source.
     const plan = await golden('agent-os-import-scaffold');
     expect(plan.warnings.map((w) => w.message)).toContainEqual(

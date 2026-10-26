@@ -9,7 +9,9 @@ const pins = fileURLToPath(new URL('./shape/pins.ts', import.meta.url));
  * and why the pins are hand-written duplicates rather than references.
  */
 describe('the frozen contract shapes (T011)', () => {
-  it('type-checks the structural pins', () => {
+  // A whole TypeScript program is built here; a cold Windows runner took 5.4s against the
+  // default 5s and failed a release commit for nothing but time.
+  it('type-checks the structural pins', { timeout: 30_000 }, () => {
     const diagnostics = formatDiagnostics(createKitProgram([pins]));
     expect(
       diagnostics,
