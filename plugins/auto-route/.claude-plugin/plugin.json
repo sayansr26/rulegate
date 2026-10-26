@@ -1,0 +1,13 @@
+{
+  "name": "auto-route",
+  "version": "0.1.0",
+  "description": "Picks the model and effort level for each turn from what the prompt asks for",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Sayan Choudhury"
+  },
+  "homepage": "https://github.com/sayansr26/rulegate#readme",
+  "repository": "https://github.com/sayansr26/rulegate",
+  "license": "MIT",
+  "keywords": ["model-routing", "effort", "mod"]
+}

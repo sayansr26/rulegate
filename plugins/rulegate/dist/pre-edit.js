@@ -89,8 +89,34 @@ var BACKUP_DIR = `${RULEGATE_DIR}/backup`;
 function foldPath(relPath) {
   return relPath.toLowerCase();
 }
-function pathKeyFor(caseInsensitive) {
+function foldUnicode(relPath) {
+  return relPath.normalize("NFC");
+}
+function pathKeyFor(caseInsensitive, normalizationInsensitive = false) {
+  if (caseInsensitive && normalizationInsensitive) return (p) => foldPath(foldUnicode(p));
+  if (normalizationInsensitive) return foldUnicode;
   return caseInsensitive ? foldPath : (relPath) => relPath;
+}
+async function probeNormalizationInsensitive(fs, candidates) {
+  for (const path2 of candidates) {
+    const nfc = path2.normalize("NFC");
+    const nfd = path2.normalize("NFD");
+    if (nfc === nfd) continue;
+    const other = path2 === nfc ? nfd : nfc;
+    try {
+      if (!await fs.exists(path2)) continue;
+      const slash = path2.lastIndexOf("/");
+      const dir = slash === -1 ? "" : path2.slice(0, slash);
+      const names = new Set((await fs.listDir(dir)).map((e) => e.name));
+      const name = path2.slice(slash + 1);
+      const otherName = other.slice(other.lastIndexOf("/") + 1);
+      if (names.has(name) && names.has(otherName)) continue;
+      return await fs.exists(other);
+    } catch {
+      continue;
+    }
+  }
+  return false;
 }
 function flipCase(name) {
   let flipped = "";
@@ -222,7 +248,11 @@ async function judge(abs) {
   if (owner === void 0) return void 0;
   const rel = within(owner.root, abs);
   if (rel === void 0) return void 0;
-  const key = pathKeyFor(await probeCaseInsensitive(probeView(owner.root)));
+  const view = probeView(owner.root);
+  const key = pathKeyFor(
+    await probeCaseInsensitive(view),
+    await probeNormalizationInsensitive(view, [...owner.state.artifacts.map((a) => a.path), rel])
+  );
   if (key(rel) === key(STATE_PATH) || key(rel).startsWith(key(".rulegate/backup/"))) {
     return {
       kind: "deny",

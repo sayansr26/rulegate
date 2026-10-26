@@ -13,32 +13,43 @@ import type { DirEntry, ReadOnlyFileSystem } from './types.js';
  * is happening, and a filesystem is the seam that already exists for showing them a
  * different view of the tree — `StagedFileSystem` (T046) does the same thing for the git
  * index. It carries no write methods, so nothing here can widen what an importer may do.
+ *
+ * A hidden entry hides what is under it too (T133): rulesync reports `.clinerules` as one
+ * output, a directory, and an exact-path mask let the Cline adapter read `.clinerules/*.md`
+ * through it and import every rule a second time.
  */
 export function maskPaths(fs: ReadOnlyFileSystem, hidden: Iterable<string>): ReadOnlyFileSystem {
-  const masked = new Set(hidden);
+  const masked = new Set([...hidden].map((p) => p.replace(/\/+$/, '')));
+  const isMasked = (relPath: string): boolean => {
+    if (masked.has(relPath)) return true;
+    for (let at = relPath.indexOf('/'); at !== -1; at = relPath.indexOf('/', at + 1)) {
+      if (masked.has(relPath.slice(0, at))) return true;
+    }
+    return false;
+  };
 
   return {
     async readFile(relPath: string): Promise<string> {
-      if (masked.has(relPath)) throw notFound(relPath);
+      if (isMasked(relPath)) throw notFound(relPath);
       return fs.readFile(relPath);
     },
     async tryReadFile(relPath: string): Promise<string | undefined> {
-      return masked.has(relPath) ? undefined : fs.tryReadFile(relPath);
+      return isMasked(relPath) ? undefined : fs.tryReadFile(relPath);
     },
     async readFileRaw(relPath: string): Promise<Uint8Array> {
-      if (masked.has(relPath)) throw notFound(relPath);
+      if (isMasked(relPath)) throw notFound(relPath);
       return fs.readFileRaw(relPath);
     },
     async exists(relPath: string): Promise<boolean> {
-      return masked.has(relPath) ? false : fs.exists(relPath);
+      return isMasked(relPath) ? false : fs.exists(relPath);
     },
     async listDir(relPath: string): Promise<readonly DirEntry[]> {
       const prefix = relPath === '' ? '' : `${relPath}/`;
       const entries = await fs.listDir(relPath);
-      return entries.filter((e) => !masked.has(`${prefix}${e.name}`));
+      return entries.filter((e) => !isMasked(`${prefix}${e.name}`));
     },
     async glob(pattern: string): Promise<readonly string[]> {
-      return (await fs.glob(pattern)).filter((p) => !masked.has(p));
+      return (await fs.glob(pattern)).filter((p) => !isMasked(p));
     },
   };
 }

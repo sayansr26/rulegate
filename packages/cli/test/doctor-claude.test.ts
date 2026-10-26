@@ -149,6 +149,7 @@ describe('rulegate doctor — Claude Code plugin line (T107)', () => {
       active: true,
       decidedAt: 'project',
       enabled: { local: null, project: true, user: null },
+      localMarketplace: false,
       legacy: {
         found: false,
         plugin: null,
@@ -370,6 +371,25 @@ describe('rulegate doctor — Claude Code plugin line (T107)', () => {
     expect((await report())?.userDir).toBe('~/.claude');
     expect((await text()).out).not.toContain('$CLAUDE_CONFIG_DIR');
     expect((await report({ noGlobal: true }))?.userDir).toBeNull();
+  });
+
+  it('warns about a rulegate marketplace on a local path in the committed settings (T144)', async () => {
+    await writeJson(path.join(repo, '.claude/settings.json'), {
+      extraKnownMarketplaces: {
+        rulegate: { source: { source: 'directory', path: '/Users/me/src/rulegate' } },
+      },
+    });
+    expect((await report())?.localMarketplace).toBe(true);
+    const { err } = await text();
+    expect(err).toContain('points the rulegate marketplace at a local path');
+    expect(err).not.toContain('/Users/me');
+    // The paired control: the published source is what a project should commit.
+    await writeJson(path.join(repo, '.claude/settings.json'), {
+      extraKnownMarketplaces: {
+        rulegate: { source: { source: 'github', repo: 'sayansr26/rulegate' } },
+      },
+    });
+    expect((await report())?.localMarketplace).toBe(false);
   });
 
   it('the paired control: a clean repository reports no agent-os and no warning', async () => {

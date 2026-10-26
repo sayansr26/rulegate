@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
 import {
+  AUTO_ROUTE_ID,
   blocked,
   claudeHome,
   cmpVersion,
@@ -10,12 +11,14 @@ import {
   MARKETPLACE_NAME,
   planScope,
   PLUGIN_ID,
+  pluginState,
   readJson,
   refusals,
   setupState,
+  type PluginState,
   type Scope,
 } from '@rulegate/claude';
-import { ensurePlugin, pluginSteps, SCOPES, shown } from '../claude/index.js';
+import { ensurePlugin, pluginSteps, SCOPES, shown, type PluginOutcome } from '../claude/index.js';
 import { applyScope } from '../claude/settings-writer.js';
 import { createOutput, type Output } from '../ui/report.js';
 import { ExitCode, type ExitCodeValue } from '../ui/exit.js';
@@ -39,13 +42,15 @@ export interface ClaudeSectionOptions {
   readonly run: boolean;
   /** The version this CLI ships; the plugin's moves with it. */
   readonly want: string;
+  /** `false` (`--no-auto-route`) leaves the auto-route mod out of the plugin step (T162). */
+  readonly autoRoute?: boolean;
 }
 
 const SETTINGS_ITEMS = /^(project|user)-(settings|git|todo)$/;
 
 /** The scope whose settings file switches the plugin off, which is where an enable must go. */
-export function offAt(root: string, claudeDir: string): string | undefined {
-  const at = enabledAt(root, claudeDir, PLUGIN_ID);
+export function offAt(root: string, claudeDir: string, id = PLUGIN_ID): string | undefined {
+  const at = enabledAt(root, claudeDir, id);
   return at?.value === false ? at.scope : undefined;
 }
 
@@ -72,7 +77,7 @@ const pluginSettings = (scope: string, root: string, claudeDir: string): string 
  */
 export async function claudeSection(
   out: Output,
-  { root, claudeDir, plugin, run, want }: ClaudeSectionOptions,
+  { root, claudeDir, plugin, run, want, autoRoute = true }: ClaudeSectionOptions,
 ): Promise<ExitCodeValue> {
   const st = await setupState(root, claudeDir, { expect: want });
   out.log('');
@@ -93,34 +98,39 @@ export async function claudeSection(
   }
 
   const pl = st.plugin;
-  const target = [want, pl.latest]
-    .filter((v): v is string => v !== undefined)
-    .sort((a, b) => cmpVersion(b, a))[0];
-  const current = pl.installed && pl.enabled && cmpVersion(pl.version, target) >= 0;
-  out.log(
-    `  plugin  ${PLUGIN_ID}  ` +
-      (pl.installed
-        ? `${pl.version ?? 'unknown version'} (${pl.scope ?? 'unknown scope'})` +
-          (pl.enabled ? '' : ', disabled') +
-          (current ? ', up to date' : '')
-        : 'not installed'),
-  );
+  const current = upToDate(pl, want);
+  out.log(pluginLine(PLUGIN_ID, pl, current));
+  // The mod moves with the marketplace, not with this CLI, so only the cache says how new
+  // it can be.
+  const mod = autoRoute ? pluginState(root, claudeDir, AUTO_ROUTE_ID) : undefined;
+  const modCurrent = mod === undefined || upToDate(mod, undefined);
+  if (mod !== undefined) out.log(pluginLine(AUTO_ROUTE_ID, mod, modCurrent));
 
   if (!(plugin && run)) {
-    if (current && !plugin) return ExitCode.Ok;
-    // Claude Code's own files say where it is installed; a scope it reports that the
-    // command set does not take is shown as the project's, which is what the run uses.
-    const scope = SCOPES.includes(pl.scope ?? '') ? (pl.scope ?? 'project') : 'project';
-    const before = pl.installed ? { scope, enabled: pl.enabled } : undefined;
-    out.log(`  to ${pl.installed ? 'update' : 'install'} it, run in ${root}:`);
+    if (current && modCurrent && !plugin) return ExitCode.Ok;
     const market = marketKnown(claudeDir, pl.latest !== undefined);
-    for (const args of pluginSteps(before, market, offAt(root, claudeDir)))
-      out.log(`    ${shown(args)}`);
+    const steps: string[][] = [];
+    if (!current || plugin) steps.push(...pluginSteps(before(pl), market, offAt(root, claudeDir)));
+    if (mod !== undefined && (!modCurrent || plugin)) {
+      const modSteps = pluginSteps(
+        before(mod),
+        market,
+        offAt(root, claudeDir, AUTO_ROUTE_ID),
+        AUTO_ROUTE_ID,
+      );
+      // One marketplace step serves both.
+      steps.push(...(steps.length > 0 ? modSteps.slice(1) : modSteps));
+    }
+    out.log(
+      `  to ${pl.installed ? 'update' : 'install'} ${mod === undefined ? 'it' : 'them'}, run in ${root}:`,
+    );
+    for (const args of steps) out.log(`    ${shown(args)}`);
     out.log(
       plugin
         ? '  nothing was run. re-run with --yes to run them (they fetch from GitHub).'
         : '  or: rulegate init --plugin --yes  (runs them; they fetch from GitHub)',
     );
+    if (mod !== undefined) out.log('  --no-auto-route leaves auto-route out.');
     return ExitCode.Ok;
   }
 
@@ -138,6 +148,53 @@ export async function claudeSection(
   };
 
   const r = await ensurePlugin({ root, want, guard, offAt: () => offAt(root, claudeDir) });
+  const code = report(out, 'plugin', r);
+  // The mod is installed from the marketplace the plugin's run has just refreshed, and only
+  // when that run left the plugin installed: a mod beside a plugin that failed to install is
+  // half a setup.
+  if (code !== ExitCode.Ok || !autoRoute || r.reason === 'no-cli') return code;
+  const m = await ensurePlugin({
+    root,
+    guard,
+    id: AUTO_ROUTE_ID,
+    refreshMarket: false,
+    offAt: () => offAt(root, claudeDir, AUTO_ROUTE_ID),
+  });
+  return report(out, 'auto-route', m);
+}
+
+/** Installed, enabled, and at least as new as both `want` and the marketplace cache. */
+function upToDate(pl: PluginState, want: string | undefined): boolean {
+  const target = [want, pl.latest]
+    .filter((v): v is string => v !== undefined)
+    .sort((a, b) => cmpVersion(b, a))[0];
+  return pl.installed && pl.enabled && cmpVersion(pl.version, target) >= 0;
+}
+
+function pluginLine(id: string, pl: PluginState, current: boolean): string {
+  return (
+    `  plugin  ${id}  ` +
+    (pl.installed
+      ? `${pl.version ?? 'unknown version'} (${pl.scope ?? 'unknown scope'})` +
+        (pl.enabled ? '' : ', disabled') +
+        (current ? ', up to date' : '')
+      : 'not installed')
+  );
+}
+
+/**
+ * Claude Code's own files say where it is installed; a scope it reports that the command set
+ * does not take is shown as the project's, which is what the run uses.
+ */
+function before(pl: PluginState): { scope: string; enabled: boolean } | undefined {
+  if (!pl.installed) return undefined;
+  return {
+    scope: SCOPES.includes(pl.scope ?? '') ? (pl.scope ?? 'project') : 'project',
+    enabled: pl.enabled,
+  };
+}
+
+function report(out: Output, label: string, r: PluginOutcome): ExitCodeValue {
   for (const line of r.done) out.log(`  ran  ${line}`);
   if (r.reason === 'no-cli') {
     // Not a failure: the rules are the part that must not depend on Claude Code's CLI.
@@ -145,7 +202,7 @@ export async function claudeSection(
     return ExitCode.Ok;
   }
   if (r.reason === 'refused') {
-    for (const line of r.hint) out.error(`  plugin  nothing run: ${line}`);
+    for (const line of r.hint) out.error(`  ${label}  nothing run: ${line}`);
     return ExitCode.Failure;
   }
   if (r.reason === 'failed') {
@@ -155,10 +212,10 @@ export async function claudeSection(
   const v = (s: string | undefined): string => s ?? 'unknown';
   out.log(
     r.reason === 'installed'
-      ? `  plugin  installed ${v(r.to)} at project scope`
+      ? `  ${label}  installed ${v(r.to)} at project scope`
       : r.reason === 'updated'
-        ? `  plugin  updated ${v(r.from)} → ${v(r.to)}`
-        : `  plugin  ${v(r.to)}, already the latest the marketplace serves`,
+        ? `  ${label}  updated ${v(r.from)} → ${v(r.to)}`
+        : `  ${label}  ${v(r.to)}, already the latest the marketplace serves`,
   );
   for (const line of r.hint) out.log(`  ${line}`);
   return ExitCode.Ok;

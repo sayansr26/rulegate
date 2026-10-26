@@ -3,7 +3,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import vitestConfig from '../../../vitest.config.js';
-import { GIT_SUBCOMMANDS, StagedFileSystem } from '../src/git/index.js';
+import {
+  GIT_NO_LAZY_FETCH_ARG as CORE_NO_LAZY_FETCH,
+  GIT_SAFETY_ARGS as CORE_GIT_SAFETY_ARGS,
+  GIT_SUBCOMMANDS,
+  StagedFileSystem,
+} from '../src/git/index.js';
 import {
   GIT_SAFETY_ARGS as PLUGIN_GIT_SAFETY_ARGS,
   GIT_SUBCOMMANDS as PLUGIN_GIT_SUBCOMMANDS,
@@ -184,6 +189,13 @@ describe('zero network calls', () => {
     for (const [, sub] of text.matchAll(/run\(\s*\[\s*'([a-z-]+)'/g)) {
       expect(GIT_SUBCOMMANDS).toContain(sub);
     }
+    // T113: a read-only subcommand is not a read-only call. fsmonitor runs a program, and a
+    // partial clone fetches; both switches are on every call, and the lazy-fetch option is
+    // spliced in for a partial clone.
+    expect(CORE_GIT_SAFETY_ARGS).toEqual(['--no-optional-locks', '-c', 'core.fsmonitor=false']);
+    expect(CORE_NO_LAZY_FETCH).toBe('--no-lazy-fetch');
+    expect(text).toMatch(/\.\.\.GIT_SAFETY_ARGS, \.\.\.args\]/);
+    expect(text).toContain("GIT_NO_LAZY_FETCH: '1'");
   });
 
   it("confines the plugin's git to four read-only subcommands", async () => {
@@ -233,6 +245,10 @@ describe('zero network calls', () => {
       'plugin install rulegate@rulegate --scope project',
       'plugin enable rulegate@rulegate --scope <scope>',
       'plugin update rulegate@rulegate --scope <scope>',
+      // The mod beside it (T162): the same three, never a marketplace of its own.
+      'plugin install auto-route@rulegate --scope project',
+      'plugin enable auto-route@rulegate --scope <scope>',
+      'plugin update auto-route@rulegate --scope <scope>',
     ]);
     expect([...CLAUDE_SCOPES]).toEqual(['user', 'project', 'local']);
 
@@ -243,7 +259,15 @@ describe('zero network calls', () => {
       /\bexec(?:Sync)?\s*\(|\bexecFile(?:Sync)?\s*\(|\bfork\s*\(|shell:\s*true/,
     );
     expect(text.match(/\bspawnSync\(/g)).toHaveLength(1);
-    expect(text).toMatch(/spawnSync\('claude', \[\.\.\.args\], \{/);
+    // `claude` itself, or — for Windows' npm `.cmd` shim, which needs a shell to run — the
+    // script the shim names under this Node (T138). Never a shell, never another program.
+    expect(text).toMatch(/spawnSync\(cmd\.file, \[\.\.\.cmd\.prefix, \.\.\.args\], \{/);
+    expect(text).toMatch(/return \{ file: 'claude', prefix: \[\] \};/);
+    expect(text).toMatch(/return \{ file: process\.execPath, prefix: \[script\] \};/);
+    expect(text).toMatch(
+      /if \(\/\\\.exe\$\/i\.test\(script\)\) return \{ file: script, prefix: \[\] \};/,
+    );
+    expect(text.match(/return \{ file: /g)).toHaveLength(4);
     expect(text).toMatch(/shell: false,/);
     // Always bounded: the spawn takes `timeout`, which only defaults to TIMEOUT_MS so a test
     // can shorten it, and nothing can pass it as absent.
@@ -299,6 +323,9 @@ async function sourceFiles(): Promise<string[]> {
     path.join(repoRoot, 'packages'),
     path.join(repoRoot, 'action', 'src'),
     path.join(repoRoot, 'plugins', 'rulegate', 'src'),
+    // A mod ships its TypeScript as written; Claude Code loads it with no bundle step, so
+    // its source is the shipped code and every scan here covers it (T162).
+    path.join(repoRoot, 'plugins', 'auto-route', 'hooks'),
   ];
   const out: string[] = [];
   const walk = async (dir: string): Promise<void> => {

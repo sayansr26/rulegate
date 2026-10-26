@@ -107,6 +107,13 @@ function isObject(value: unknown): value is Record<string, JsonValue> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** `<SERVER>_MCP_<HEADER>`, upper-cased to one identifier: `github` + `Authorization` → `GITHUB_MCP_AUTHORIZATION`. */
+function headerEnvRef(serverId: string, header: string): EnvRef {
+  const part = (s: string): string => s.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const name = `${part(serverId)}_MCP_${part(header)}`.toUpperCase();
+  return envRef(/^[A-Z_]/.test(name) ? name : `_${name}`);
+}
+
 function importSecrets(
   raw: JsonValue | undefined,
   what: string,
@@ -138,8 +145,23 @@ function importSecrets(
 
     // A literal. Two cases, and only one of them is safe to rewrite.
     if (isLiteralSecret(key, value)) {
-      // T036's stated conversion: the credential becomes a reference named after the key
-      // it was found under, so nothing is written back into a git-committed file.
+      // T036's stated conversion: the credential becomes a reference, so nothing is written
+      // back into a git-committed file.
+      if (what === 'headers') {
+        // A header's variable may be named anything — Codex maps header to variable in
+        // `env_http_headers` (T088) — so it is named after the server, not `Authorization`,
+        // a name every server would share (T152). It holds the whole header value, scheme
+        // included, which is what the user has to be told: until it is set, the server is
+        // sent no credential at all.
+        const ref = headerEnvRef(serverId, key);
+        map[key] = ref;
+        const scheme = /^([A-Za-z][\w-]*)\s+\S/.exec(value)?.[1];
+        const shape = scheme === undefined ? 'the header value' : `\`${scheme} <token>\``;
+        warnings.push(
+          `${options.file}: server \`${serverId}\` had a literal credential in its \`${key}\` header; imported as \`env:${ref.name}\`. Set ${ref.name} to the whole header value — ${shape} — before the next session: until then the server is sent no ${key} header.`,
+        );
+        continue;
+      }
       map[key] = literalToEnvRef(key);
       warnings.push(
         `${options.file}: server \`${serverId}\` had a literal credential under \`${what}.${key}\`; imported as \`env:${literalToEnvRef(key).name}\`. Set that variable before running the server.`,

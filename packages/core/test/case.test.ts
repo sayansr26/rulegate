@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LINT_CONFIG } from '../src/model/lint.js';
-import { foldPath, pathKeyFor, probeCaseInsensitive } from '../src/fs/case.js';
+import {
+  foldPath,
+  pathKeyFor,
+  probeCaseInsensitive,
+  probeNormalizationInsensitive,
+} from '../src/fs/case.js';
 import { compareToDisk } from '../src/state/compare.js';
 import { applyPlan, assertDeletable } from '../src/pipeline/apply.js';
 import { verifyPlan } from '../src/pipeline/verify.js';
@@ -281,5 +286,62 @@ describe('check across a case-only rename', () => {
 
     await applyPlan(plan, fs);
     expect((await verifyPlan(plan, fs)).clean).toBe(true);
+  });
+});
+
+/**
+ * Unicode normalisation (T114): APFS resolves `café` spelled NFC and spelled NFD to one
+ * file, ext4 keeps two. Paired with its control the same way, for the same reason.
+ */
+describe('NFC and NFD spellings of one name', () => {
+  const NFC = 'café.mdc';
+  const NFD = 'café.mdc';
+
+  it('keys both spellings alike only where asked to', () => {
+    expect(pathKeyFor(false, true)(NFD)).toBe(NFC);
+    expect(pathKeyFor(true, true)(NFD.toUpperCase())).toBe(NFC);
+    expect(pathKeyFor(false)(NFD)).toBe(NFD);
+  });
+
+  it('probes the paths it is given, and says no when none can tell', async () => {
+    const folding = new MemoryFileSystem([[NFC, 'x\n']], { normalizationInsensitive: true });
+    const exact = new MemoryFileSystem([[NFC, 'x\n']]);
+    expect(await probeNormalizationInsensitive(folding, [NFC])).toBe(true);
+    expect(await probeNormalizationInsensitive(exact, [NFC])).toBe(false);
+    // ASCII names have one spelling: no answer, and no fold.
+    expect(await probeNormalizationInsensitive(folding, ['CLAUDE.md'])).toBe(false);
+    // A directory holding both spellings has two real files; that proves nothing.
+    const both = new MemoryFileSystem(
+      [
+        [NFC, 'x\n'],
+        [NFD, 'y\n'],
+      ],
+      { normalizationInsensitive: true },
+    );
+    expect(await probeNormalizationInsensitive(both, [NFC])).toBe(false);
+  });
+
+  const compare = (normalizationInsensitive: boolean) =>
+    compareToDisk(
+      {
+        schemaVersion: STATE_SCHEMA_VERSION,
+        artifacts: buildState([artifact(NFC, OLD)]).artifacts,
+      },
+      [artifact(NFD, RENDER)],
+      new MemoryFileSystem([[NFC, OLD]], { normalizationInsensitive }),
+    );
+
+  it('recognizes its own artifact under the other spelling where the filesystem folds', async () => {
+    const comparison = await compare(true);
+    expect(comparison.normalizationInsensitive).toBe(true);
+    expect(comparison.unmanaged).toEqual([]);
+    expect(comparison.orphaned).toEqual([]);
+  });
+
+  it('still reports two real files as two files where it does not', async () => {
+    const comparison = await compare(false);
+    expect(comparison.normalizationInsensitive).toBe(false);
+    expect(comparison.untracked).toEqual([NFD]);
+    expect(comparison.orphaned).toEqual([NFC]);
   });
 });

@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { delimiter, dirname, join } from 'node:path';
 import {
+  AUTO_ROUTE_ID,
   MARKETPLACE_ENTRY,
   MARKETPLACE_NAME,
   PLUGIN_ID,
@@ -41,6 +43,9 @@ export const CLAUDE_COMMANDS: readonly (readonly string[])[] = Object.freeze([
   ['plugin', 'install', PLUGIN_ID, '--scope', 'project'],
   ['plugin', 'enable', PLUGIN_ID, '--scope', SCOPE],
   ['plugin', 'update', PLUGIN_ID, '--scope', SCOPE],
+  ['plugin', 'install', AUTO_ROUTE_ID, '--scope', 'project'],
+  ['plugin', 'enable', AUTO_ROUTE_ID, '--scope', SCOPE],
+  ['plugin', 'update', AUTO_ROUTE_ID, '--scope', SCOPE],
 ]);
 
 const allowed = (args: readonly string[]): boolean =>
@@ -61,6 +66,47 @@ export interface RunResult {
   readonly stderr: string;
 }
 
+/**
+ * What an npm `.cmd` shim runs: the `"%dp0%\…\cli.js"` it hands to node, or the native
+ * `claude.exe` it calls, relative to the shim's own directory. `undefined` for anything else,
+ * which is then not run at all.
+ */
+export function shimScript(cmdText: string): string | undefined {
+  // The first quoted `%dp0%` path that is not the shim's own `node.exe` probe.
+  for (const m of cmdText.matchAll(/"%~?dp0%?\\([^"%]+\.(?:js|mjs|cjs|exe))"/gi)) {
+    const rel = m[1];
+    if (rel !== undefined && rel.toLowerCase() !== 'node.exe') return rel;
+  }
+  return undefined;
+}
+
+/**
+ * What to spawn for `claude` (T138). Elsewhere, and for a native `claude.exe` on Windows, the
+ * name itself. An npm install on Windows is a `claude.cmd` shim, which Node cannot run without
+ * a shell — so the shim is read, never executed: the script it would hand to node runs under
+ * this Node directly. Still no shell, and the argv after it is the allowlisted one.
+ */
+function claudeCommand(env: NodeJS.ProcessEnv): { file: string; prefix: string[] } {
+  if (process.platform !== 'win32') return { file: 'claude', prefix: [] };
+  const dirs = (env.PATH ?? env.Path ?? '').split(delimiter).filter((d) => d !== '');
+  for (const dir of dirs) {
+    if (existsSync(join(dir, 'claude.exe')) || existsSync(join(dir, 'claude.com'))) break;
+    const shim = join(dir, 'claude.cmd');
+    if (!existsSync(shim)) continue;
+    let rel: string | undefined;
+    try {
+      rel = shimScript(readFileSync(shim, 'utf8'));
+    } catch {
+      rel = undefined;
+    }
+    const script = rel === undefined ? undefined : join(dirname(shim), rel);
+    if (script === undefined || !existsSync(script)) continue;
+    if (/\.exe$/i.test(script)) return { file: script, prefix: [] };
+    return { file: process.execPath, prefix: [script] };
+  }
+  return { file: 'claude', prefix: [] };
+}
+
 function run(
   args: readonly string[],
   cwd: string,
@@ -68,7 +114,8 @@ function run(
   timeout: number,
 ): RunResult {
   if (!allowed(args)) throw new Error(`not an allowlisted claude command: ${args.join(' ')}`);
-  const r = spawnSync('claude', [...args], {
+  const cmd = claudeCommand(env);
+  const r = spawnSync(cmd.file, [...cmd.prefix, ...args], {
     cwd,
     env,
     encoding: 'utf8',
@@ -152,10 +199,14 @@ function list(
  * install recorded for this root first, else a user install. Claude Code's own answer, where
  * `pluginState` reads its files — the run acts on what the CLI will act on.
  */
-function installed(rows: readonly Record<string, unknown>[], root: string): Installed | undefined {
+function installed(
+  rows: readonly Record<string, unknown>[],
+  root: string,
+  id: string,
+): Installed | undefined {
   const mine = rows.filter(
     (p) =>
-      p.id === PLUGIN_ID &&
+      p.id === id &&
       typeof p.scope === 'string' &&
       SCOPES.includes(p.scope) &&
       (p.scope === 'user' ||
@@ -182,14 +233,14 @@ export interface PluginOutcome {
 }
 
 /** What to type inside Claude Code when the CLI cannot run it from here. */
-export function manualSteps(installedAlready: boolean): string[] {
+export function manualSteps(installedAlready: boolean, id = PLUGIN_ID): string[] {
   return installedAlready
     ? [
         `  /plugin marketplace update ${MARKETPLACE_NAME}`,
-        `  /plugin update ${PLUGIN_ID}`,
+        `  /plugin update ${id}`,
         '  /reload-plugins',
       ]
-    : [`  /plugin marketplace add ${MARKETPLACE_SOURCE}`, `  /plugin install ${PLUGIN_ID}`];
+    : [`  /plugin marketplace add ${MARKETPLACE_SOURCE}`, `  /plugin install ${id}`];
 }
 
 /** An install as `pluginSteps` plans from it. */
@@ -213,6 +264,7 @@ export function pluginSteps(
   before: Before | undefined,
   haveMarket: boolean,
   offAt?: string,
+  id = PLUGIN_ID,
 ): string[][] {
   const steps: string[][] = [
     haveMarket
@@ -220,9 +272,9 @@ export function pluginSteps(
       : ['plugin', 'marketplace', 'add', MARKETPLACE_SOURCE, '--scope', 'project'],
   ];
   if (before === undefined) {
-    steps.push(['plugin', 'install', PLUGIN_ID, '--scope', 'project']);
+    steps.push(['plugin', 'install', id, '--scope', 'project']);
     if (offAt !== undefined && !moreLocal('project', offAt))
-      steps.push(['plugin', 'enable', PLUGIN_ID, '--scope', offAt]);
+      steps.push(['plugin', 'enable', id, '--scope', offAt]);
   } else {
     const off =
       offAt !== undefined && moreLocal(offAt, before.scope)
@@ -230,8 +282,8 @@ export function pluginSteps(
         : offAt !== undefined || !before.enabled
           ? before.scope
           : undefined;
-    if (off !== undefined) steps.push(['plugin', 'enable', PLUGIN_ID, '--scope', off]);
-    steps.push(['plugin', 'update', PLUGIN_ID, '--scope', before.scope]);
+    if (off !== undefined) steps.push(['plugin', 'enable', id, '--scope', off]);
+    steps.push(['plugin', 'update', id, '--scope', before.scope]);
   }
   return steps;
 }
@@ -268,6 +320,7 @@ function failed(
   r: RunResult | undefined,
   before: Installed | undefined,
   done: readonly string[],
+  id = PLUGIN_ID,
 ): PluginOutcome {
   return {
     reason: 'failed',
@@ -278,7 +331,7 @@ function failed(
       what,
       ...(r === undefined ? [] : tail(r)),
       'inside Claude Code, run:',
-      ...manualSteps(before !== undefined),
+      ...manualSteps(before !== undefined, id),
     ],
   };
 }
@@ -289,7 +342,8 @@ const unread = (l: Extract<Listed, { r: RunResult }>): string =>
     : `\`${shown(l.args)}\` failed:`;
 
 /**
- * Bring `rulegate@rulegate` to the marketplace's latest for this repository:
+ * Bring `id` — `rulegate@rulegate`, or a mod from the same marketplace — to the marketplace's
+ * latest for this repository:
  *
  *   not installed        marketplace add (or update) + install, at project scope
  *   installed, disabled  refresh the marketplace, enable where it is disabled, update
@@ -297,6 +351,10 @@ const unread = (l: Extract<Listed, { r: RunResult }>): string =>
  *
  * Claude Code pins the cached version, so an install is never left where it is: a project
  * installed once otherwise stays on that version until something updates it.
+ *
+ * `refreshMarket: false` leaves the marketplace alone, for a mod installed straight after the
+ * plugin's own run has just added or updated it: a second clone of the same repository would
+ * add a network round trip and nothing else.
  */
 export async function ensurePlugin({
   root,
@@ -305,6 +363,8 @@ export async function ensurePlugin({
   guard,
   offAt,
   timeout = TIMEOUT_MS,
+  id = PLUGIN_ID,
+  refreshMarket = true,
 }: {
   root: string;
   env?: NodeJS.ProcessEnv;
@@ -315,13 +375,15 @@ export async function ensurePlugin({
   /** `pluginSteps`' `offAt`, read from the settings files — once to plan, once to confirm. */
   offAt?: () => string | undefined;
   timeout?: number;
+  id?: string;
+  refreshMarket?: boolean;
 }): Promise<PluginOutcome> {
   const version = run(['--version'], root, env, timeout);
   if (!version.ok) {
     // Only a CLI that is not there is "not on PATH"; one that is there and fails, or hangs
     // past the timeout, is broken, and saying otherwise hides it behind exit 0.
     if (!version.missing)
-      return failed(`\`${shown(['--version'])}\` failed:`, version, undefined, []);
+      return failed(`\`${shown(['--version'])}\` failed:`, version, undefined, [], id);
     return {
       reason: 'no-cli',
       from: undefined,
@@ -330,20 +392,23 @@ export async function ensurePlugin({
       hint: [
         'the `claude` CLI is not on PATH, so the plugin was not installed or updated.',
         'inside Claude Code, run:',
-        ...manualSteps(false),
+        ...manualSteps(false, id),
       ],
     };
   }
 
   const plugins = list(['plugin', 'list', '--json'], 'id', root, env, timeout);
-  if (!('rows' in plugins)) return failed(unread(plugins), plugins.r, undefined, []);
-  const found = installed(plugins.rows, root);
-  const before = found;
-  const markets = list(['plugin', 'marketplace', 'list', '--json'], 'name', root, env, timeout);
-  if (!('rows' in markets)) return failed(unread(markets), markets.r, before, []);
-  const haveMarket = markets.rows.some((m) => m.name === MARKETPLACE_NAME);
-
-  const steps = pluginSteps(before, haveMarket, offAt?.());
+  if (!('rows' in plugins)) return failed(unread(plugins), plugins.r, undefined, [], id);
+  const before = installed(plugins.rows, root, id);
+  let steps: string[][];
+  if (refreshMarket) {
+    const markets = list(['plugin', 'marketplace', 'list', '--json'], 'name', root, env, timeout);
+    if (!('rows' in markets)) return failed(unread(markets), markets.r, before, [], id);
+    const haveMarket = markets.rows.some((m) => m.name === MARKETPLACE_NAME);
+    steps = pluginSteps(before, haveMarket, offAt?.(), id);
+  } else {
+    steps = pluginSteps(before, true, offAt?.(), id).slice(1);
+  }
   const why = await guard?.(settingsScopes(steps));
   if (why !== undefined) {
     return { reason: 'refused', from: before?.version, to: undefined, done: [], hint: [why] };
@@ -352,20 +417,21 @@ export async function ensurePlugin({
   const done: string[] = [];
   for (const args of steps) {
     const r = run(args, root, env, timeout);
-    if (!r.ok) return failed(`\`${shown(args)}\` failed:`, r, before, done);
+    if (!r.ok) return failed(`\`${shown(args)}\` failed:`, r, before, done, id);
     done.push(shown(args));
   }
 
   // The steps succeeded; a result nobody could read back is still not a result.
   const again = list(['plugin', 'list', '--json'], 'id', root, env, timeout);
-  if (!('rows' in again)) return failed(unread(again), again.r, before, done);
-  const after = installed(again.rows, root);
+  if (!('rows' in again)) return failed(unread(again), again.r, before, done, id);
+  const after = installed(again.rows, root, id);
   if (after === undefined) {
     return failed(
-      `\`${shown(['plugin', 'list', '--json'])}\` does not list ${PLUGIN_ID} for this repository after the steps ran.`,
+      `\`${shown(['plugin', 'list', '--json'])}\` does not list ${id} for this repository after the steps ran.`,
       undefined,
       before,
       done,
+      id,
     );
   }
   // An enable that exited 0 and left the plugin off is the false success this check exists
@@ -380,11 +446,11 @@ export async function ensurePlugin({
       to: undefined,
       done,
       hint: [
-        `${PLUGIN_ID} is still disabled at ${stillOff} scope after the steps ran.`,
+        `${id} is still disabled at ${stillOff} scope after the steps ran.`,
         ...(file === undefined
-          ? ['inside Claude Code, run:', `  /plugin enable ${PLUGIN_ID}`, '  /reload-plugins']
+          ? ['inside Claude Code, run:', `  /plugin enable ${id}`, '  /reload-plugins']
           : [
-              `its ${file}-scope settings file sets enabledPlugins["${PLUGIN_ID}"] to false;`,
+              `its ${file}-scope settings file sets enabledPlugins["${id}"] to false;`,
               'set it to true, then run /reload-plugins in any open Claude Code session.',
             ]),
       ],

@@ -137,6 +137,53 @@ describe('rulegate check --staged', () => {
    * view stops being the commit-to-be and no exit-code test notices, because an untracked
    * path has no blob to read anyway.
    */
+  describe('a partial clone (T113)', () => {
+    let clone: string;
+    afterEach(async () => {
+      await rm(clone, { recursive: true, force: true });
+    });
+
+    /**
+     * A blobless clone of `repo` over `file://`, so a lazy fetch would really succeed: the
+     * test can only pass by not fetching. `read-tree` fills the index from the tree without
+     * downloading a single blob.
+     */
+    async function blobless(): Promise<void> {
+      await git('config', 'uploadpack.allowFilter', 'true');
+      clone = await mkdtemp(path.join(tmpdir(), 'rulegate-partial-'));
+      await runFile('git', [
+        'clone',
+        '--quiet',
+        '--no-checkout',
+        '--filter=blob:none',
+        `file://${repo}`,
+        clone,
+      ]);
+      await runFile('git', ['read-tree', 'HEAD'], { cwd: clone });
+    }
+
+    const missing = async (): Promise<string> =>
+      (
+        await runFile('git', ['rev-list', '--objects', '--missing=print', 'HEAD'], {
+          cwd: clone,
+          env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+        })
+      ).stdout;
+
+    it('refuses a blob that is not local instead of fetching it', async () => {
+      await blobless();
+      const before = await missing();
+      expect(before).toMatch(/^\?/m);
+      const fs = new StagedFileSystem(clone);
+      await expect(fs.readFile('.rulegate/rulegate.yaml')).rejects.toMatchObject({
+        code: 'E_GIT_FAILED',
+        hint: expect.stringContaining('git cat-file -p') as unknown,
+      });
+      // Nothing came down: the same objects are still missing.
+      expect(await missing()).toBe(before);
+    });
+  });
+
   describe('the staged view itself', () => {
     it('reads a CRLF blob back as LF, like every other read in the codebase', async () => {
       await keepCrlfInBlobs();

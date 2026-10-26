@@ -94,6 +94,13 @@ describe('dist/settings.js exit codes', () => {
     expect(run(['--root', sb.root, '--scope', 'project', '--apply'])).toBe(1);
     expect(readFileSync(path.join(sb.claudeDir, 'target.json'), 'utf8')).toBe('{}\n');
   });
+
+  it("exits 1 on agent-os's bannered CLAUDE.md and leaves it byte-identical (T134)", async () => {
+    const bannered = '<!-- agent-os: generated from .agent-os/ -->\n# Project\n';
+    await sb.put('CLAUDE.md', bannered);
+    expect(run(['--root', sb.root, '--scope', 'project', '--apply'])).toBe(1);
+    expect(readFileSync(path.join(sb.root, 'CLAUDE.md'), 'utf8')).toBe(bannered);
+  });
 });
 
 describe('the memory migrator against a hostile repository (T106)', () => {

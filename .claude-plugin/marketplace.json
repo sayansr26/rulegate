@@ -22,6 +22,13 @@
         "agents",
         "codebase-navigation"
       ]
+    },
+    {
+      "name": "auto-route",
+      "source": "./plugins/auto-route",
+      "description": "Picks the model and effort level for each turn from what the prompt asks for. /route pins a tier or turns routing off.",
+      "category": "productivity",
+      "keywords": ["model-routing", "effort", "mod"]
     }
   ]
 }

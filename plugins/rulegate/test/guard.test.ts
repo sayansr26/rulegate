@@ -125,6 +125,23 @@ describe('generated-file guard (T100)', () => {
       expect(await guard(at('claude.md'))).toBeUndefined();
     },
   );
+
+  // T114: APFS resolves NFC and NFD spellings of a name to one file; ext4 does not. Asked
+  // of this machine's disk, from a file the test writes under its NFC name.
+  it('denies the NFD spelling of a recorded NFC path exactly where the disk folds it', async () => {
+    const NFC = 'café.mdc';
+    const NFD = 'café.mdc';
+    await sb.put('.rulegate/rulegate.yaml', 'schemaVersion: 1\n');
+    await sb.put('.rulegate/state.json', {
+      schemaVersion: 1,
+      artifacts: [{ path: NFC, hash: 'sha256:x', adapter: 'cursor', kind: 'instructions' }],
+    });
+    await sb.put(NFC, '<!-- generated -->\n');
+    const folds = existsSync(at(NFD)) && !readdirSync(sb.root).includes(NFD);
+    expect((await guard(at(NFC)))?.kind).toBe('deny');
+    if (folds) expect((await guard(at(NFD)))?.kind).toBe('deny');
+    else expect(await guard(at(NFD))).toBeUndefined();
+  });
 });
 
 describe('cartographer reminder (T100)', () => {

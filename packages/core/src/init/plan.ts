@@ -1,5 +1,6 @@
 import { formatterWarnings } from './formatters.js';
 import { backupSecretWarnings } from './backup-secrets.js';
+import { repoPattern } from '../doctor/resolve.js';
 import { sizeCapWarnings } from './size-caps.js';
 import { RulegateError } from '../model/errors.js';
 import {
@@ -26,7 +27,12 @@ import { detectTools } from '../detect/engine.js';
 import { collectImports } from '../import/collect.js';
 import { filesOnly, notAFile } from '../fs/files-only.js';
 import { maskPaths } from '../fs/mask.js';
-import { pathKeyFor, probeCaseInsensitive, type PathKey } from '../fs/case.js';
+import {
+  pathKeyFor,
+  probeCaseInsensitive,
+  probeNormalizationInsensitive,
+  type PathKey,
+} from '../fs/case.js';
 import { ADAPTER_API_VERSION } from '../adapter/context.js';
 import { ORDER_STEP, dedupeImported, type ImportConflict } from '../import/dedupe.js';
 import { claimRuleId } from '../import/rule.js';
@@ -283,7 +289,10 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   for (const skill of canonical.skills) {
     for (const [path, contents] of serializeSkill(skill)) skillFiles.set(path, contents);
   }
-  const canonicalFiles = await classify(serialized, skillFiles, fs);
+  const canonicalFiles = [
+    ...(await classify(serialized, skillFiles, fs)),
+    await backupIgnoreFile(fs),
+  ];
   errors.push(...(await canonicalInTheWay(fs, serialized, skillFiles)));
   const written = await parse({
     fs: new MemoryFileSystem([...serialized, ...skillFiles]),
@@ -308,7 +317,10 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
     for (const rule of source.rules) importedFrom.add(rule.source.file);
     for (const server of source.mcpServers) importedFrom.add(server.source.file);
   }
-  const key = pathKeyFor(await probeCaseInsensitive(fs));
+  const key = pathKeyFor(
+    await probeCaseInsensitive(fs),
+    await probeNormalizationInsensitive(fs, [...generatedPaths, ...importedFrom]),
+  );
   const verified = [...generated.keys()].filter((path) => !inferred.has(path));
   // Through `filesOnly`: a path `notFiles` refused is already an error, and each check below
   // would otherwise throw on it with a bare errno before the refusal could be reported.
@@ -320,7 +332,13 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   };
   warnings.push(...unimported.map((file) => unimportedWarning(file, inferredBy(file))));
   warnings.push(...(await formatterWarnings({ fs: probe, generated: generatedPaths })));
-  warnings.push(...(await backupSecretWarnings({ fs: probe, taking: generatedPaths })));
+  warnings.push(...(await nestedLeftAlone(probe, adapters, detected)));
+  // `.rulegate/.gitignore` keeps the backups out of every commit (T151) unless the user
+  // already has one that says otherwise, so the warning is only for that case.
+  const backupIgnored = (await fs.tryReadFile(BACKUP_IGNORE_PATH)) === undefined;
+  if (!backupIgnored) {
+    warnings.push(...(await backupSecretWarnings({ fs: probe, taking: generatedPaths })));
+  }
   warnings.push(
     ...(await sizeCapWarnings({
       fs: probe,
@@ -596,6 +614,70 @@ function canonicalFrom(
     skills,
     commands,
     agents,
+  };
+}
+
+/**
+ * Instruction files below the root that a detected tool reads, which `init` leaves alone
+ * (T153). It imports the repository root only — a package's own `AGENTS.md` belongs to a
+ * nested `.rulegate/` level, which is the user's to create — and before this said nothing at
+ * all, so a monorepo's `packages/api/AGENTS.md` was neither imported nor mentioned. Which
+ * tool reads it comes from each adapter's documented `nesting`, the answer `doctor` gives.
+ */
+async function nestedLeftAlone(
+  fs: ReadOnlyFileSystem,
+  adapters: readonly Adapter[],
+  detected: readonly ToolId[],
+): Promise<RulegateError[]> {
+  const readers = new Map<string, Set<string>>();
+  for (const adapter of adapters) {
+    if (!detected.includes(adapter.name)) continue;
+    for (const entry of adapter.docs.files) {
+      if (entry.role !== 'instructions' || entry.scope === 'global') continue;
+      if (entry.nesting === undefined || entry.nesting === 'root-only') continue;
+      if (entry.pattern.includes('/')) continue;
+      for (const path of await fs.glob(repoPattern(entry))) {
+        // The root copy is init's to import; anything under a `.rulegate/` is Rulegate's own.
+        if (!path.includes('/') || /(^|\/)\.rulegate\//.test(path)) continue;
+        const tools = readers.get(path) ?? new Set<string>();
+        tools.add(adapter.name);
+        readers.set(path, tools);
+      }
+    }
+  }
+  return [...readers.keys()].sort(compareCodepoint).map((path) => {
+    const dir = path.slice(0, path.lastIndexOf('/'));
+    const tools = [...(readers.get(path) ?? [])].sort(compareCodepoint).join(', ');
+    return new RulegateError({
+      code: 'W_NESTED_NOT_IMPORTED',
+      message: `${path} is read by ${tools} for ${dir}/, and was left as it is: init imports the repository root only`,
+      source: { file: path },
+      hint: `to generate it from Rulegate, give ${dir}/ its own .rulegate/ (a nested level) holding its rules; until then it stays hand-written`,
+    });
+  });
+}
+
+/** Where `init` keeps `.rulegate/backup/` out of git (T151). */
+export const BACKUP_IGNORE_PATH = '.rulegate/.gitignore';
+
+/**
+ * `.rulegate/.gitignore`, ignoring `backup/` (T151). The backups are copies of what git
+ * already holds — and, when an imported config carried a literal secret, the only plaintext
+ * copy left — so they stay on the machine that made them; `restore` reads them from there.
+ * A source file like `rulegate.yaml`, not a generated one: `sync` and `check` never read or
+ * write it, so a repository adopted before it existed shows no drift, and the user may edit or
+ * delete it. One that already exists is left exactly as it is.
+ */
+async function backupIgnoreFile(fs: ReadOnlyFileSystem): Promise<CanonicalFile> {
+  const contents =
+    '# Written by `rulegate init`. The originals of files Rulegate took over stay on this\n' +
+    '# machine for `rulegate restore`; they are copies of what git already holds.\n' +
+    'backup/\n';
+  const existing = await fs.tryReadFile(BACKUP_IGNORE_PATH);
+  return {
+    path: BACKUP_IGNORE_PATH,
+    contents: existing ?? contents,
+    kind: existing === undefined ? 'create' : 'leave-alone',
   };
 }
 

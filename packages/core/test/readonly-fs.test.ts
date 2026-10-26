@@ -60,6 +60,37 @@ describe('createReadOnlyFileSystem', () => {
  * name. A directory there is not that tool's file, and must not throw EISDIR out of `init`
  * (T148).
  */
+describe('maskPaths (T133)', () => {
+  let root: string;
+  beforeEach(async () => {
+    root = await mkdtemp(path.join(tmpdir(), 'rulegate-mask-'));
+    await mkdir(path.join(root, '.clinerules/nested'), { recursive: true });
+    await writeFile(path.join(root, '.clinerules/style.md'), 'Tabs.\n');
+    await writeFile(path.join(root, '.clinerules/nested/deep.md'), 'Deep.\n');
+    await writeFile(path.join(root, '.clinerules-keep.md'), 'Kept.\n');
+  });
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it('hides everything under a hidden directory, through every read', async () => {
+    const fs = maskPaths(new NodeFileSystem(root), ['.clinerules/']);
+    expect(await fs.exists('.clinerules')).toBe(false);
+    expect(await fs.exists('.clinerules/style.md')).toBe(false);
+    expect(await fs.tryReadFile('.clinerules/nested/deep.md')).toBeUndefined();
+    await expect(fs.readFile('.clinerules/style.md')).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(fs.readFileRaw('.clinerules/style.md')).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await fs.listDir('.clinerules')).toEqual([]);
+    expect(await fs.glob('.clinerules/**/*.md')).toEqual([]);
+    expect((await fs.listDir('')).map((e) => e.name)).not.toContain('.clinerules');
+  });
+
+  it('hides a prefix only at a path boundary', async () => {
+    const fs = maskPaths(new NodeFileSystem(root), ['.clinerules']);
+    expect(await fs.tryReadFile('.clinerules-keep.md')).toBe('Kept.\n');
+  });
+});
+
 describe('filesOnly', () => {
   let root: string;
 

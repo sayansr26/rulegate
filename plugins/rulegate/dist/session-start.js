@@ -118,6 +118,13 @@ var GIT_DENY = Object.freeze([
   "Bash(git worktree *)"
 ]);
 var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
+var LEGACY_AUTO_ROUTE_ID = "auto-route@sayan-plugins";
+var LEGACY_AUTO_HANDOFF_ID = "auto-handoff@sayan-plugins";
+var LEGACY_MARKETPLACE_PLUGINS = Object.freeze([
+  LEGACY_PLUGIN_ID,
+  LEGACY_AUTO_ROUTE_ID,
+  LEGACY_AUTO_HANDOFF_ID
+]);
 function enabledAt(root, claudeDir, id) {
   for (const [scope, p] of [
     ["local", join2(root, ".claude/settings.local.json")],

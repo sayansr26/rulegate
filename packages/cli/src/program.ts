@@ -47,7 +47,9 @@ export function buildProgram(): Command {
     // `init` makes no network call. Without either flag the commands are printed.
     .option('--plugin', 'with --yes, install or update the Claude Code plugin via `claude plugin`')
     .option('--no-plugin', 'hide the Claude Code section')
-    .action(async (opts: { yes?: boolean }, cmd: Command) => {
+    // agent-os init installed auto-route by default, so a migrated project keeps it (T162).
+    .option('--no-auto-route', 'leave the auto-route mod out of the plugin step')
+    .action(async (opts: { yes?: boolean; autoRoute?: boolean }, cmd: Command) => {
       const globals = cmd.optsWithGlobals<{ cwd?: string; quiet?: boolean; color?: boolean }>();
       const { root, searched } = resolveGlobalCwd(globals.cwd);
       const code = await runInit({
@@ -55,6 +57,7 @@ export function buildProgram(): Command {
         ...(searched ? { announceRoot: true } : {}),
         ...(opts.yes === undefined ? {} : { yes: opts.yes }),
         ...triState(cmd, 'plugin'),
+        ...(opts.autoRoute === false ? { autoRoute: false } : {}),
         ...(globals.quiet === undefined ? {} : { quiet: globals.quiet }),
         ...(globals.color === undefined ? {} : { color: globals.color }),
       });

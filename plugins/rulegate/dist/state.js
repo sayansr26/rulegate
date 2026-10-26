@@ -133,8 +133,16 @@ var GIT_DENY = Object.freeze([
 ]);
 var PLUGIN_ID = "rulegate@rulegate";
 var MARKETPLACE_NAME = "rulegate";
+var AUTO_ROUTE_ID = "auto-route@rulegate";
 var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
 var LEGACY_MARKETPLACE = "sayan-plugins";
+var LEGACY_AUTO_ROUTE_ID = "auto-route@sayan-plugins";
+var LEGACY_AUTO_HANDOFF_ID = "auto-handoff@sayan-plugins";
+var LEGACY_MARKETPLACE_PLUGINS = Object.freeze([
+  LEGACY_PLUGIN_ID,
+  LEGACY_AUTO_ROUTE_ID,
+  LEGACY_AUTO_HANDOFF_ID
+]);
 var MARKETPLACE_ENTRY = {
   source: { source: "github", repo: "sayansr26/rulegate" }
 };
@@ -168,13 +176,22 @@ function ruleTarget(scope, root, claudeDir) {
   if (scope === "user") return join(claudeDir, "CLAUDE.md");
   return isRulegateProject(root) ? join(root, TASK_RULE_FILE) : join(root, "CLAUDE.md");
 }
+function localMarketplace(settings) {
+  if (!isRecord(settings) || !isRecord(settings.extraKnownMarketplaces)) return void 0;
+  const entry = settings.extraKnownMarketplaces[MARKETPLACE_NAME];
+  const source = isRecord(entry) && isRecord(entry.source) ? entry.source : void 0;
+  if (source === void 0 || source.source !== "directory" && source.source !== "file") {
+    return void 0;
+  }
+  return typeof source.path === "string" ? source.path : String(source.source);
+}
 function swapMarketplace(markets) {
   const out = {};
   for (const [k, v] of Object.entries(markets)) if (k !== LEGACY_MARKETPLACE) out[k] = v;
   if (!(MARKETPLACE_NAME in out)) out[MARKETPLACE_NAME] = MARKETPLACE_ENTRY;
   return out;
 }
-function planSettings(text, { todo = true, retireMarketplace } = {}) {
+function planSettings(text, { todo = true, retireMarketplace, marketplaceUsers, flagLocalMarketplace } = {}) {
   let settings = {};
   if (text !== void 0) {
     try {
@@ -186,8 +203,14 @@ function planSettings(text, { todo = true, retireMarketplace } = {}) {
     }
   }
   const markets = isRecord(settings.extraKnownMarketplaces) ? settings.extraKnownMarketplaces : void 0;
-  const marketplace = retireMarketplace === void 0 || markets === void 0 || !(LEGACY_MARKETPLACE in markets) ? void 0 : retireMarketplace ? "retire" : "blocked";
-  const withMarket = marketplace === void 0 ? {} : { marketplace };
+  const user = marketplaceUsers?.find((id) => id === LEGACY_AUTO_HANDOFF_ID) ?? marketplaceUsers?.[0];
+  const retire = marketplaceUsers === void 0 ? retireMarketplace : user === void 0;
+  const marketplace = retire === void 0 || markets === void 0 || !(LEGACY_MARKETPLACE in markets) ? void 0 : user === LEGACY_AUTO_HANDOFF_ID ? "kept" : retire ? "retire" : "blocked";
+  const local = flagLocalMarketplace === true ? localMarketplace(settings) : void 0;
+  const withMarket = {
+    ...marketplace === void 0 ? {} : { marketplace, ...user === void 0 ? {} : { marketplaceUser: user } },
+    ...local === void 0 ? {} : { localMarketplace: local }
+  };
   const perms = isRecord(settings.permissions) ? settings.permissions : {};
   const deny = Array.isArray(perms.deny) ? perms.deny.filter((r) => typeof r === "string") : [];
   const have = new Set(deny.map(normRule));
@@ -292,11 +315,16 @@ ${TASK_RULE}
 }
 function planScope(scope, root, claudeDir) {
   const settingsFile = settingsPath(scope, root, claudeDir);
-  const retireMarketplace = scope === "project" ? enabledFlag(root, claudeDir, LEGACY_PLUGIN_ID) !== true && enabledIn(settingsFile, LEGACY_PLUGIN_ID) !== true : void 0;
+  const marketplaceUsers = scope === "project" ? LEGACY_MARKETPLACE_PLUGINS.filter(
+    (id) => enabledFlag(root, claudeDir, id) === true || enabledIn(settingsFile, id) === true
+  ) : void 0;
   return {
     scope,
     settingsFile,
-    settings: planSettings(read(settingsFile), { retireMarketplace }),
+    settings: planSettings(read(settingsFile), {
+      marketplaceUsers,
+      flagLocalMarketplace: scope === "project"
+    }),
     rule: planTaskRule(scope, root, claudeDir)
   };
 }
@@ -360,8 +388,34 @@ var BACKUP_DIR = `${RULEGATE_DIR}/backup`;
 function foldPath(relPath) {
   return relPath.toLowerCase();
 }
-function pathKeyFor(caseInsensitive) {
+function foldUnicode(relPath) {
+  return relPath.normalize("NFC");
+}
+function pathKeyFor(caseInsensitive, normalizationInsensitive = false) {
+  if (caseInsensitive && normalizationInsensitive) return (p) => foldPath(foldUnicode(p));
+  if (normalizationInsensitive) return foldUnicode;
   return caseInsensitive ? foldPath : (relPath) => relPath;
+}
+async function probeNormalizationInsensitive(fs, candidates) {
+  for (const path2 of candidates) {
+    const nfc = path2.normalize("NFC");
+    const nfd = path2.normalize("NFD");
+    if (nfc === nfd) continue;
+    const other = path2 === nfc ? nfd : nfc;
+    try {
+      if (!await fs.exists(path2)) continue;
+      const slash = path2.lastIndexOf("/");
+      const dir = slash === -1 ? "" : path2.slice(0, slash);
+      const names = new Set((await fs.listDir(dir)).map((e) => e.name));
+      const name = path2.slice(slash + 1);
+      const otherName = other.slice(other.lastIndexOf("/") + 1);
+      if (names.has(name) && names.has(otherName)) continue;
+      return await fs.exists(other);
+    } catch {
+      continue;
+    }
+  }
+  return false;
 }
 function flipCase(name) {
   let flipped = "";
@@ -493,7 +547,11 @@ async function judge(abs) {
   if (owner === void 0) return void 0;
   const rel = within(owner.root, abs);
   if (rel === void 0) return void 0;
-  const key = pathKeyFor(await probeCaseInsensitive(probeView(owner.root)));
+  const view = probeView(owner.root);
+  const key = pathKeyFor(
+    await probeCaseInsensitive(view),
+    await probeNormalizationInsensitive(view, [...owner.state.artifacts.map((a) => a.path), rel])
+  );
   if (key(rel) === key(STATE_PATH) || key(rel).startsWith(key(".rulegate/backup/"))) {
     return {
       kind: "deny",
@@ -543,6 +601,16 @@ function unreadableState(abs) {
   const text = read(state);
   return text?.trim() !== "" && parseState(text) === void 0;
 }
+var AGENT_OS_BANNER = "agent-os: generated from .agent-os/";
+function agentOsGenerated(text) {
+  for (const line of text.replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    const t = line.trim();
+    if (t === "") continue;
+    if (!t.startsWith("<!--")) return false;
+    if (t.includes(AGENT_OS_BANNER)) return true;
+  }
+  return false;
+}
 async function blocked(scope, root, claudeDir, abs, { bytes = false } = {}) {
   if (scope === "project") {
     if (inside(claudeDir, abs)) {
@@ -568,6 +636,9 @@ async function blocked(scope, root, claudeDir, abs, { bytes = false } = {}) {
   }
   if (!bytes && exists(abs) && !isUtf8File(abs)) {
     return "not UTF-8 text \u2014 rewriting it would replace the bytes it cannot decode";
+  }
+  if (!bytes && exists(abs) && agentOsGenerated(read(abs) ?? "")) {
+    return "generated by agent-os (its banner is at the top) \u2014 run `npx rulegate init` first, which imports .agent-os/ and takes the file over";
   }
   if (unreadableState(abs)) {
     return ".rulegate/state.json does not parse, so ownership cannot be checked \u2014 fix it first";
@@ -876,9 +947,10 @@ async function setupState(root, claudeDir, { expect } = {}) {
     const settingsRefused = refused.find((r) => r.item === "settings");
     const ruleRefused = refused.find((r) => r.item === "rule");
     const where = scope === "user" ? "~/.claude/settings.json" : ".claude/settings.json";
-    if (scope === "project" && p.settings.marketplace !== void 0) {
+    if (scope === "project" && p.settings.marketplace !== void 0 && p.settings.marketplace !== "kept") {
       marketplace = {
         state: p.settings.marketplace,
+        user: p.settings.marketplaceUser,
         fix: settingsRefused === void 0 ? "/rulegate:init settings" : byHand(settingsRefused.reason)
       };
     }
@@ -952,7 +1024,7 @@ async function setupState(root, claudeDir, { expect } = {}) {
       "legacy-marketplace",
       `.claude/settings.json declares ${MARKETPLACE_NAME}, not ${LEGACY_MARKETPLACE}`,
       false,
-      marketplace.state === "retire" ? marketplace.fix : `${disableCommand(legacy.plugin ?? "project")}, then ${marketplace.fix}`
+      marketplace.state === "retire" ? marketplace.fix : marketplace.user === LEGACY_AUTO_ROUTE_ID ? `claude plugin disable ${LEGACY_AUTO_ROUTE_ID} --scope project, then rulegate init --plugin --yes (installs ${AUTO_ROUTE_ID}), then ${marketplace.fix}` : `${disableCommand(legacy.plugin ?? "project")}, then ${marketplace.fix}`
     );
   }
   const setUp = legacy.found || AGENTS_SECTION.test(claudeMd ?? "") || ls(join6(root, ".claude/agent-memory")).some((d) => d.startsWith("rulegate-")) || read(join6(root, ".claude/rulegate.json")) !== void 0;

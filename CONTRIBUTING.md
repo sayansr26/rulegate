@@ -19,7 +19,14 @@ pnpm test
 ```
 
 Node ≥ 20 (this repository develops on 22; see `.nvmrc`) and pnpm 10.18.3, which
-`packageManager` pins. There is no bundler: the build is `tsc`, per package.
+`packageManager` pins. The build is `tsc`, per package; the GitHub Action and the Claude Code
+plugin are also bundled with esbuild into committed `dist/` files (`pnpm bundles` checks them).
+
+**Adding a workspace package — an adapter, say — run `pnpm install` online, never
+`--offline`.** An offline install can only keep the lockfile entries already in your store, so
+it drops the platform-specific ones (esbuild's per-OS binaries, an optional peer) for every
+platform but yours, and the lockfile that arrives in CI no longer installs on the others. After
+the install, `git diff pnpm-lock.yaml` should show the new importer and nothing removed.
 
 ## The commands
 
@@ -31,7 +38,8 @@ Node ≥ 20 (this repository develops on 22; see `.nvmrc`) and pnpm 10.18.3, whi
 | `pnpm test:watch`      | Vitest, watching                                                   |
 | `pnpm lint`            | ESLint, including the rules that enforce the invariants below      |
 | `pnpm format`          | Prettier, check only (`format:fix` writes)                         |
-| `pnpm verify`          | lint ▸ build ▸ typecheck ▸ test — what a PR has to pass            |
+| `pnpm verify`          | lint ▸ build ▸ typecheck ▸ test ▸ bundles — what a PR has to pass  |
+| `pnpm bundles`         | The Action and plugin bundles are fresh; the plugins are valid     |
 | `pnpm fixtures:update` | Regenerate golden fixtures. Needs `pnpm build` first, and `--yes`. |
 | `pnpm smoke`           | Pack every workspace package and install the CLI from the tarballs |
 | `pnpm bench`           | Time `sync` and `check` on generated repos; fails over budget      |

@@ -16,9 +16,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GIT_DENY, TODO_ENV } from '@rulegate/claude';
-import { runInit } from '../src/commands/init.js';
+import { runInit as runInitWithMod } from '../src/commands/init.js';
 import { runClaudeSettings } from '../src/commands/claude.js';
-import { ensurePlugin } from '../src/claude/index.js';
+import { ensurePlugin, shimScript } from '../src/claude/index.js';
 import { ExitCode } from '../src/ui/exit.js';
 import { readVersion } from '../src/version.js';
 import { buildProgram } from '../src/program.js';
@@ -94,6 +94,8 @@ interface StubState {
   enableNoop?: boolean;
   /** A subcommand word sequence that hangs instead of answering. */
   hang?: string;
+  /** auto-route@rulegate's install (T162); absent is not installed. */
+  mod?: { scope: string; version: string; enabled: boolean } | null;
 }
 
 /**
@@ -113,6 +115,7 @@ fs.appendFileSync(dir + '/calls.jsonl', JSON.stringify({ args, cwd: process.cwd(
 const st = JSON.parse(fs.readFileSync(dir + '/state.json', 'utf8'));
 const save = () => fs.writeFileSync(dir + '/state.json', JSON.stringify(st));
 const cmd = args.filter((a) => !a.startsWith('-')).join(' ');
+const isMod = args.includes('auto-route@rulegate');
 if (typeof st.fail === 'string' && cmd.startsWith(st.fail)) { process.stderr.write('boom: ' + cmd + '\\n'); process.exit(1); }
 if (typeof st.hang === 'string' && cmd.startsWith(st.hang)) { setTimeout(() => {}, 60000); return; }
 if (args[0] === '--version') { console.log('2.1.300 (Claude Code)'); process.exit(0); }
@@ -138,11 +141,18 @@ const effective = (i) => {
 if (cmd === 'plugin list' && st.listOutput !== undefined) console.log(st.listOutput);
 else if (cmd === 'plugin list') {
   const i = st.installed;
-  console.log(JSON.stringify(i ? [{ id: 'rulegate@rulegate', scope: i.scope, version: i.version, enabled: effective(i), projectPath: process.cwd() }] : []));
+  const m = st.mod;
+  console.log(JSON.stringify([
+    ...(i ? [{ id: 'rulegate@rulegate', scope: i.scope, version: i.version, enabled: effective(i), projectPath: process.cwd() }] : []),
+    ...(m ? [{ id: 'auto-route@rulegate', scope: m.scope, version: m.version, enabled: m.enabled, projectPath: process.cwd() }] : []),
+  ]));
 } else if (cmd === 'plugin marketplace list') {
   console.log(JSON.stringify(st.markets.map((name) => ({ name, source: 'github' }))));
 } else if (cmd.startsWith('plugin marketplace add')) { st.markets.push('rulegate'); save(); }
 else if (cmd.startsWith('plugin marketplace update')) {}
+else if (isMod && cmd.startsWith('plugin install')) { st.mod = { scope: 'project', version: '0.1.0', enabled: true }; save(); }
+else if (isMod && cmd.startsWith('plugin enable')) { st.mod.enabled = true; save(); }
+else if (isMod && cmd.startsWith('plugin update')) { save(); }
 else if (cmd.startsWith('plugin install')) {
   st.installed = { scope: 'project', version: st.serves, enabled: true }; save();
   if (st.precedence) enableIn('project');
@@ -157,7 +167,37 @@ else { process.stderr.write('unknown ' + cmd + '\\n'); process.exit(3); }
   // CommonJS: the stub has no extension, and no package.json above it says otherwise.
   await writeFile(file, script);
   await chmod(file, 0o755);
+  // On Windows, the shape npm installs: a `.cmd` shim naming the script it hands to node
+  // (T138). Node runs a `.cmd` only through a shell, so the CLI must read the shim instead.
+  if (process.platform === 'win32') {
+    const cli = path.join(bin, 'node_modules/@anthropic-ai/claude-code/cli.js');
+    await mkdir(path.dirname(cli), { recursive: true });
+    await writeFile(cli, script);
+    await writeFile(path.join(bin, 'claude.cmd'), NPM_SHIM);
+  }
 }
+
+/** npm's cmd-shim for `claude`, as `npm install -g @anthropic-ai/claude-code` writes it. */
+const NPM_SHIM = [
+  '@ECHO off',
+  'GOTO start',
+  ':find_dp0',
+  'SET dp0=%~dp0',
+  'EXIT /b',
+  ':start',
+  'SETLOCAL',
+  'CALL :find_dp0',
+  '',
+  'IF EXIST "%dp0%\\node.exe" (',
+  '  SET "_prog=%dp0%\\node.exe"',
+  ') ELSE (',
+  '  SET "_prog=node"',
+  '  SET PATHEXT=%PATHEXT:;.JS;=;%',
+  ')',
+  '',
+  'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*',
+  '',
+].join('\r\n');
 
 async function calls(): Promise<{ args: string[]; cwd: string }[]> {
   const file = path.join(sandbox, 'stub', 'calls.jsonl');
@@ -181,6 +221,10 @@ const PROBES = ['--version', 'plugin list --json', 'plugin marketplace list --js
 const posix = it.skipIf(process.platform === 'win32');
 
 describe('rulegate init — Claude Code section (T107)', () => {
+  // The plugin's own steps, pinned exactly; the auto-route mod beside them is T162's below.
+  const runInit = (o: Parameters<typeof runInitWithMod>[0]) =>
+    runInitWithMod({ autoRoute: false, ...o });
+
   posix('prints the setup state and the plugin commands, and runs nothing', async () => {
     await seedClaude();
     await stubClaude({ installed: null, markets: [], serves: VERSION });
@@ -626,6 +670,108 @@ describe('rulegate init — Claude Code section (T107)', () => {
       expect(printed()).toContain('`claude plugin marketplace list --json` failed:');
       expect(await argv()).toEqual(PROBES);
     });
+  });
+});
+
+describe('claude on Windows: the npm shim (T138)', () => {
+  it('reads the script an npm shim runs, and nothing else', () => {
+    expect(shimScript(NPM_SHIM)).toBe('node_modules\\@anthropic-ai\\claude-code\\cli.js');
+    // The older cmd-shim spelling, and one that calls a native binary.
+    expect(shimScript('@"%~dp0\\node_modules\\pkg\\cli.mjs" %*')).toBe(
+      'node_modules\\pkg\\cli.mjs',
+    );
+    expect(shimScript('"%dp0%\\node_modules\\pkg\\bin\\claude.exe" %*')).toBe(
+      'node_modules\\pkg\\bin\\claude.exe',
+    );
+    expect(shimScript('@echo off\r\nclaude-real %*\r\n')).toBeUndefined();
+  });
+
+  it.runIf(process.platform === 'win32')(
+    'runs the install steps through claude.cmd, without a shell',
+    async () => {
+      await seedClaude();
+      await stubClaude({ installed: null, markets: [], serves: VERSION });
+      expect(await runInitWithMod({ cwd: repo, yes: true, plugin: true, autoRoute: false })).toBe(
+        ExitCode.Ok,
+      );
+      expect(await argv()).toEqual([
+        ...PROBES,
+        'plugin marketplace add sayansr26/rulegate --scope project',
+        'plugin install rulegate@rulegate --scope project',
+        'plugin list --json',
+      ]);
+    },
+  );
+});
+
+describe('rulegate init — the auto-route mod (T162)', () => {
+  posix(
+    'plain init names auto-route and prints its install, one marketplace step for both',
+    async () => {
+      await seedClaude();
+      await stubClaude({ installed: null, markets: [], serves: VERSION });
+      expect(await runInitWithMod({ cwd: repo })).toBe(ExitCode.Ok);
+      const text = printed();
+      expect(text).toContain('plugin  auto-route@rulegate  not installed');
+      expect(text).toContain('    claude plugin install auto-route@rulegate --scope project\n');
+      expect(text.match(/claude plugin marketplace add/g)).toHaveLength(1);
+      expect(text).toContain('--no-auto-route leaves auto-route out.');
+      expect(await calls()).toEqual([]);
+    },
+  );
+
+  posix(
+    '`--plugin --yes` installs it after the plugin, from the marketplace just added',
+    async () => {
+      await seedClaude();
+      await stubClaude({ installed: null, markets: [], serves: VERSION });
+      expect(await runInitWithMod({ cwd: repo, yes: true, plugin: true })).toBe(ExitCode.Ok);
+      expect(await argv()).toEqual([
+        ...PROBES,
+        'plugin marketplace add sayansr26/rulegate --scope project',
+        'plugin install rulegate@rulegate --scope project',
+        'plugin list --json',
+        // No second marketplace list or update: the plugin's run has just refreshed it.
+        '--version',
+        'plugin list --json',
+        'plugin install auto-route@rulegate --scope project',
+        'plugin list --json',
+      ]);
+      expect(printed()).toContain('auto-route  installed 0.1.0 at project scope');
+    },
+  );
+
+  posix('an installed auto-route is updated where it is installed', async () => {
+    await seedClaude();
+    await stubClaude({
+      installed: { scope: 'project', version: VERSION, enabled: true },
+      markets: ['rulegate'],
+      serves: VERSION,
+      mod: { scope: 'user', version: '0.1.0', enabled: true },
+    });
+    expect(await runInitWithMod({ cwd: repo, yes: true, plugin: true })).toBe(ExitCode.Ok);
+    expect(await argv()).toContain('plugin update auto-route@rulegate --scope user');
+    expect(await argv()).not.toContain('plugin install auto-route@rulegate --scope project');
+  });
+
+  posix('`--no-auto-route` leaves it out of the plan and the run', async () => {
+    await seedClaude();
+    await stubClaude({ installed: null, markets: [], serves: VERSION });
+    await buildProgram().parseAsync(
+      ['--cwd', repo, '--no-color', 'init', '--yes', '--plugin', '--no-auto-route'],
+      { from: 'user' },
+    );
+    expect(process.exitCode).toBe(ExitCode.Ok);
+    expect((await argv()).some((a) => a.includes('auto-route'))).toBe(false);
+    expect(printed()).not.toContain('auto-route@rulegate');
+    process.exitCode = undefined;
+  });
+
+  posix('a plugin install that fails never goes on to the mod', async () => {
+    await seedClaude();
+    await stubClaude({ installed: null, markets: [], serves: VERSION, fail: 'plugin install' });
+    expect(await runInitWithMod({ cwd: repo, yes: true, plugin: true })).toBe(ExitCode.Failure);
+    expect((await argv()).some((a) => a.includes('auto-route'))).toBe(false);
   });
 });
 

@@ -63,9 +63,26 @@ All notable changes to this project are recorded here. This project follows
   `Artifact.bytes`, `AdapterDocs.commands`, `AdapterDocs.agents`, and the `Skill`, `SkillAsset`, `SkillsSupport`,
   `Command`, `CommandsSupport`, `Agent`, `AgentFolder` and `AgentsSupport` types join the adapter
   kit — additive, per `docs/adapter-api-v1.md`.
+- **auto-route 0.1.0 joins the `rulegate` marketplace**, ported from agent-os. It is a Claude
+  Code mod that picks the model and effort level for each turn from what the prompt asks for —
+  Haiku for a lookup, Sonnet for a regular task, Opus for design or debugging, Opus at max effort
+  when asked to think hard — and leaves subagents alone. `/route` pins a tier or turns it off.
+  `rulegate init --plugin` installs it beside `rulegate@rulegate` at project scope, as
+  `agent-os init` did; `--no-auto-route` leaves it out.
 
 ### Changed
 
+- **`init`'s dry run shows what changes in each file it would rewrite.** Under "then `rulegate
+sync` would write", every existing file now gets the same diff `check` prints — `+` lines are
+  what `--yes` writes — or "content unchanged". Before, it only named the files, and the real
+  preview was `git diff` after the fact.
+- **`.rulegate/backup/` stays out of git by default.** `init` now writes `.rulegate/.gitignore`
+  ignoring `backup/`: the backups are copies of what git already holds, and, when an imported
+  config carried a literal credential, its only plaintext copy. `restore` reads them from the
+  machine that made them. The file is yours afterwards; `sync` and `check` never touch it, so a
+  repository adopted earlier shows no drift. `init`'s plan now also lists `.rulegate/state.json`,
+  and it ends by saying what to commit. `W_BACKUP_SECRET` fires only where an existing
+  `.rulegate/.gitignore` is left as it was.
 - **`check` and `sync` are about three times faster on large repositories.** Each generated
   file is now read once instead of twice, in parallel rather than one at a time, and finding
   nested `.rulegate/` levels walks the repository once instead of twice. On fifty packages
@@ -73,6 +90,72 @@ All notable changes to this project are recorded here. This project follows
   `check`. Output is unchanged byte for byte. A benchmark in CI (`pnpm bench`) now fails if
   `check` or a no-op `sync` goes over 1s on a typical repository or 2s on fifty packages, or
   grows faster than the number of files.
+- **Migrating from agent-os no longer orphans its mods.** The settings pass removed agent-os's
+  `sayan-plugins` marketplace as soon as agent-os itself was off, while `auto-route@sayan-plugins`
+  or `auto-handoff@sayan-plugins` could still be loading from it. It now waits until agent-os's
+  auto-route is disabled too, and says to run `rulegate init --plugin --yes` for
+  `auto-route@rulegate` in its place. A project that still uses auto-handoff, which Rulegate does
+  not ship, keeps `sayan-plugins` for good, and that counts as set up rather than as something
+  missing.
+
+### Fixed
+
+- **Windsurf reads `AGENTS.md` in subdirectories, and Rulegate now says so.** Its documentation
+  scopes a subdirectory's `AGENTS.md` to that directory, but the Windsurf adapter recorded the
+  root copy only, so `doctor` told a monorepo that no detected tool read
+  `packages/api/AGENTS.md`. `init`, which imports the repository root only, also left such a
+  file without a word; it now names each one a detected tool reads (`W_NESTED_NOT_IMPORTED`)
+  and says how to bring it under Rulegate.
+- **`check --staged` can no longer reach the network or run a configured program.** Its git
+  calls ran with your git config, so a `core.fsmonitor` program ran on every check, and in a
+  partial clone reading a staged file whose contents were never downloaded fetched it from the
+  remote. Every call now switches fsmonitor off and lazy fetching off. In a partial clone, a
+  file that is not available locally is refused with the command that downloads it, and a git
+  older than 2.44 — which cannot switch lazy fetching off — is refused with a hint rather than
+  allowed to fetch. Outside a partial clone nothing changes, on any git version.
+- **A file name with an accent is one file however it is spelled, where the disk says so.** On
+  macOS (APFS) `café.mdc` written with a precomposed `é` and with `e` plus a combining accent
+  is the same file, but `sync`, `check` and the plugin's edit guard compared the two spellings
+  exactly. A generated file could then be treated as somebody else's, or as an orphan, and an
+  edit to it under the other spelling got past the guard. Rulegate now asks the disk, using
+  the paths it is comparing, and treats the spellings as one only where the disk does; on
+  Linux nothing changes.
+- **`init` no longer imports a rulesync-generated Cline rule twice.** rulesync reports
+  `.clinerules` as one output, a directory, and only that exact path was hidden from the
+  adapters while rulesync's source was imported, so the Cline adapter read every
+  `.clinerules/*.md` and each rule arrived a second time beside its source. A hidden directory
+  now hides everything under it.
+- **The settings pass no longer writes into a `CLAUDE.md` agent-os generated.** Run before
+  `rulegate init` had imported `.agent-os/`, it added the task-tracking rule to agent-os's
+  bannered `CLAUDE.md`, where agent-os's next compile overwrote it or `init` imported it as a
+  rule. The preview, the writer and the setup state now refuse that file and say to run
+  `npx rulegate init` first, and the file is left byte for byte.
+- **`init --plugin --yes` works with an npm-installed Claude Code on Windows.** npm installs
+  `claude` there as a `claude.cmd` script, which Node cannot run without a shell, so the plugin
+  step said Claude Code was not on PATH. Rulegate now reads the script the `.cmd` would run and
+  runs it directly — still without a shell, and only with the same fixed commands.
+- **`init` no longer calls a Markdown style guide a credential.** "Font family is always a
+  token: `var(--body-font)`" in a rule file was reported as a literal secret, with advice to
+  gitignore `.rulegate/backup/`. Guessing a credential from a key and a random-looking value
+  now happens only in key/value formats (JSON, TOML, YAML, `.env`); in any file a known token
+  format (`ghp_…`, `sk-…`, `AKIA…` and the rest) still warns.
+- **A literal credential in an MCP header imports to a variable named after its server.** A
+  `Authorization: Bearer ghp_…` header became `env:Authorization` — a name every server would
+  share — and the warning did not say what to put in it. It now becomes
+  `env:<SERVER>_MCP_AUTHORIZATION` (for `billing-api`, `BILLING_API_MCP_AUTHORIZATION`), and the
+  warning says to set it to the whole header value, `Bearer <token>`, before the next session,
+  because until then the server is sent no header at all. `env` credentials keep their key's
+  name, which Codex requires.
+- **A `rulegate` marketplace on a local path in the committed project settings is flagged.**
+  Testing an unpublished plugin with `claude plugin marketplace add <checkout> --scope project`
+  can record that machine's path in `.claude/settings.json` for the whole team. The settings
+  pass preview and `doctor` now say so and suggest adding it at user scope instead; the entry
+  itself is left as it is.
+- **A repository with only `.rulesync/rules/` is migrated, not called empty.** With no rulesync
+  config and no generated files committed, `init` reported "no AI tool configuration found" and
+  stopped. It now imports the rules, and enables the tools they name in their `targets` — and
+  those in `rulesync.jsonc` when there is one. When no rule names a tool, it says to list them
+  in `.rulegate/rulegate.yaml`.
 
 ## [0.4.1] — 2026-09-29
 

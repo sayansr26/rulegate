@@ -166,7 +166,7 @@ export async function applyPlan(
   // rather than probing again, so every layer of one run identifies paths identically
   // (T077). Two layers disagreeing is how a file gets refused as somebody else's by the
   // write loop and deleted as ours by the orphan loop, in the same run.
-  const key = pathKeyFor(comparison.caseInsensitive);
+  const key = pathKeyFor(comparison.caseInsensitive, comparison.normalizationInsensitive);
   const handEdited = new Set(comparison.changed);
   const unmanaged = new Set(comparison.unmanaged);
   const force = options.force === true;

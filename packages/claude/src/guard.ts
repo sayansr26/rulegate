@@ -7,6 +7,7 @@ import {
   parseState,
   pathKeyFor,
   probeCaseInsensitive,
+  probeNormalizationInsensitive,
   type DirEntry,
   type ReadOnlyFileSystem,
   type StateFile,
@@ -100,7 +101,12 @@ async function judge(abs: string): Promise<Decision | undefined> {
   if (owner === undefined) return undefined;
   const rel = within(owner.root, abs);
   if (rel === undefined) return undefined;
-  const key = pathKeyFor(await probeCaseInsensitive(probeView(owner.root)));
+  const view = probeView(owner.root);
+  // An NFD spelling of a recorded NFC artifact is the same file on APFS (T114).
+  const key = pathKeyFor(
+    await probeCaseInsensitive(view),
+    await probeNormalizationInsensitive(view, [...owner.state.artifacts.map((a) => a.path), rel]),
+  );
 
   // The ownership record and the backups are `sync`'s own bookkeeping. A hand edit to
   // `state.json` is how Rulegate comes to call its own artifact somebody else's. Keyed like

@@ -13,7 +13,9 @@ import {
   registerInCliPackage,
   registerInRegistry,
   registerInRfc,
+  registerInSmoke,
   registerInVitestConfig,
+  registerInWorkspaceTsconfig,
 } from './register.js';
 import { scaffoldFiles } from './templates.js';
 
@@ -22,7 +24,9 @@ export {
   registerInCliPackage,
   registerInRegistry,
   registerInRfc,
+  registerInSmoke,
   registerInVitestConfig,
+  registerInWorkspaceTsconfig,
 } from './register.js';
 export { scaffoldFiles } from './templates.js';
 
@@ -42,6 +46,8 @@ const REGISTRY = 'packages/cli/src/registry.ts';
 const CLI_PACKAGE = 'packages/cli/package.json';
 const VITEST_CONFIG = 'vitest.config.ts';
 const RFC = 'docs/rfc-0001-canonical-format.md';
+const WORKSPACE_TSCONFIG = 'tsconfig.workspace.json';
+const SMOKE = 'scripts/smoke.mjs';
 
 /**
  * `rulegate adapter new <tool>` — the contribution funnel (T028).
@@ -53,7 +59,7 @@ const RFC = 'docs/rfc-0001-canonical-format.md';
  * precedence rules, and a hand-written golden.
  *
  * Like `init` and `restore` it prints the plan and writes nothing without `--yes`, and
- * like them it never overwrites: every generated path must be absent, and the three
+ * like them it never overwrites: every generated path must be absent, and the six
  * patched files must exist. A half-applied scaffold is worse than none.
  */
 export async function runAdapterNew(options: AdapterNewOptions): Promise<ExitCodeValue> {
@@ -79,7 +85,7 @@ export async function runAdapterNew(options: AdapterNewOptions): Promise<ExitCod
     return ExitCode.Usage;
   }
 
-  for (const required of [REGISTRY, CLI_PACKAGE, VITEST_CONFIG, RFC]) {
+  for (const required of [REGISTRY, CLI_PACKAGE, VITEST_CONFIG, RFC, WORKSPACE_TSCONFIG, SMOKE]) {
     if (await fs.exists(required)) continue;
     // The scaffold writes into *this* monorepo, not into a user's repository. Saying so
     // up front is better than a patch failure three steps later.
@@ -110,6 +116,12 @@ export async function runAdapterNew(options: AdapterNewOptions): Promise<ExitCod
         kind: 'update',
       },
       { path: RFC, contents: registerInRfc(await fs.readFile(RFC), tool), kind: 'update' },
+      {
+        path: WORKSPACE_TSCONFIG,
+        contents: registerInWorkspaceTsconfig(await fs.readFile(WORKSPACE_TSCONFIG), tool),
+        kind: 'update',
+      },
+      { path: SMOKE, contents: registerInSmoke(await fs.readFile(SMOKE), tool), kind: 'update' },
     ];
   } catch (error) {
     if (!isRulegateError(error)) throw error;

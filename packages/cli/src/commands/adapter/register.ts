@@ -1,5 +1,6 @@
 import { RulegateError } from '@rulegate/core';
 import { toolNames } from './names.js';
+import { fitCall } from './templates.js';
 
 /**
  * The three files that turn a directory under `packages/adapters/` into a shipped adapter.
@@ -48,7 +49,66 @@ export function registerInRegistry(source: string, id: string): string {
   if (!array.test(text)) {
     throw patchFailed('packages/cli/src/registry.ts', 'the ADAPTERS array is not where it was');
   }
-  return text.replace(array, `$1[${sorted.map(([, binding]) => binding).join(', ')}]`);
+  // Prettier's own choice, so the patched file passes `prettier --check` unedited: one line
+  // while it fits the 100-column print width, one binding per line once it does not.
+  const bindings = sorted.map(([, binding]) => binding);
+  const declaration = 'export const ADAPTERS: readonly Adapter[] = ';
+  const oneLine = `[${bindings.join(', ')}]`;
+  return text.replace(
+    array,
+    `$1${declaration.length + oneLine.length + 1 <= PRINT_WIDTH ? oneLine : `[\n${bindings.map((b) => `  ${b},`).join('\n')}\n]`}`,
+  );
+}
+
+/** `.prettierrc.json`'s `printWidth`. */
+const PRINT_WIDTH = 100;
+
+/**
+ * Add the path alias eslint's type-checked project resolves the package through. Without it
+ * every symbol the new adapter exports lints as `any` until somebody builds its `dist/`.
+ * Appended, as the block is ordered by when each package arrived, not by name.
+ */
+export function registerInWorkspaceTsconfig(source: string, id: string): string {
+  const n = toolNames(id);
+  return appendAfterLast(
+    source,
+    /^ {6}"@rulegate\/adapter-[a-z0-9-]+": \["packages\/adapters\/[a-z0-9-]+\/src\/index\.ts"\],?$/,
+    `      "${n.packageName}": ["packages/adapters/${n.id}/src/index.ts"]`,
+    { file: 'tsconfig.workspace.json', missing: 'it maps no adapter paths', json: true },
+  );
+}
+
+/**
+ * Add the package to the release smoke test's list, which packs and installs every published
+ * package; a package missing from it ships untested and is caught only by a user's install.
+ */
+export function registerInSmoke(source: string, id: string): string {
+  return appendAfterLast(
+    source,
+    /^ {2}'@rulegate\/adapter-[a-z0-9-]+',$/,
+    `  '${toolNames(id).packageName}',`,
+    { file: 'scripts/smoke.mjs', missing: 'its PACKAGES list names no adapters', json: false },
+  );
+}
+
+/** Insert `line` after the last line matching `shape`, minding JSON's trailing commas. */
+function appendAfterLast(
+  source: string,
+  shape: RegExp,
+  line: string,
+  where: { file: string; missing: string; json: boolean },
+): string {
+  const lines = source.split('\n');
+  const last = lines.reduce((found, l, i) => (shape.test(l) ? i : found), -1);
+  if (last === -1) throw patchFailed(where.file, where.missing);
+  let added = line;
+  if (where.json) {
+    const prev = lines[last] ?? '';
+    // The last entry of a JSON object has no comma; the new line takes over that position.
+    if (prev.endsWith(',')) added = `${line},`;
+    else lines[last] = `${prev},`;
+  }
+  return [...lines.slice(0, last + 1), added, ...lines.slice(last + 1)].join('\n');
 }
 
 /** Add the workspace dependency, in the sorted position the rest of the block is in. */
@@ -69,7 +129,12 @@ export function registerInCliPackage(source: string, id: string): string {
  */
 export function registerInVitestConfig(source: string, id: string): string {
   const n = toolNames(id);
-  const line = `      '${n.packageName}': src('./packages/adapters/${n.id}/src/index.ts'),`;
+  const line = fitCall(
+    '      ',
+    `'${n.packageName}': src(`,
+    `'./packages/adapters/${n.id}/src/index.ts'`,
+    '),',
+  );
   return insertSorted(
     source,
     /^ {6}'@rulegate\/adapter-[a-z0-9-]+': src\('\.\/packages\/adapters\/[a-z0-9-]+\/src\/index\.ts'\),$/,

@@ -5,7 +5,9 @@ import { planMemoryMigration } from './migrate.js';
 import { isDir, isRecord, ls, read, readJson } from './read.js';
 import { refusals } from './refusals.js';
 import {
+  AUTO_ROUTE_ID,
   GIT_DENY,
+  LEGACY_AUTO_ROUTE_ID,
   LEGACY_MARKETPLACE,
   LEGACY_PLUGIN_ID,
   MARKETPLACE_NAME,
@@ -140,7 +142,7 @@ export async function setupState(
   let taskRuleOk = true;
   let taskRuleFile = '';
   let taskRuleFix = '/rulegate:init settings';
-  let marketplace: { state: MarketplaceState; fix: string } | undefined;
+  let marketplace: { state: MarketplaceState; user: string | undefined; fix: string } | undefined;
   // An item the writer refuses is not the settings pass's to fix: sending it back there
   // would loop, refusing again on every run. It names the refusal instead, which says what
   // to do by hand — the writer's own reasons, from the same check.
@@ -151,9 +153,15 @@ export async function setupState(
     const settingsRefused = refused.find((r) => r.item === 'settings');
     const ruleRefused = refused.find((r) => r.item === 'rule');
     const where = scope === 'user' ? '~/.claude/settings.json' : '.claude/settings.json';
-    if (scope === 'project' && p.settings.marketplace !== undefined) {
+    // `kept` is the settled state for a project that still uses auto-handoff, not a gap.
+    if (
+      scope === 'project' &&
+      p.settings.marketplace !== undefined &&
+      p.settings.marketplace !== 'kept'
+    ) {
       marketplace = {
         state: p.settings.marketplace,
+        user: p.settings.marketplaceUser,
         fix:
           settingsRefused === undefined
             ? '/rulegate:init settings'
@@ -241,7 +249,9 @@ export async function setupState(
       false,
       marketplace.state === 'retire'
         ? marketplace.fix
-        : `${disableCommand(legacy.plugin ?? 'project')}, then ${marketplace.fix}`,
+        : marketplace.user === LEGACY_AUTO_ROUTE_ID
+          ? `claude plugin disable ${LEGACY_AUTO_ROUTE_ID} --scope project, then rulegate init --plugin --yes (installs ${AUTO_ROUTE_ID}), then ${marketplace.fix}`
+          : `${disableCommand(legacy.plugin ?? 'project')}, then ${marketplace.fix}`,
     );
   }
 

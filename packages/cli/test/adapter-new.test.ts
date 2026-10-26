@@ -1,4 +1,5 @@
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import * as prettier from 'prettier';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +39,8 @@ const PATCHED = [
   'packages/cli/package.json',
   'vitest.config.ts',
   'docs/rfc-0001-canonical-format.md',
+  'tsconfig.workspace.json',
+  'scripts/smoke.mjs',
 ] as const;
 
 let repo: string;
@@ -184,7 +187,10 @@ describe('rulegate adapter new --yes', () => {
     // other tests turned out to be silently bound the same way.
     const listed = /ADAPTERS: readonly Adapter\[\] = \[([^\]]*)\]/.exec(registry)?.[1];
     expect(listed).toBeDefined();
-    const names = listed!.split(',').map((n) => n.trim());
+    const names = listed!
+      .split(',')
+      .map((n) => n.trim())
+      .filter((n) => n !== '');
     expect(names).toContain('kiro');
     expect([...names].sort()).toEqual(names);
 
@@ -237,6 +243,48 @@ describe('rulegate adapter new --yes', () => {
     expect(await read('fixtures/kiro/expected/KIRO.md')).toBe(rendered);
     // And the excluded rule really is excluded, so the fixture tests something.
     expect(rendered).not.toContain('must not reach kiro');
+  });
+});
+
+describe('rulegate adapter new --yes, checked by Prettier (T129)', () => {
+  // A long id: `antigravity` was the one whose stub `write()` overflowed the print width.
+  const tool = 'antigravity-next';
+
+  it('writes and patches only files that pass `prettier --check` unedited', async () => {
+    expect(await runAdapterNew({ cwd: repo, tool, yes: true })).toBe(ExitCode.Ok);
+    const touched = stdout
+      .join('')
+      .split('\n')
+      .map((l) => /^(?:created|registered in) {2}(.+)$/.exec(l)?.[1])
+      .filter((p): p is string => p !== undefined);
+    expect(touched).toContain('tsconfig.workspace.json');
+    expect(touched).toContain('scripts/smoke.mjs');
+
+    const options = JSON.parse(
+      await readFile(path.join(repoRoot, '.prettierrc.json'), 'utf8'),
+    ) as prettier.Options;
+    const unformatted: string[] = [];
+    for (const rel of touched) {
+      // Asked as the repository would ask it: a fixture is in `.prettierignore` here too.
+      const info = await prettier.getFileInfo(path.join(repoRoot, rel), {
+        ignorePath: path.join(repoRoot, '.prettierignore'),
+      });
+      if (info.ignored || info.inferredParser === null) continue;
+      if (!(await prettier.check(await read(rel), { ...options, filepath: rel })))
+        unformatted.push(rel);
+    }
+    expect(unformatted).toEqual([]);
+  });
+
+  it('registers the package for eslint and for the release smoke test', async () => {
+    expect(await runAdapterNew({ cwd: repo, tool, yes: true })).toBe(ExitCode.Ok);
+    const paths = (
+      JSON.parse((await read('tsconfig.workspace.json')).replace(/^\s*\/\/.*$/gm, '')) as {
+        compilerOptions: { paths: Record<string, string[]> };
+      }
+    ).compilerOptions.paths;
+    expect(paths[`@rulegate/adapter-${tool}`]).toEqual([`packages/adapters/${tool}/src/index.ts`]);
+    expect(await read('scripts/smoke.mjs')).toContain(`  '@rulegate/adapter-${tool}',\n`);
   });
 });
 

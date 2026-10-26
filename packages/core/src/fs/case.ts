@@ -36,11 +36,59 @@ export function foldPath(relPath: string): string {
   return relPath.toLowerCase();
 }
 
-/** How to key a path for lookup. Identity where the filesystem distinguishes case. */
+/**
+ * Normalise a repo-relative path to NFC for use as an identity key (T114). APFS resolves
+ * `café` spelled NFC and spelled NFD to one file; ext4 keeps them as two. Never a stored value,
+ * for the reason `foldPath` gives.
+ */
+export function foldUnicode(relPath: string): string {
+  return relPath.normalize('NFC');
+}
+
+/** How to key a path for lookup. Identity where the filesystem distinguishes the spellings. */
 export type PathKey = (relPath: string) => string;
 
-export function pathKeyFor(caseInsensitive: boolean): PathKey {
+export function pathKeyFor(caseInsensitive: boolean, normalizationInsensitive = false): PathKey {
+  if (caseInsensitive && normalizationInsensitive) return (p) => foldPath(foldUnicode(p));
+  if (normalizationInsensitive) return foldUnicode;
   return caseInsensitive ? foldPath : (relPath) => relPath;
+}
+
+/**
+ * Does this filesystem resolve the NFC and NFD spellings of a name to one file (T114)?
+ *
+ * Asked of `candidates` — the paths about to be looked up — rather than of the root, which
+ * `probeCaseInsensitive` can use because almost every name has a cased letter, while almost
+ * no repository root has a name with a precomposed character. A path whose two spellings
+ * are equal cannot answer, and needs no answer: no key it produces differs either way. So the
+ * probe answers exactly when it matters, and otherwise keeps today's exact keys.
+ *
+ * The rule from `probeCaseInsensitive` holds: a directory listing both spellings has two
+ * real files, so it proves nothing and is skipped.
+ */
+export async function probeNormalizationInsensitive(
+  fs: Pick<ReadOnlyFileSystem, 'listDir' | 'exists'>,
+  candidates: readonly string[],
+): Promise<boolean> {
+  for (const path of candidates) {
+    const nfc = path.normalize('NFC');
+    const nfd = path.normalize('NFD');
+    if (nfc === nfd) continue;
+    const other = path === nfc ? nfd : nfc;
+    try {
+      if (!(await fs.exists(path))) continue;
+      const slash = path.lastIndexOf('/');
+      const dir = slash === -1 ? '' : path.slice(0, slash);
+      const names = new Set((await fs.listDir(dir)).map((e) => e.name));
+      const name = path.slice(slash + 1);
+      const otherName = other.slice(other.lastIndexOf('/') + 1);
+      if (names.has(name) && names.has(otherName)) continue;
+      return await fs.exists(other);
+    } catch {
+      continue;
+    }
+  }
+  return false;
 }
 
 /** The same name with every cased character flipped. Unchanged if it has none. */

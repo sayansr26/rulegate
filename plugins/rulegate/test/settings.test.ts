@@ -137,6 +137,79 @@ describe("retiring agent-os's marketplace (T106)", () => {
       });
       expect(planScope('project', sb.root, sb.claudeDir).settings.marketplace).toBe('blocked');
     });
+
+    it("keeps it while agent-os's auto-route is enabled, until Rulegate's replaces it (T162)", async () => {
+      // Retiring here was the orphan: agent-os off, its auto-route still loading from
+      // sayan-plugins, and the marketplace gone from under it.
+      await sb.put('.claude/settings.json', {
+        ...markets,
+        enabledPlugins: { 'agent-os@sayan-plugins': false, 'auto-route@sayan-plugins': true },
+      });
+      const p = planScope('project', sb.root, sb.claudeDir);
+      expect(p.settings).toMatchObject({
+        marketplace: 'blocked',
+        marketplaceUser: 'auto-route@sayan-plugins',
+      });
+      const text = describeScope(p, { dry: true }).join('\n');
+      expect(text).toContain('kept while auto-route@sayan-plugins is enabled');
+      expect(text).toContain('installs auto-route@rulegate in its place');
+    });
+
+    it('keeps it for good while auto-handoff is enabled, which Rulegate does not ship (T162)', async () => {
+      await sb.put(
+        '.claude/settings.json',
+        protectedText({
+          ...markets,
+          enabledPlugins: {
+            'auto-route@sayan-plugins': true,
+            'auto-handoff@sayan-plugins': true,
+          },
+        }),
+      );
+      const p = planScope('project', sb.root, sb.claudeDir);
+      expect(p.settings).toMatchObject({
+        status: 'unchanged',
+        marketplace: 'kept',
+        marketplaceUser: 'auto-handoff@sayan-plugins',
+      });
+      expect(describeScope(p, { dry: true }).join('\n')).toContain(
+        'sayan-plugins kept: auto-handoff@sayan-plugins still installs from it',
+      );
+    });
+  });
+});
+
+describe('a rulegate marketplace on a local path (T144)', () => {
+  let sb: Sandbox;
+  beforeEach(async () => {
+    sb = await sandbox();
+  });
+  afterEach(async () => {
+    await sb.dispose();
+  });
+  const local = {
+    extraKnownMarketplaces: {
+      rulegate: { source: { source: 'directory', path: '/Users/me/src/rulegate' } },
+    },
+  };
+
+  it('is flagged in the project file, previewed, and left unchanged', async () => {
+    const before = JSON.stringify({
+      ...(JSON.parse(planSettings(undefined).next!) as object),
+      ...local,
+    });
+    await sb.put('.claude/settings.json', before);
+    const p = planScope('project', sb.root, sb.claudeDir);
+    expect(p.settings.localMarketplace).toBe('/Users/me/src/rulegate');
+    expect(p.settings.status).toBe('unchanged');
+    expect(describeScope(p, { dry: true }).join('\n')).toContain(
+      'rulegate points at a local path (/Users/me/src/rulegate)',
+    );
+  });
+
+  it('is not flagged in the user file, where a local checkout belongs', async () => {
+    await sb.putHome('settings.json', local);
+    expect(planScope('user', sb.root, sb.claudeDir).settings.localMarketplace).toBeUndefined();
   });
 });
 

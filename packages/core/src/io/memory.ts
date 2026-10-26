@@ -1,6 +1,6 @@
 import { RulegateError } from '../model/errors.js';
 import { escapesRoot, normalizeRelative } from '../fs/paths.js';
-import { foldPath } from '../fs/case.js';
+import { pathKeyFor } from '../fs/case.js';
 import { matchesGlob } from '../fs/glob.js';
 import { compareCodepoint } from '../render/order.js';
 import { normalizeText } from '../render/eol.js';
@@ -17,6 +17,8 @@ export interface MemoryFileSystemOptions {
    * how the defect survived 801 green tests.
    */
   readonly caseInsensitive?: boolean;
+  /** Resolve NFC and NFD spellings of a name to one file, as APFS does (T114). Off by default. */
+  readonly normalizationInsensitive?: boolean;
 }
 
 /**
@@ -28,12 +30,14 @@ export class MemoryFileSystem implements WritableFileSystem {
   /** Bytes written by `writeBytes`, which a string cannot hold faithfully. */
   private readonly binary = new Map<string, Uint8Array>();
   private readonly caseInsensitive: boolean;
+  private readonly normalizationInsensitive: boolean;
 
   constructor(
     initial?: Iterable<readonly [string, string | Uint8Array]>,
     options?: MemoryFileSystemOptions,
   ) {
     this.caseInsensitive = options?.caseInsensitive === true;
+    this.normalizationInsensitive = options?.normalizationInsensitive === true;
     for (const [p, c] of initial ?? []) {
       const key = normalizeRelative(p);
       if (typeof c === 'string') {
@@ -62,12 +66,17 @@ export class MemoryFileSystem implements WritableFileSystem {
    */
   private resolve(relPath: string): string {
     const p = this.guard(relPath);
-    if (!this.caseInsensitive || this.files.has(p)) return p;
-    const folded = foldPath(p);
+    if ((!this.caseInsensitive && !this.normalizationInsensitive) || this.files.has(p)) return p;
+    const fold = this.fold();
+    const folded = fold(p);
     for (const key of this.files.keys()) {
-      if (foldPath(key) === folded) return key;
+      if (fold(key) === folded) return key;
     }
     return p;
+  }
+
+  private fold(): (p: string) => string {
+    return pathKeyFor(this.caseInsensitive, this.normalizationInsensitive);
   }
 
   snapshot(): ReadonlyMap<string, string> {
@@ -102,9 +111,10 @@ export class MemoryFileSystem implements WritableFileSystem {
     const p = this.resolve(relPath);
     if (this.files.has(p)) return await Promise.resolve(true);
     const prefix = p === '' ? '' : `${p}/`;
-    const wanted = this.caseInsensitive ? foldPath(prefix) : prefix;
+    const fold = this.fold();
+    const wanted = fold(prefix);
     for (const key of this.files.keys()) {
-      const candidate = this.caseInsensitive ? foldPath(key) : key;
+      const candidate = fold(key);
       if (candidate.startsWith(wanted)) return await Promise.resolve(true);
     }
     return await Promise.resolve(false);

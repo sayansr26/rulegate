@@ -78,8 +78,42 @@ function selectorFor(targets: readonly string[]): ToolSelector | undefined {
   return { kind: 'include', tools };
 }
 
+/**
+ * The tools a rulesync repository generates for (T149): `rulesync.jsonc`'s `targets`, and every
+ * tool a rule's own `targets` names. With neither committed outputs nor a config, the rules are
+ * the only statement of which tools are in use, and without it `init` enabled none and said the
+ * repository had no AI tool configuration at all. `*` names no tool in particular.
+ */
+async function targetedTools(
+  ctx: AdapterContext,
+  ruleTargets: readonly string[],
+): Promise<string[]> {
+  const targets = new Set(ruleTargets);
+  const config = await ctx.fs.tryReadFile('rulesync.jsonc');
+  if (config !== undefined) {
+    try {
+      // JSONC: whole-line and trailing `//` comments, and block comments, then trailing commas.
+      const json = config
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '')
+        .replace(/,\s*([}\]])/g, '$1');
+      const parsed = JSON.parse(json) as { targets?: unknown };
+      if (Array.isArray(parsed.targets)) {
+        for (const t of parsed.targets) if (typeof t === 'string') targets.add(t);
+      }
+    } catch {
+      // An unreadable config names nothing; the rules' own targets still do.
+    }
+  }
+  return [...targets]
+    .filter((t) => t !== '*')
+    .map((t) => TARGET_TO_TOOL[t] ?? t)
+    .sort();
+}
+
 async function read(ctx: AdapterContext): Promise<InteropResult> {
   const rules: RuleDocument[] = [];
+  const ruleTargets: string[] = [];
   const taken = new Set<string>();
   const generated: string[] = [];
   const notImported: string[] = [];
@@ -112,6 +146,7 @@ async function read(ctx: AdapterContext): Promise<InteropResult> {
     // `targets` is the one field rulesync has that maps straight onto canonical `tools`,
     // so it survives rather than widening to `all` the way an adapter import has to.
     const tools = selectorFor(meta.targets);
+    ruleTargets.push(...meta.targets);
     rules.push(
       tools === undefined ? rule : { ...rule, frontmatter: { ...rule.frontmatter, tools } },
     );
@@ -136,7 +171,13 @@ async function read(ctx: AdapterContext): Promise<InteropResult> {
   }
 
   // Every one of them inferred, never read, so `init` still checks what it would replace.
-  return { rules, generated, inferred: generated, notImported };
+  return {
+    rules,
+    generated,
+    inferred: generated,
+    notImported,
+    tools: await targetedTools(ctx, ruleTargets),
+  };
 }
 
 export const rulesync: InteropImporter = {

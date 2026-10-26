@@ -44,6 +44,16 @@ function file(path: string, contents: string): ScaffoldFile {
   return { path, contents, kind: 'create' };
 }
 
+/**
+ * A one-argument call as Prettier prints it (T129): on one line while it fits the
+ * 100-column print width, its argument on a line of its own once a long tool id pushes it
+ * past. Either fixed form fails `prettier --check` for some id.
+ */
+export function fitCall(indent: string, head: string, arg: string, tail: string): string {
+  const one = `${indent}${head}${arg}${tail}`;
+  return one.length <= 100 ? one : `${indent}${head}\n${indent}  ${arg},\n${indent}${tail}`;
+}
+
 /** The two rules the write fixture renders, and the one it must exclude. */
 const STYLE_RULE = `---
 description: Style
@@ -255,7 +265,7 @@ async function write(ctx: AdapterContext): Promise<readonly Artifact[]> {
 
   if (isCanonicalSource(canonical.manifest, ${n.constant})) return [];
 
-  const rules = sortRules(canonical.rules.filter((r) => selects(r.frontmatter.tools, '${n.id}')));
+${fitCall('  ', 'const rules = sortRules(', `canonical.rules.filter((r) => selects(r.frontmatter.tools, '${n.id}'))`, ');')}
   if (rules.length === 0) return [];
 
   const body = renderConcatenated(rules, { headingLevel: 2, showGlobs: true });
@@ -385,7 +395,7 @@ describe('${n.id} write()', () => {
 
   it('excludes rules that target other tools', async () => {
     const actual = await renderFixture('${n.id}', ${n.binding});
-    expect(actual.get(${n.constant})).not.toContain('This rule must not reach ${n.id}');
+${fitCall('    ', `expect(actual.get(${n.constant})).not.toContain(`, `'This rule must not reach ${n.id}'`, ');')}
   });
 
   it('records which rules produced the file', async () => {

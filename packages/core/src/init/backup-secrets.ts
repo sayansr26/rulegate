@@ -1,5 +1,5 @@
 import { RulegateError } from '../model/errors.js';
-import { scanTextForSecrets } from '../render/secrets.js';
+import { isKeyValueFormat, scanTextForSecrets } from '../render/secrets.js';
 import { backupPathFor } from '../pipeline/apply.js';
 import { ignoreCovers } from './formatters.js';
 import type { ReadOnlyFileSystem } from '../fs/types.js';
@@ -66,7 +66,7 @@ export async function backupSecretWarnings(
 
     // Key paths, never values. `scanTextForSecrets` is built so that nothing it returns can
     // print the credential, and this message keeps that bargain.
-    const found = scanTextForSecrets(original);
+    const found = scanTextForSecrets(original, { keyValue: isKeyValueFormat(path) });
     if (found.length === 0) continue;
 
     const backup = backupPathFor(path);

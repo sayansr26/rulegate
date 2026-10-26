@@ -10818,8 +10818,39 @@ function basenamePosix(p) {
 function foldPath(relPath) {
   return relPath.toLowerCase();
 }
-function pathKeyFor(caseInsensitive) {
+function foldUnicode(relPath) {
+  return relPath.normalize("NFC");
+}
+function pathKeyFor(caseInsensitive, normalizationInsensitive = false) {
+  if (caseInsensitive && normalizationInsensitive)
+    return (p) => foldPath(foldUnicode(p));
+  if (normalizationInsensitive)
+    return foldUnicode;
   return caseInsensitive ? foldPath : (relPath) => relPath;
+}
+async function probeNormalizationInsensitive(fs2, candidates) {
+  for (const path4 of candidates) {
+    const nfc = path4.normalize("NFC");
+    const nfd = path4.normalize("NFD");
+    if (nfc === nfd)
+      continue;
+    const other = path4 === nfc ? nfd : nfc;
+    try {
+      if (!await fs2.exists(path4))
+        continue;
+      const slash = path4.lastIndexOf("/");
+      const dir = slash === -1 ? "" : path4.slice(0, slash);
+      const names = new Set((await fs2.listDir(dir)).map((e) => e.name));
+      const name = path4.slice(slash + 1);
+      const otherName = other.slice(other.lastIndexOf("/") + 1);
+      if (names.has(name) && names.has(otherName))
+        continue;
+      return await fs2.exists(other);
+    } catch {
+      continue;
+    }
+  }
+  return false;
 }
 function flipCase(name) {
   let flipped = "";
@@ -11304,7 +11335,7 @@ function findLiteralSecrets(value, prefix) {
   walk2(value, prefix, prefix.split(".").at(-1) ?? prefix);
   return found;
 }
-function scanTextForSecrets(text) {
+function scanTextForSecrets(text, { keyValue = true } = {}) {
   const found = [];
   let inEnvVarSection = false;
   text.split("\n").forEach((line, i) => {
@@ -11320,7 +11351,9 @@ function scanTextForSecrets(text) {
     }
     const pair = /["']?([A-Za-z0-9_\-.]+)["']?\s*[:=]\s*(?:"([^"]*)"|'([^']*)'|([^\s,}\]]+))/.exec(line);
     const value = pair?.[2] ?? pair?.[3] ?? pair?.[4];
-    if (inEnvVarSection)
+    if (inEnvVarSection || !keyValue)
+      return;
+    if (value?.startsWith("`") === true)
       return;
     if (pair && value !== void 0 && isLiteralSecret(pair[1], value))
       found.push(label);
@@ -12455,6 +12488,11 @@ function canonicalReference(raw) {
 function isObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+function headerEnvRef(serverId, header) {
+  const part = (s) => s.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  const name = `${part(serverId)}_MCP_${part(header)}`.toUpperCase();
+  return envRef(/^[A-Z_]/.test(name) ? name : `_${name}`);
+}
 function importSecrets(raw, what, options2, warnings, serverId) {
   if (raw === void 0)
     return { kind: "ok", map: {} };
@@ -12478,6 +12516,14 @@ function importSecrets(raw, what, options2, warnings, serverId) {
       continue;
     }
     if (isLiteralSecret(key, value)) {
+      if (what === "headers") {
+        const ref = headerEnvRef(serverId, key);
+        map[key] = ref;
+        const scheme = /^([A-Za-z][\w-]*)\s+\S/.exec(value)?.[1];
+        const shape = scheme === void 0 ? "the header value" : `\`${scheme} <token>\``;
+        warnings.push(`${options2.file}: server \`${serverId}\` had a literal credential in its \`${key}\` header; imported as \`env:${ref.name}\`. Set ${ref.name} to the whole header value \u2014 ${shape} \u2014 before the next session: until then the server is sent no ${key} header.`);
+        continue;
+      }
       map[key] = literalToEnvRef(key);
       warnings.push(`${options2.file}: server \`${serverId}\` had a literal credential under \`${what}.${key}\`; imported as \`env:${literalToEnvRef(key).name}\`. Set that variable before running the server.`);
       continue;
@@ -12816,7 +12862,11 @@ async function compareToDisk(state, artifacts, fs2) {
   const untracked = [];
   const unmanaged = [];
   const caseInsensitive = await probeCaseInsensitive(fs2);
-  const key = pathKeyFor(caseInsensitive);
+  const normalizationInsensitive = await probeNormalizationInsensitive(fs2, [
+    ...state.artifacts.map((a) => a.path),
+    ...artifacts.map((a) => a.path)
+  ]);
+  const key = pathKeyFor(caseInsensitive, normalizationInsensitive);
   const planned = new Set(artifacts.map((a) => key(a.path)));
   const recorded = new Map(state.artifacts.map((a) => [key(a.path), a]));
   for (const artifact of artifacts) {
@@ -12843,7 +12893,8 @@ async function compareToDisk(state, artifacts, fs2) {
     untracked: untracked.sort(compareCodepoint),
     unmanaged: unmanaged.sort(compareCodepoint),
     orphaned: [...orphaned].sort(compareCodepoint),
-    caseInsensitive
+    caseInsensitive,
+    normalizationInsensitive
   };
 }
 
@@ -14002,6 +14053,8 @@ async function withPathErrors(relPath, abs, run2) {
 
 // ../packages/core/dist/git/index.js
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { isAbsolute, join } from "node:path";
 async function gitTopLevel(cwd) {
   try {
     const out = await run(["rev-parse", "--show-toplevel"], cwd);
@@ -14013,6 +14066,7 @@ async function gitTopLevel(cwd) {
 var StagedFileSystem = class {
   #cwd;
   #listing;
+  #partial;
   #contents = /* @__PURE__ */ new Map();
   constructor(cwd) {
     this.#cwd = cwd;
@@ -14107,16 +14161,43 @@ var StagedFileSystem = class {
   async #show(rel) {
     if (!(await this.#files()).has(rel))
       return void 0;
+    this.#partial ??= isPartialClone(this.#cwd);
+    const partial = await this.#partial;
+    let raw;
     try {
-      const raw = await run(["cat-file", "blob", `:./${rel}`], this.#cwd);
-      return normalizeText(raw);
-    } catch {
-      return void 0;
+      raw = await run(["cat-file", "blob", `:./${rel}`], this.#cwd, partial);
+    } catch (error) {
+      if (!partial)
+        return void 0;
+      const stderr = error.stderr;
+      const old = typeof stderr === "string" && /unknown option|usage: git/i.test(stderr);
+      throw new RulegateError({
+        code: "E_GIT_FAILED",
+        message: old ? "this repository is a partial clone, and this git cannot read the index with lazy fetching switched off (that needs git 2.44 or newer)" : `${rel} is staged, but its contents are not available locally in this partial clone, and Rulegate does not fetch`,
+        hint: old ? "upgrade git to 2.44 or newer, or run the check without --staged" : `\`git cat-file -p :./${rel}\` downloads it; then run the check again`,
+        source: { file: rel }
+      });
     }
+    return normalizeText(raw);
   }
 };
+async function isPartialClone(cwd) {
+  try {
+    const dir = (await run(["rev-parse", "--git-common-dir"], cwd)).trim();
+    const config = await readFile(join(isAbsolute(dir) ? dir : join(cwd, dir), "config"), "utf8");
+    return /^\s*(partialclone\s*=\s*\S|promisor\s*=\s*true\b)/im.test(config);
+  } catch {
+    return true;
+  }
+}
 var GIT_SUBCOMMANDS = ["rev-parse", "ls-files", "cat-file"];
-function run(args, cwd) {
+var GIT_SAFETY_ARGS = Object.freeze([
+  "--no-optional-locks",
+  "-c",
+  "core.fsmonitor=false"
+]);
+var GIT_NO_LAZY_FETCH_ARG = "--no-lazy-fetch";
+function run(args, cwd, partial = false) {
   const subcommand = args[0];
   if (subcommand === void 0 || !GIT_SUBCOMMANDS.includes(subcommand)) {
     return Promise.reject(new RulegateError({
@@ -14127,14 +14208,22 @@ function run(args, cwd) {
   return new Promise((resolve, reject) => {
     execFile(
       "git",
-      [...args],
+      [...partial ? [GIT_NO_LAZY_FETCH_ARG] : [], ...GIT_SAFETY_ARGS, ...args],
       // No shell, an explicit cwd, and a cap: a pathological repository must not be able
       // to make a pre-commit hook hang or exhaust memory.
-      { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 3e4, shell: false },
-      (error, stdout) => {
-        if (error)
-          reject(error instanceof Error ? error : new Error("git failed"));
-        else
+      {
+        cwd,
+        env: { ...process.env, GIT_NO_LAZY_FETCH: "1" },
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+        timeout: 3e4,
+        shell: false
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          const e = error instanceof Error ? error : new Error("git failed");
+          reject(Object.assign(e, { stderr }));
+        } else
           resolve(stdout);
       }
     );
@@ -18414,6 +18503,7 @@ var RULES_DOCS7 = {
   title: "Windsurf \u2014 Rules and memories (Cascade)",
   retrieved: "2026-09-04"
 };
+var AGENTS_DOCS2 = { ...RULES_DOCS7, retrieved: "2026-10-26" };
 var docs12 = {
   toolName: "Windsurf",
   homepage: "https://windsurf.com",
@@ -18454,8 +18544,12 @@ var docs12 = {
       scope: "project",
       role: "instructions",
       managed: false,
-      description: "Read at the workspace root, without frontmatter. Generated by the codex adapter, not by this one \u2014 so enabling windsurf and codex together sends Windsurf the same rules twice.",
-      source: RULES_DOCS7
+      // Re-read 2026-10-26 (T153): "root-level = always-on, subdirectory = auto-glob for that
+      // directory". The entry said root only, and `doctor` told a monorepo that no detected
+      // tool read its `packages/api/AGENTS.md`.
+      nesting: "all-merged",
+      description: "Read in any directory of the workspace, without frontmatter: at the root always on, in a subdirectory scoped to that directory by an automatic glob. Generated by the codex adapter, not by this one \u2014 so enabling windsurf and codex together sends Windsurf the same rules twice.",
+      source: AGENTS_DOCS2
     },
     {
       pattern: "~/.codeium/windsurf/memories/global_rules.md",
@@ -18785,6 +18879,24 @@ function formatSkippedLevels(plan) {
   return plan.levels.filter((level) => level.skippedTools.length > 0).map((level) => `skipped  ${level.dir}  ${[...level.skippedTools].join(", ")}`);
 }
 
+// ../packages/cli/dist/ui/diff.js
+function renderDiff(lines, c) {
+  return lines.map((line) => {
+    switch (line.kind) {
+      case "hunk":
+        return c.cyan(line.text);
+      case "add":
+        return c.green(line.text);
+      case "remove":
+        return c.red(line.text);
+      case "note":
+        return c.dim(line.text);
+      default:
+        return line.text;
+    }
+  });
+}
+
 // ../packages/cli/dist/ui/exit.js
 var ExitCode = { Ok: 0, Failure: 1, Usage: 2 };
 
@@ -18835,6 +18947,15 @@ var GIT_DENY = Object.freeze([
 ]);
 var PLUGIN_ID = "rulegate@rulegate";
 var MARKETPLACE_NAME = "rulegate";
+var AUTO_ROUTE_ID = "auto-route@rulegate";
+var LEGACY_PLUGIN_ID = "agent-os@sayan-plugins";
+var LEGACY_AUTO_ROUTE_ID = "auto-route@sayan-plugins";
+var LEGACY_AUTO_HANDOFF_ID = "auto-handoff@sayan-plugins";
+var LEGACY_MARKETPLACE_PLUGINS = Object.freeze([
+  LEGACY_PLUGIN_ID,
+  LEGACY_AUTO_ROUTE_ID,
+  LEGACY_AUTO_HANDOFF_ID
+]);
 var MARKETPLACE_ENTRY = {
   source: { source: "github", repo: "sayansr26/rulegate" }
 };
@@ -18851,26 +18972,11 @@ var CLAUDE_COMMANDS = Object.freeze([
   ["plugin", "marketplace", "update", MARKETPLACE_NAME],
   ["plugin", "install", PLUGIN_ID, "--scope", "project"],
   ["plugin", "enable", PLUGIN_ID, "--scope", SCOPE],
-  ["plugin", "update", PLUGIN_ID, "--scope", SCOPE]
+  ["plugin", "update", PLUGIN_ID, "--scope", SCOPE],
+  ["plugin", "install", AUTO_ROUTE_ID, "--scope", "project"],
+  ["plugin", "enable", AUTO_ROUTE_ID, "--scope", SCOPE],
+  ["plugin", "update", AUTO_ROUTE_ID, "--scope", SCOPE]
 ]);
-
-// ../packages/cli/dist/ui/diff.js
-function renderDiff(lines, c) {
-  return lines.map((line) => {
-    switch (line.kind) {
-      case "hunk":
-        return c.cyan(line.text);
-      case "add":
-        return c.green(line.text);
-      case "remove":
-        return c.red(line.text);
-      case "note":
-        return c.dim(line.text);
-      default:
-        return line.text;
-    }
-  });
-}
 
 // ../packages/cli/dist/ui/hints.js
 var HINT_SYNC = "hint: run: rulegate sync";

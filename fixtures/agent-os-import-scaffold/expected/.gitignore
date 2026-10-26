@@ -1,0 +1,3 @@
+# Written by `rulegate init`. The originals of files Rulegate took over stay on this
+# machine for `rulegate restore`; they are copies of what git already holds.
+backup/

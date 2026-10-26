@@ -7,8 +7,10 @@ import {
   cmpVersion,
   enabledAt,
   enabledIn,
+  localMarketplace,
   moreLocal,
   pluginState,
+  readJson,
   type PluginScope,
 } from '@rulegate/claude';
 import type { Colors } from '../ui/report.js';
@@ -60,6 +62,11 @@ export interface ClaudePluginReport {
     readonly project: boolean | null;
     readonly user: boolean | null;
   };
+  /**
+   * The project's settings file declares the `rulegate` marketplace on a local path (T144). A
+   * flag, not the path: the JSON never carries an absolute path.
+   */
+  readonly localMarketplace: boolean;
   readonly legacy: {
     readonly found: boolean;
     /** The scope that enables agent-os here, or `null`. */
@@ -118,6 +125,8 @@ export function inspectClaudePlugin(
       project: flag(join(repoRoot, '.claude/settings.json')),
       user: probed ? flag(join(claudeDir, 'settings.json')) : null,
     },
+    localMarketplace:
+      localMarketplace(readJson(join(repoRoot, '.claude/settings.json'))) !== undefined,
     legacy: {
       found: legacy.found,
       plugin: legacy.plugin ?? null,
@@ -223,6 +232,13 @@ export function describeClaudePlugin(
     });
   } else if (l.plugin !== null || l.shared || l.memory > 0 || l.marketplace) {
     warnings.push({ message: 'agent-os is still set up here.', hint: migrate });
+  }
+  if (p.localMarketplace) {
+    warnings.push({
+      message:
+        '.claude/settings.json points the rulegate marketplace at a local path: committed, it is a directory on one machine for everyone.',
+      hint: 'add that marketplace at user scope instead, and keep sayansr26/rulegate in the project',
+    });
   }
   if (l.source && !l.imported) {
     warnings.push({

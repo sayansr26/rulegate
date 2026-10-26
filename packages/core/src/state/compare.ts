@@ -1,7 +1,7 @@
 import { artifactHash, hashOnDisk, isBinaryArtifact, isRawHash, type StateFile } from './state.js';
 import { compareCodepoint } from '../render/order.js';
 import type { Artifact } from '../adapter/artifact.js';
-import { pathKeyFor, probeCaseInsensitive } from '../fs/case.js';
+import { pathKeyFor, probeCaseInsensitive, probeNormalizationInsensitive } from '../fs/case.js';
 import type { ReadOnlyFileSystem } from '../fs/types.js';
 
 export interface DiskComparison {
@@ -42,6 +42,8 @@ export interface DiskComparison {
    * them refuses to write a file the other deletes.
    */
   readonly caseInsensitive: boolean;
+  /** The same, for NFC and NFD spellings of one name (T114). */
+  readonly normalizationInsensitive: boolean;
 }
 
 export async function compareToDisk(
@@ -60,7 +62,12 @@ export async function compareToDisk(
   // exactly is what made that file `unmanaged` (so `sync` refused to write it) *and*
   // `orphaned` (so the same run deleted it). See fs/case.ts (T077).
   const caseInsensitive = await probeCaseInsensitive(fs);
-  const key = pathKeyFor(caseInsensitive);
+  // Unicode spellings likewise (T114), asked of the paths this comparison is about.
+  const normalizationInsensitive = await probeNormalizationInsensitive(fs, [
+    ...state.artifacts.map((a) => a.path),
+    ...artifacts.map((a) => a.path),
+  ]);
+  const key = pathKeyFor(caseInsensitive, normalizationInsensitive);
 
   const planned = new Set(artifacts.map((a) => key(a.path)));
   const recorded = new Map(state.artifacts.map((a) => [key(a.path), a]));
@@ -99,6 +106,7 @@ export async function compareToDisk(
     unmanaged: unmanaged.sort(compareCodepoint),
     orphaned: [...orphaned].sort(compareCodepoint),
     caseInsensitive,
+    normalizationInsensitive,
   };
 }
 

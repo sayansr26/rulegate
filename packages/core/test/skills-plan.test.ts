@@ -213,7 +213,8 @@ describe('a shared directory changing owner (T052)', () => {
     expect(second.errors).toEqual([]);
     expect(owner(second)).toBe('cursor');
     const verify = await verifyPlan(second, fs);
-    expect(verify.entries.filter((e) => e.status !== 'clean')).toEqual([]);
+    // A verify report lists only what differs; there is no `clean` status to filter out.
+    expect(verify.entries).toEqual([]);
     const applied = await applyPlan(second, fs);
     expect(applied.deleted).toEqual([]);
     expect(await fs.tryReadFile('.agents/skills/deploy/SKILL.md')).not.toBeNull();

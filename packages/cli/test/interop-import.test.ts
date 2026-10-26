@@ -1,7 +1,7 @@
 import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { NodeFileSystem, computeInitPlan } from '@rulegate/core';
 import {
   AGENT_OS_BANNER,
@@ -112,6 +112,58 @@ describe('interop — T048', () => {
     expect(wide!.frontmatter.tools).toEqual({ kind: 'all' });
   });
 
+  it('takes .rulesync/rules/ alone as a repository to migrate, not an empty one (T149)', async () => {
+    // The fixture has no rulesync config and no committed outputs: only the rules. Their own
+    // `targets` are the one statement of which tools are in use.
+    const plan = await init('rulesync-import');
+    expect(plan.canonical.rules.map((r) => r.frontmatter.description).sort()).toEqual([
+      'Style',
+      'Test files',
+    ]);
+    expect(plan.detected).toEqual(['claude-code', 'cursor']);
+
+    const repo = await mkdtemp(path.join(tmpdir(), 'rulegate-rulesync-'));
+    try {
+      await cp(path.join(fixtures, 'rulesync-import/input'), repo, { recursive: true });
+      const log = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      let lines: string[];
+      try {
+        expect(await runInit({ cwd: repo, plugin: false })).toBe(ExitCode.Ok);
+      } finally {
+        lines = log.mock.calls.map(([chunk]) => String(chunk));
+        log.mockRestore();
+      }
+      expect(lines.join('')).not.toContain('no AI tool configuration');
+      expect(lines.join('')).toContain('detected  claude-code, cursor');
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("reads rulesync.jsonc's targets, comments and all", async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), 'rulegate-rulesync-'));
+    try {
+      await mkdir(path.join(repo, '.rulesync/rules'), { recursive: true });
+      await writeFile(
+        path.join(repo, '.rulesync/rules/style.md'),
+        '---\ntargets: ["*"]\n---\n\nTabs.\n',
+      );
+      await writeFile(
+        path.join(repo, 'rulesync.jsonc'),
+        '{\n  // the tools we use\n  "targets": ["geminicli", "windsurf"], /* both */\n}\n',
+      );
+      const plan = await computeInitPlan({
+        repoRoot: repo,
+        fs: new NodeFileSystem(repo),
+        adapters: ADAPTERS,
+        interop: INTEROP,
+      });
+      expect(plan.detected).toEqual(['gemini', 'windsurf']);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
   it('reports what it found and did not import, rather than dropping it silently', async () => {
     const repoRoot = path.join(fixtures, 'rulesync-import/input');
     const found = await rulesync.read({
@@ -144,6 +196,29 @@ describe('interop — T048', () => {
       });
       expect(plan.plan.artifacts.map((a) => a.path)).toContain('.clinerules/style.md');
       expect(plan.warnings.filter((w) => w.code === 'W_INTEROP_OUTPUT_LEFT')).toEqual([]);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('imports a rule rulesync wrote into `.clinerules/` once, from its source (T133)', async () => {
+    // The mask hid `.clinerules` itself but not the files under it, so the Cline adapter
+    // read `.clinerules/style.md` and the rule arrived a second time beside its source.
+    const repo = await mkdtemp(path.join(tmpdir(), 'rulegate-rulesync-'));
+    try {
+      await mkdir(path.join(repo, '.rulesync/rules'), { recursive: true });
+      await mkdir(path.join(repo, '.clinerules'), { recursive: true });
+      await writeFile(path.join(repo, '.rulesync/rules/style.md'), 'Tabs.\n');
+      // Not byte-identical, so deduplication cannot be what makes it arrive once.
+      await writeFile(path.join(repo, '.clinerules/style.md'), 'Tabs, as rulesync rendered it.\n');
+      const plan = await computeInitPlan({
+        repoRoot: repo,
+        fs: new NodeFileSystem(repo),
+        adapters: ADAPTERS,
+        interop: INTEROP,
+      });
+      const bodies = plan.canonical.rules.map((r) => r.body.trim());
+      expect(bodies).toEqual(['Tabs.']);
     } finally {
       await rm(repo, { recursive: true, force: true });
     }

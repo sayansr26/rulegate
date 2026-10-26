@@ -90,6 +90,10 @@ npx rulegate claude settings                # preview git protection + task tool
 npx rulegate claude settings --scope project --apply   # write it; each file backed up first
 ```
 
+`init --plugin` also installs **auto-route**, a mod from the same marketplace that picks the
+model and effort level for each turn from what the prompt asks for (`/route` pins a tier or
+turns it off). `--no-auto-route` leaves it out.
+
 `rulegate doctor` shows the plugin's installed and latest version, and names the settings file
 when one turns it off.
 

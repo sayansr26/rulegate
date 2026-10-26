@@ -86,9 +86,21 @@ export type Scope = 'project' | 'user';
 
 export const PLUGIN_ID = 'rulegate@rulegate';
 export const MARKETPLACE_NAME = 'rulegate';
+/** The model-routing mod `init --plugin` installs beside the plugin, as agent-os init did (T162). */
+export const AUTO_ROUTE_ID = 'auto-route@rulegate';
 /** An agent-os install still enabled next to this one prints the session block twice (T106). */
 export const LEGACY_PLUGIN_ID = 'agent-os@sayan-plugins';
 export const LEGACY_MARKETPLACE = 'sayan-plugins';
+/** agent-os 0.6.1's auto-route, which Rulegate ships as `AUTO_ROUTE_ID` (T162). */
+export const LEGACY_AUTO_ROUTE_ID = 'auto-route@sayan-plugins';
+/** agent-os 0.6.2's auto-handoff, which Rulegate does not ship: it keeps `sayan-plugins` (T162). */
+export const LEGACY_AUTO_HANDOFF_ID = 'auto-handoff@sayan-plugins';
+/** Every plugin `sayan-plugins` serves; retiring it while one is enabled orphans that one. */
+export const LEGACY_MARKETPLACE_PLUGINS: readonly string[] = Object.freeze([
+  LEGACY_PLUGIN_ID,
+  LEGACY_AUTO_ROUTE_ID,
+  LEGACY_AUTO_HANDOFF_ID,
+]);
 /** What `claude plugin marketplace add sayansr26/rulegate --scope project` declares (D4). */
 export const MARKETPLACE_ENTRY = {
   source: { source: 'github', repo: 'sayansr26/rulegate' },
@@ -168,10 +180,12 @@ export type EnvState = 'added' | 'present' | 'conflict';
 
 /**
  * agent-os's marketplace in `extraKnownMarketplaces`: `retire` swaps it for Rulegate's,
- * `blocked` leaves it while agent-os is still enabled here, since removing the marketplace
- * of a plugin that is still loading is how a session ends up with neither (T106).
+ * `blocked` leaves it while a plugin Rulegate replaces (agent-os, its auto-route) is still
+ * enabled here, since removing the marketplace of a plugin that is still loading is how a
+ * session ends up with neither (T106). `kept` leaves it for good: auto-handoff installs from
+ * it and Rulegate has no replacement (T162).
  */
-export type MarketplaceState = 'retire' | 'blocked';
+export type MarketplaceState = 'retire' | 'blocked' | 'kept';
 
 export interface SettingsPlan {
   readonly status: 'changed' | 'unchanged' | 'invalid';
@@ -179,6 +193,10 @@ export interface SettingsPlan {
   readonly env: EnvState | undefined;
   readonly current: unknown;
   readonly marketplace?: MarketplaceState;
+  /** The enabled plugin that makes the marketplace `blocked` or `kept`. */
+  readonly marketplaceUser?: string;
+  /** The local path a project file's `rulegate` marketplace points at (T144). Never changed. */
+  readonly localMarketplace?: string;
   /** The merged file, when `status` is `changed`. The writer writes exactly this. */
   readonly next?: string;
 }
@@ -192,6 +210,29 @@ export interface SettingsOptions {
    * yet migrated still need it.
    */
   readonly retireMarketplace?: boolean | undefined;
+  /**
+   * The `sayan-plugins` plugins still enabled for this project, when it is asked about at
+   * all: an auto-handoff among them keeps the marketplace, any other blocks it.
+   */
+  readonly marketplaceUsers?: readonly string[] | undefined;
+  /** Report a `rulegate` marketplace on a local path — asked of the project file only. */
+  readonly flagLocalMarketplace?: boolean;
+}
+
+/**
+ * The local path a settings object's `rulegate` marketplace points at, or `undefined` (T144).
+ * Testing an unpublished plugin means `claude plugin marketplace add <checkout>`; at project
+ * scope that path lands in the committed `.claude/settings.json`, where it names a directory
+ * on one machine for the whole team.
+ */
+export function localMarketplace(settings: unknown): string | undefined {
+  if (!isRecord(settings) || !isRecord(settings.extraKnownMarketplaces)) return undefined;
+  const entry = settings.extraKnownMarketplaces[MARKETPLACE_NAME];
+  const source = isRecord(entry) && isRecord(entry.source) ? entry.source : undefined;
+  if (source === undefined || (source.source !== 'directory' && source.source !== 'file')) {
+    return undefined;
+  }
+  return typeof source.path === 'string' ? source.path : String(source.source);
 }
 
 /**
@@ -208,7 +249,7 @@ function swapMarketplace(markets: Record<string, unknown>): Record<string, unkno
 /** Plan the merge into one settings.json, given its current text (`undefined`: absent). */
 export function planSettings(
   text: string | undefined,
-  { todo = true, retireMarketplace }: SettingsOptions = {},
+  { todo = true, retireMarketplace, marketplaceUsers, flagLocalMarketplace }: SettingsOptions = {},
 ): SettingsPlan {
   let settings: Record<string, unknown> = {};
   if (text !== undefined) {
@@ -223,13 +264,24 @@ export function planSettings(
   const markets = isRecord(settings.extraKnownMarketplaces)
     ? settings.extraKnownMarketplaces
     : undefined;
+  const user =
+    marketplaceUsers?.find((id) => id === LEGACY_AUTO_HANDOFF_ID) ?? marketplaceUsers?.[0];
+  const retire = marketplaceUsers === undefined ? retireMarketplace : user === undefined;
   const marketplace: MarketplaceState | undefined =
-    retireMarketplace === undefined || markets === undefined || !(LEGACY_MARKETPLACE in markets)
+    retire === undefined || markets === undefined || !(LEGACY_MARKETPLACE in markets)
       ? undefined
-      : retireMarketplace
-        ? 'retire'
-        : 'blocked';
-  const withMarket = marketplace === undefined ? {} : { marketplace };
+      : user === LEGACY_AUTO_HANDOFF_ID
+        ? 'kept'
+        : retire
+          ? 'retire'
+          : 'blocked';
+  const local = flagLocalMarketplace === true ? localMarketplace(settings) : undefined;
+  const withMarket = {
+    ...(marketplace === undefined
+      ? {}
+      : { marketplace, ...(user === undefined ? {} : { marketplaceUser: user }) }),
+    ...(local === undefined ? {} : { localMarketplace: local }),
+  };
   const perms = isRecord(settings.permissions) ? settings.permissions : {};
   const deny = Array.isArray(perms.deny)
     ? perms.deny.filter((r): r is string => typeof r === 'string')
@@ -367,20 +419,25 @@ export interface ScopePlan {
 
 export function planScope(scope: Scope, root: string, claudeDir: string): ScopePlan {
   const settingsFile = settingsPath(scope, root, claudeDir);
-  // Retired only once agent-os is off in this project — after `claude plugin disable`, which
-  // the migration runs first — so this pass never pulls the marketplace from under a
-  // plugin that is still loading. The file being rewritten is read on its own as well: a
-  // developer's local `false` hides the committed `true` from the effective flag, and
-  // retiring then ships every teammate an enabled agent-os with no marketplace.
-  const retireMarketplace =
+  // Retired only once every plugin it serves is off in this project — agent-os after the
+  // `claude plugin disable` the migration runs first, auto-route once it is replaced by
+  // Rulegate's (T162) — so this pass never pulls the marketplace from under a plugin that is
+  // still loading. The file being rewritten is read on its own as well: a developer's local
+  // `false` hides the committed `true` from the effective flag, and retiring then ships
+  // every teammate an enabled plugin with no marketplace.
+  const marketplaceUsers =
     scope === 'project'
-      ? enabledFlag(root, claudeDir, LEGACY_PLUGIN_ID) !== true &&
-        enabledIn(settingsFile, LEGACY_PLUGIN_ID) !== true
+      ? LEGACY_MARKETPLACE_PLUGINS.filter(
+          (id) => enabledFlag(root, claudeDir, id) === true || enabledIn(settingsFile, id) === true,
+        )
       : undefined;
   return {
     scope,
     settingsFile,
-    settings: planSettings(read(settingsFile), { retireMarketplace }),
+    settings: planSettings(read(settingsFile), {
+      marketplaceUsers,
+      flagLocalMarketplace: scope === 'project',
+    }),
     rule: planTaskRule(scope, root, claudeDir),
   };
 }
@@ -432,7 +489,21 @@ export function describeScope(
       );
     } else if (s.marketplace === 'blocked') {
       lines.push(
-        `  extraKnownMarketplaces  ${LEGACY_MARKETPLACE} (agent-os) kept while ${LEGACY_PLUGIN_ID} is enabled here or in this file — disable it first`,
+        `  extraKnownMarketplaces  ${LEGACY_MARKETPLACE} (agent-os) kept while ${s.marketplaceUser ?? LEGACY_PLUGIN_ID} is enabled here or in this file — disable it first`,
+      );
+      if (s.marketplaceUser === LEGACY_AUTO_ROUTE_ID) {
+        lines.push(
+          `    then \`rulegate init --plugin --yes\` installs ${AUTO_ROUTE_ID} in its place`,
+        );
+      }
+    } else if (s.marketplace === 'kept') {
+      lines.push(
+        `  extraKnownMarketplaces  ${LEGACY_MARKETPLACE} kept: ${LEGACY_AUTO_HANDOFF_ID} still installs from it, and Rulegate does not ship auto-handoff`,
+      );
+    }
+    if (s.localMarketplace !== undefined) {
+      lines.push(
+        `  extraKnownMarketplaces  ${MARKETPLACE_NAME} points at a local path (${s.localMarketplace}) — committed here it is a path on one machine; add it at user scope instead and leave the project on sayansr26/rulegate. Left as it is`,
       );
     }
   }

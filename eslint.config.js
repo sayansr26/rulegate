@@ -9,7 +9,10 @@ import tseslint from 'typescript-eslint';
  */
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', 'fixtures/**', 'coverage/**', '**/*.d.ts'],
+    // auto-route is a Claude Code mod: it imports the `claude-code` module, which exists
+    // only inside Claude Code and its `claude plugin test` harness, so it is type-checked
+    // there and never by this workspace's project.
+    ignores: ['**/dist/**', 'fixtures/**', 'coverage/**', '**/*.d.ts', 'plugins/auto-route/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

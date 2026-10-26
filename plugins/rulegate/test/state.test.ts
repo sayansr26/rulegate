@@ -195,6 +195,32 @@ describe('setupState (T098)', () => {
     ]);
   });
 
+  it("sends agent-os's auto-route to Rulegate's before the marketplace goes (T162)", async () => {
+    await healthy();
+    await sb.put('.claude/settings.json', {
+      ...(JSON.parse(planSettings(undefined).next!) as object),
+      extraKnownMarketplaces: { 'sayan-plugins': { source: { source: 'github', repo: 'x/y' } } },
+      enabledPlugins: { 'auto-route@sayan-plugins': true },
+    });
+    const item = (await setupState(sb.root, sb.claudeDir)).missing;
+    expect(item.map((i) => [i.key, i.fix])).toEqual([
+      [
+        'legacy-marketplace',
+        'claude plugin disable auto-route@sayan-plugins --scope project, then rulegate init --plugin --yes (installs auto-route@rulegate), then /rulegate:init settings',
+      ],
+    ]);
+  });
+
+  it('counts a marketplace kept for auto-handoff as settled, not missing (T162)', async () => {
+    await healthy();
+    await sb.put('.claude/settings.json', {
+      ...(JSON.parse(planSettings(undefined).next!) as object),
+      extraKnownMarketplaces: { 'sayan-plugins': { source: { source: 'github', repo: 'x/y' } } },
+      enabledPlugins: { 'auto-handoff@sayan-plugins': true },
+    });
+    expect((await setupState(sb.root, sb.claudeDir)).missing).toEqual([]);
+  });
+
   it('reports invalid settings JSON instead of throwing', async () => {
     await healthy();
     await sb.put('.claude/settings.json', '{ nope');

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -12,6 +13,9 @@ import { runSync } from '../src/commands/sync.js';
 import { ExitCode } from '../src/ui/exit.js';
 
 const fixtures = fileURLToPath(new URL('../../../fixtures/', import.meta.url));
+
+/** The host's PATH, read before `beforeEach` narrows it to the sandbox, for the test that needs git. */
+const HOST_PATH = process.env.PATH ?? '';
 
 let repo: string;
 let sandbox: string;
@@ -85,6 +89,26 @@ describe('rulegate init', () => {
     expect(await tree()).toEqual(before);
   });
 
+  it('names a nested AGENTS.md a detected tool reads, and leaves it as it is (T153)', async () => {
+    // The T032 platform shape: Cline, Windsurf and Gemini at the root, a package's own
+    // AGENTS.md below it. Windsurf reads that one for packages/api/ (vendor docs, re-read
+    // 2026-10-26); Cline documents the root only.
+    await cp(path.join(fixtures, 'windsurf-import/input'), repo, { recursive: true });
+    await cp(path.join(fixtures, 'cline-import/input'), repo, { recursive: true });
+    await mkdir(path.join(repo, 'packages/api'), { recursive: true });
+    await writeFile(path.join(repo, 'packages/api/AGENTS.md'), '# API\n\nValidate input.\n');
+
+    const p = await plan();
+    const nested = p.warnings.filter((w) => w.code === 'W_NESTED_NOT_IMPORTED');
+    expect(nested.map((w) => w.source?.file)).toEqual(['packages/api/AGENTS.md']);
+    expect(nested[0]?.message).toContain('read by windsurf for packages/api/');
+    expect(nested[0]?.message).not.toContain('cline');
+    expect(p.canonical.rules.map((r) => r.source.file)).not.toContain('packages/api/AGENTS.md');
+
+    expect(await runInit({ cwd: repo, yes: true, quiet: true, plugin: false })).toBe(ExitCode.Ok);
+    expect(await read('packages/api/AGENTS.md')).toBe('# API\n\nValidate input.\n');
+  });
+
   it('applies exactly the plan it printed', async () => {
     await seedNativeConfigs();
     const planned = await computeInitPlan({
@@ -101,6 +125,32 @@ describe('rulegate init', () => {
     for (const artifact of planned.plan.artifacts) {
       expect(await read(artifact.path)).toBe(artifact.contents);
     }
+  });
+
+  it('shows, in the dry run, the lines --yes then changes in each existing file (T150)', async () => {
+    await seedNativeConfigs();
+    const before = await read('AGENTS.md');
+    const log = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    expect(await runInit({ cwd: repo, color: false, plugin: false })).toBe(ExitCode.Ok);
+    const printed = log.mock.calls.map(([chunk]) => String(chunk)).join('');
+    log.mockRestore();
+
+    // The hunk sits under its file, indented; `+` lines are what --yes will write.
+    const lines = printed.slice(printed.indexOf('\n  AGENTS.md') + 1).split('\n');
+    // This file's hunks only: they end at the next two-space file line.
+    const end = lines.findIndex((l, i) => i > 0 && !l.startsWith('    '));
+    const block = lines.slice(0, end === -1 ? undefined : end).join('\n');
+    const added = block
+      .split('\n')
+      .filter((l) => l.startsWith('    +'))
+      .map((l) => l.slice(5));
+    expect(block).toMatch(/\n {4}@@ /);
+    expect(added.length).toBeGreaterThan(0);
+
+    expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
+    const after = await read('AGENTS.md');
+    for (const line of added) expect(after).toContain(line.replace(/·/g, ' ').replace(/␉/g, '\t'));
+    expect(after).not.toBe(before);
   });
 
   it('leaves the repository in a state where sync is already up to date', async () => {
@@ -555,9 +605,51 @@ describe('rulegate init', () => {
     2,
   );
 
+  it('keeps the backups out of git by default, so a copied credential is never offered for commit (T151)', async () => {
+    await seedNativeConfigs();
+    await writeFile(path.join(repo, '.mcp.json'), `${MCP_WITH_LITERAL}\n`);
+    const p = await plan();
+    expect(p.warnings.map((w) => w.code)).not.toContain('W_BACKUP_SECRET');
+    expect(p.canonicalFiles.find((f) => f.path === '.rulegate/.gitignore')).toMatchObject({
+      kind: 'create',
+      contents: expect.stringMatching(/^backup\/$/m) as unknown,
+    });
+  });
+
+  it('leaves nothing under .rulegate/backup/ for git to offer, and names every file it creates (T151)', async () => {
+    await seedNativeConfigs();
+    const log = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    expect(await runInit({ cwd: repo, plugin: false })).toBe(ExitCode.Ok);
+    const dry = log.mock.calls.map(([chunk]) => String(chunk)).join('');
+    log.mockClear();
+    expect(dry).toContain('would create  .rulegate/state.json');
+    expect(dry).toContain('would create  .rulegate/.gitignore');
+
+    const git = (...args: string[]) =>
+      execFileSync('git', args, {
+        cwd: repo,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env: { ...process.env, PATH: HOST_PATH },
+      });
+    git('init', '--quiet');
+    expect(await runInit({ cwd: repo, yes: true, plugin: false })).toBe(ExitCode.Ok);
+    const done = log.mock.calls.map(([chunk]) => String(chunk)).join('');
+    log.mockRestore();
+    expect(await readdir(path.join(repo, '.rulegate/backup'))).not.toEqual([]);
+    const offered = git('status', '--porcelain', '--untracked-files=all');
+    expect(offered).not.toContain('.rulegate/backup/');
+    expect(offered).toContain('.rulegate/state.json');
+    expect(done).toContain('.rulegate/backup/ stays on this');
+  });
+
+  // An existing `.rulegate/.gitignore` is the user's and is left as it is, so whether it
+  // covers the backups is theirs to say — and the warning is back.
   it('warns that taking ownership copies a credential into the directory you commit', async () => {
     await seedNativeConfigs();
     await writeFile(path.join(repo, '.mcp.json'), `${MCP_WITH_LITERAL}\n`);
+    await mkdir(path.join(repo, '.rulegate'), { recursive: true });
+    await writeFile(path.join(repo, '.rulegate/.gitignore'), '*.tmp\n');
 
     const warning = (await plan()).warnings.find((w) => w.code === 'W_BACKUP_SECRET');
     expect(warning?.message).toContain('.mcp.json');
@@ -577,6 +669,29 @@ describe('rulegate init', () => {
     await writeFile(path.join(repo, '.gitignore'), '.mcp.json\n');
 
     expect((await plan()).warnings.map((w) => w.code)).not.toContain('W_BACKUP_SECRET');
+  });
+
+  // T140, from a real project's `.claude/rules/theming.md`: prose, not a credential.
+  it('reads a Markdown rule as prose: a backticked value after "token:" is not a credential', async () => {
+    await seedNativeConfigs();
+    await writeFile(
+      path.join(repo, 'CLAUDE.md'),
+      '# Theming\n\nFont family is always a token: `var(--body-font)` (Inter)\n',
+    );
+    expect((await plan()).warnings.map((w) => w.code)).not.toContain('W_BACKUP_SECRET');
+  });
+
+  it('still warns about a vendor-prefixed token inside a Markdown rule', async () => {
+    await seedNativeConfigs();
+    await writeFile(
+      path.join(repo, 'CLAUDE.md'),
+      '# Setup\n\nUse ghp_notARealTokenJustLongEnough1234567 for the API.\n',
+    );
+    await mkdir(path.join(repo, '.rulegate'), { recursive: true });
+    await writeFile(path.join(repo, '.rulegate/.gitignore'), '*.tmp\n');
+    const warning = (await plan()).warnings.find((w) => w.code === 'W_BACKUP_SECRET');
+    expect(warning?.message).toContain('CLAUDE.md');
+    expect(warning?.message).not.toContain('ghp_');
   });
 
   it('stays quiet when the file being taken over holds no credential', async () => {
@@ -787,12 +902,8 @@ describe('rulegate init — then check is clean (T115)', () => {
     expect(await read('.rulegate/rules/z.md')).toMatch(/^---\norder: 100\n---\n\n---\n/);
   });
 
-  /**
-   * Fixtures `init` has nothing to adopt from: rulesync with neither a config nor any
-   * generated output enables no tool, so `init` says so and writes nothing, which `check`
-   * then reports as a repository with no canonical source.
-   */
-  const NOTHING_TO_ADOPT = new Set(['rulesync-import']);
+  // rulesync-import used to be the exception — rules with no config or outputs enabled no
+  // tool, and `init` wrote nothing. Its rules' `targets` now name the tools (T149).
   const importFixtures = readdirSync(fixtures)
     .filter((name) => name.endsWith('-import'))
     .sort();
@@ -803,12 +914,6 @@ describe('rulegate init — then check is clean (T115)', () => {
 
   it.each(importFixtures)('init --yes then check is clean on %s', async (name) => {
     await cp(path.join(fixtures, name, 'input'), repo, { recursive: true });
-    if (NOTHING_TO_ADOPT.has(name)) {
-      const before = await tree();
-      expect(await runInit({ cwd: repo, yes: true, quiet: true })).toBe(ExitCode.Ok);
-      expect(await tree()).toEqual(before);
-      return;
-    }
     await initThenCheck();
   });
 });

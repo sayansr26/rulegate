@@ -168,4 +168,67 @@ describe('validate-plugin (T095)', () => {
       'plugins/rulegate/skills/map/SKILL.md contains "acme-billing" — examples must be invented, not lifted from a real codebase',
     ]);
   });
+
+  describe('mods (T162)', () => {
+    /** The valid repository plus one mod, at its own version, listed in the marketplace. */
+    async function withMod(): Promise<void> {
+      await validRepo();
+      await put('.claude-plugin/marketplace.json', {
+        name: 'rulegate',
+        owner: { name: 'o' },
+        metadata: { version: '1.2.0' },
+        plugins: [
+          { name: 'rulegate', source: './plugins/rulegate' },
+          { name: 'auto-route', source: './plugins/auto-route' },
+        ],
+      });
+      await put('plugins/auto-route/.claude-plugin/plugin.json', {
+        name: 'auto-route',
+        description: 'd',
+        version: '0.1.0',
+      });
+      await put('plugins/auto-route/hooks/hooks.json', { modules: ['./register.ts'] });
+      await put('plugins/auto-route/hooks/register.ts', 'export const register = () => {};\n');
+      await put(
+        'CHANGELOG.md',
+        '# Changelog\n\n## [Unreleased]\n\n- auto-route 0.1.0\n\n## [1.2.0]\n',
+      );
+    }
+
+    it('passes a mod at its own version', async () => {
+      await withMod();
+      const { ok, failures } = validatePlugin(root);
+      expect(failures).toEqual([]);
+      expect(ok).toContain('auto-route: module ./register.ts');
+    });
+
+    it('fails a module that is not on disk', async () => {
+      await withMod();
+      await put('plugins/auto-route/hooks/hooks.json', { modules: ['./route.ts'] });
+      expect(validatePlugin(root).failures).toEqual([
+        'plugins/auto-route/hooks/hooks.json -> ./route.ts does not exist',
+      ]);
+    });
+
+    it('fails a mod version the changelog does not mention', async () => {
+      await withMod();
+      await put('plugins/auto-route/.claude-plugin/plugin.json', {
+        name: 'auto-route',
+        description: 'd',
+        version: '0.2.0',
+      });
+      expect(validatePlugin(root).failures).toEqual([
+        'CHANGELOG.md never mentions "auto-route 0.2.0"',
+      ]);
+    });
+
+    it('checks a mod against .leakcheck', async () => {
+      await withMod();
+      await put('.leakcheck', 'acme-billing\n');
+      await put('plugins/auto-route/hooks/register.ts', '// acme-billing\n');
+      expect(validatePlugin(root).failures).toEqual([
+        'plugins/auto-route/hooks/register.ts contains "acme-billing" — examples must be invented, not lifted from a real codebase',
+      ]);
+    });
+  });
 });

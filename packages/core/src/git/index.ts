@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
 import { RulegateError } from '../model/errors.js';
 import { compareCodepoint } from '../render/order.js';
 import { normalizeText } from '../render/eol.js';
@@ -24,6 +26,12 @@ import type { DirEntry, ReadOnlyFileSystem } from '../fs/types.js';
  *   `git fetch` and a submodule update are both one argument away, so the argument arrays
  *   here are fixed rather than assembled from user input, and `staged.test.ts` asserts the
  *   set of subcommands this module can run.
+ * - **A read-only subcommand is not a read-only call (T113).** `core.fsmonitor` runs a
+ *   configured program on `ls-files`, and in a partial clone `cat-file` on a blob that is
+ *   not local fetches it from the remote. Every call switches the first off and sets
+ *   `GIT_NO_LAZY_FETCH`; in a partial clone `--no-lazy-fetch` is passed too, so a git too
+ *   old to honour either (both arrived in 2.44) rejects the call instead of fetching. Outside
+ *   a partial clone there is nothing to fetch, so no git version is refused there.
  */
 
 /** Where git's own root is. `undefined` when this is not a git working tree at all. */
@@ -54,6 +62,7 @@ export async function gitTopLevel(cwd: string): Promise<string | undefined> {
 export class StagedFileSystem implements ReadOnlyFileSystem {
   readonly #cwd: string;
   #listing: Promise<ReadonlyMap<string, true>> | undefined;
+  #partial: Promise<boolean> | undefined;
   readonly #contents = new Map<string, Promise<string | undefined>>();
 
   constructor(cwd: string) {
@@ -164,26 +173,69 @@ export class StagedFileSystem implements ReadOnlyFileSystem {
 
   async #show(rel: string): Promise<string | undefined> {
     if (!(await this.#files()).has(rel)) return undefined;
+    this.#partial ??= isPartialClone(this.#cwd);
+    const partial = await this.#partial;
+    let raw: string;
     try {
       // `:./` resolves the path against the process's cwd rather than the repository root,
       // which is what makes this correct when Rulegate's root is a subdirectory of git's.
-      const raw = await run(['cat-file', 'blob', `:./${rel}`], this.#cwd);
-      // The same normalization `NodeFileSystem.readFile` applies. Without it a CRLF file
-      // staged on Windows would compare unequal to the identical file read from disk, and
-      // `--staged` would report drift that `check` does not — the two commands describing
-      // one file two ways, which is the thing this codebase spends the most effort
-      // preventing (T073).
-      return normalizeText(raw);
-    } catch {
-      return undefined;
+      raw = await run(['cat-file', 'blob', `:./${rel}`], this.#cwd, partial);
+    } catch (error) {
+      if (!partial) return undefined;
+      // In a partial clone the likely cause is a blob that was never downloaded, and the
+      // only way to read it is the fetch this command promises not to make.
+      const stderr = (error as { stderr?: unknown }).stderr;
+      const old = typeof stderr === 'string' && /unknown option|usage: git/i.test(stderr);
+      throw new RulegateError({
+        code: 'E_GIT_FAILED',
+        message: old
+          ? 'this repository is a partial clone, and this git cannot read the index with lazy fetching switched off (that needs git 2.44 or newer)'
+          : `${rel} is staged, but its contents are not available locally in this partial clone, and Rulegate does not fetch`,
+        hint: old
+          ? 'upgrade git to 2.44 or newer, or run the check without --staged'
+          : `\`git cat-file -p :./${rel}\` downloads it; then run the check again`,
+        source: { file: rel },
+      });
     }
+    // The same normalization `NodeFileSystem.readFile` applies. Without it a CRLF file
+    // staged on Windows would compare unequal to the identical file read from disk, and
+    // `--staged` would report drift that `check` does not — the two commands describing
+    // one file two ways, which is the thing this codebase spends the most effort
+    // preventing (T073).
+    return normalizeText(raw);
+  }
+}
+
+/**
+ * Whether the repository fetches missing objects on demand: a promisor remote, recorded by a
+ * partial clone as `extensions.partialClone` (or a remote's `promisor`) in the repository's
+ * own config — where git itself reads it, so a global setting cannot make one.
+ */
+async function isPartialClone(cwd: string): Promise<boolean> {
+  try {
+    const dir = (await run(['rev-parse', '--git-common-dir'], cwd)).trim();
+    const config = await readFile(join(isAbsolute(dir) ? dir : join(cwd, dir), 'config'), 'utf8');
+    return /^\s*(partialclone\s*=\s*\S|promisor\s*=\s*true\b)/im.test(config);
+  } catch {
+    // Unknown is treated as partial: refusing a check is recoverable, a fetch is not.
+    return true;
   }
 }
 
 /** Every subcommand this module may run. Asserted by test, so the list is the contract. */
 export const GIT_SUBCOMMANDS: readonly string[] = ['rev-parse', 'ls-files', 'cat-file'];
 
-function run(args: readonly string[], cwd: string): Promise<string> {
+/** Prepended to every call; asserted by test so an edit cannot drop one quietly. */
+export const GIT_SAFETY_ARGS: readonly string[] = Object.freeze([
+  '--no-optional-locks',
+  '-c',
+  'core.fsmonitor=false',
+]);
+
+/** Added in a partial clone, where it is the only thing standing between a read and a fetch. */
+export const GIT_NO_LAZY_FETCH_ARG = '--no-lazy-fetch';
+
+function run(args: readonly string[], cwd: string, partial = false): Promise<string> {
   const subcommand = args[0];
   if (subcommand === undefined || !GIT_SUBCOMMANDS.includes(subcommand)) {
     // Unreachable from this module's own callers, and that is the point: it is the guard
@@ -200,15 +252,25 @@ function run(args: readonly string[], cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       'git',
-      [...args],
+      [...(partial ? [GIT_NO_LAZY_FETCH_ARG] : []), ...GIT_SAFETY_ARGS, ...args],
       // No shell, an explicit cwd, and a cap: a pathological repository must not be able
       // to make a pre-commit hook hang or exhaust memory.
-      { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 30_000, shell: false },
-      (error, stdout) => {
+      {
+        cwd,
+        env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+        encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
+        timeout: 30_000,
+        shell: false,
+      },
+      (error, stdout, stderr) => {
         // `error` is typed loosely by the callback signature; normalize before it can
-        // be stringified as `[object Object]` in somebody's terminal.
-        if (error) reject(error instanceof Error ? error : new Error('git failed'));
-        else resolve(stdout);
+        // be stringified as `[object Object]` in somebody's terminal. stderr rides along
+        // so a caller can tell an old git's usage error from a missing blob.
+        if (error) {
+          const e = error instanceof Error ? error : new Error('git failed');
+          reject(Object.assign(e, { stderr }));
+        } else resolve(stdout);
       },
     );
   });

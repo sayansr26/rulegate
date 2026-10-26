@@ -22,6 +22,9 @@ export type RulegateErrorCode =
   // A tool's skill `init` could not import as-is — invalid as an Agent Skill, or a copy that
   // differs from the one imported under the same name (T052). It is left where it is.
   | 'W_SKILL_IMPORT'
+  // An instruction file below the repository root that a detected tool reads, which `init`
+  // left as it is: it imports the root only (T153). Named so it is not a silent omission.
+  | 'W_NESTED_NOT_IMPORTED'
   // A command file Rulegate cannot render for every tool it selects (T053): no frontmatter or
   // `description`, a name no tool accepts, a folder, or a positional placeholder (`$1`) that
   // means a different argument in different tools.

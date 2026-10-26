@@ -3,12 +3,17 @@ import {
   applyCanonicalFiles,
   applyPlan,
   computeInitPlan,
+  diffLines,
+  formatHunks,
+  isBinaryArtifact,
   resolveRepoRoot,
+  STATE_PATH,
   type McpTransport,
 } from '@rulegate/core';
 import { ADAPTERS } from '../registry.js';
 import { INTEROP } from '@rulegate/interop';
 import { createOutput, formatErrors, pluralize } from '../ui/report.js';
+import { renderDiff } from '../ui/diff.js';
 import { ExitCode, type ExitCodeValue } from '../ui/exit.js';
 import { readVersion } from '../version.js';
 import { claudeDirFromEnv, claudeSection } from './claude.js';
@@ -26,6 +31,8 @@ export interface InitOptions {
    * (`--no-plugin`): hidden.
    */
   readonly plugin?: boolean;
+  /** `false` (`--no-auto-route`): the plugin step leaves the auto-route mod out (T162). */
+  readonly autoRoute?: boolean;
   /** Claude Code's config dir; defaults to `CLAUDE_CONFIG_DIR` or `~/.claude`. */
   readonly claudeDir?: string;
 }
@@ -66,6 +73,7 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
       plugin: options.plugin === true,
       run: options.yes === true,
       want: readVersion(),
+      autoRoute: options.autoRoute !== false,
     });
   };
 
@@ -83,7 +91,9 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
     return ExitCode.Failure;
   }
 
-  if (init.detected.length === 0) {
+  // An interop source with rules is configuration even when no tool's files are on disk yet
+  // (T149): rulesync's `.rulesync/rules/` alone is a repository to migrate, not an empty one.
+  if (init.detected.length === 0 && init.interop.length === 0) {
     out.log('no AI tool configuration found in this repository.');
     out.log('hint: create .rulegate/rules/*.md by hand, then run: rulegate sync');
     // Nothing to import is no reason to drop a `--plugin` the user named: the plugin does
@@ -91,7 +101,11 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
     return claude();
   }
 
-  out.log(`detected  ${init.detected.join(', ')}`);
+  out.log(
+    init.detected.length > 0
+      ? `detected  ${init.detected.join(', ')}`
+      : 'detected  no tool yet — list the ones you use under `tools:` in .rulegate/rulegate.yaml, then run rulegate sync',
+  );
   if (init.interop.length > 0) {
     // Named separately from `detected`: these are tools Rulegate is taking over *from*,
     // not tools it will generate for, and printing them in one list would suggest a
@@ -107,6 +121,9 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
   out.log('');
 
   for (const file of init.canonicalFiles) out.log(`${verb(file.kind, options)}  ${file.path}`);
+  // Written by `applyPlan`, not by the canonical pass, and listed so the plan names every file
+  // `--yes` creates (T151).
+  if (options.yes !== true) out.log(`${verb('create', options)}  ${STATE_PATH}`);
 
   // What happens to the user's existing files is the question they actually have, and it
   // is answered before anything is written rather than discovered on the next command.
@@ -117,11 +134,25 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
     // scans, and "would write" beside a file nothing was imported from reads as a create.
     const unimported = new Set(init.unimported);
     for (const artifact of init.plan.artifacts) {
+      // The dry run shows how each existing file changes, not only that it will (T150): a
+      // reader shown "would write CLAUDE.md" took `git diff` after `--yes` as the preview.
+      // The same hunks `check` prints, from disk to the same render.
+      const before =
+        options.yes === true || isBinaryArtifact(artifact)
+          ? undefined
+          : await fs.tryReadFile(artifact.path);
+      const same = before !== undefined && before === artifact.contents;
       out.log(
         unimported.has(artifact.path)
           ? `  ${artifact.path}  (exists, not imported: backed up, then replaced)`
-          : `  ${artifact.path}`,
+          : same
+            ? `  ${artifact.path}  (exists, content unchanged)`
+            : `  ${artifact.path}`,
       );
+      if (before === undefined || same) continue;
+      for (const line of renderDiff(formatHunks(diffLines(before, artifact.contents)), out.c)) {
+        out.log(`    ${line}`);
+      }
     }
   }
 
@@ -193,7 +224,10 @@ export async function runInit(options: InitOptions): Promise<ExitCodeValue> {
   }
 
   out.log('');
-  out.log('done. edit .rulegate/rules/ and run: rulegate sync');
+  // What to commit was the question every rehearsal participant had to guess at (T151).
+  out.log('done. commit .rulegate/ and the generated files; .rulegate/backup/ stays on this');
+  out.log('machine (.rulegate/.gitignore) for `rulegate restore`.');
+  out.log('from now on: edit .rulegate/rules/ and run: rulegate sync');
   return claude();
 }
 

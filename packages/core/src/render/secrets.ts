@@ -193,8 +193,16 @@ export function findLiteralSecrets(value: JsonValue, prefix: string): string[] {
  * Line-oriented and format-agnostic on purpose: it has to work on JSON, on TOML and on
  * whatever the next MCP format turns out to be, and it runs after rendering, where no
  * structure is left to walk. Returns `line: n` labels, never the matching text.
+ *
+ * `keyValue: false` keeps the vendor prefixes and drops the key/value pass, for prose (T140):
+ * in Markdown, "a token: `var(--body-font)`" is a sentence, but the pass read `token` as a
+ * key and the backticked span as a generated value, and `init` called a style guide a
+ * credential. A vendor-prefixed token is a fact in any format; a key is only a key in one.
  */
-export function scanTextForSecrets(text: string): string[] {
+export function scanTextForSecrets(
+  text: string,
+  { keyValue = true }: { keyValue?: boolean } = {},
+): string[] {
   const found: string[] = [];
   // One regex on section headers, not a parser: the scanner stays structure-free except for
   // the one fact it cannot get from a single line — which table a TOML key sits in.
@@ -220,10 +228,24 @@ export function scanTextForSecrets(text: string): string[] {
       line,
     );
     const value = pair?.[2] ?? pair?.[3] ?? pair?.[4];
-    if (inEnvVarSection) return;
+    if (inEnvVarSection || !keyValue) return;
+    // A backticked span is code quoted in prose, in any format that has one.
+    if (value?.startsWith('`') === true) return;
     if (pair && value !== undefined && isLiteralSecret(pair[1]!, value)) found.push(label);
   });
   return found;
+}
+
+/**
+ * Formats whose lines are keys and values, where a secret-shaped key holding a generated value
+ * means a credential. Everything else — Markdown rules above all — gets the vendor prefixes
+ * only.
+ */
+export function isKeyValueFormat(path: string): boolean {
+  return (
+    /\.(?:json|jsonc|json5|toml|ya?ml|ini|env)$/i.test(path) ||
+    /(?:^|\/)\.env(?:\.[^/]*)?$/.test(path)
+  );
 }
 
 /**

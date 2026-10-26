@@ -49,6 +49,29 @@ describe('importMcpJson — T040', () => {
     expect(warnings[0]).not.toContain('ghp_');
   });
 
+  it('names a header credential after its server and says what value it must hold (T152)', () => {
+    const { servers, warnings } = importJson(
+      JSON.stringify({
+        mcpServers: {
+          'billing-api': {
+            type: 'http',
+            url: 'https://x.test/mcp',
+            headers: { Authorization: 'Bearer ghp_notARealTokenJustLongEnough1234567' },
+          },
+        },
+      }),
+    );
+    expect(servers[0]!.headers['Authorization']).toEqual({
+      kind: 'env',
+      name: 'BILLING_API_MCP_AUTHORIZATION',
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('env:BILLING_API_MCP_AUTHORIZATION');
+    expect(warnings[0]).toContain('`Bearer <token>`');
+    expect(warnings[0]).toContain('before the next session');
+    expect(warnings[0]).not.toContain('ghp_');
+  });
+
   it('refuses a whole server rather than half-importing a literal that is not a secret', () => {
     // `env: { NODE_ENV: "production" }` is ordinary and canonical cannot express it:
     // `McpServer.env` is `Record<string, EnvRef>`. Converting would silently repoint the

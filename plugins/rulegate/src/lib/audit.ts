@@ -400,7 +400,7 @@ export async function runAudit({
     say(`  marketplace ${LEGACY_MARKETPLACE} declared in .claude/settings.json`);
     flag(
       'INFO',
-      `.claude/settings.json declares agent-os's marketplace (${LEGACY_MARKETPLACE}) — once agent-os is disabled, the settings pass replaces it with ${MARKETPLACE_NAME}.`,
+      `.claude/settings.json declares agent-os's marketplace (${LEGACY_MARKETPLACE}) — once agent-os and its auto-route are disabled, the settings pass replaces it with ${MARKETPLACE_NAME}; while auto-handoff is enabled it stays, since Rulegate does not ship one.`,
     );
   }
 

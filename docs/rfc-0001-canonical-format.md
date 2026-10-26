@@ -48,6 +48,7 @@ format makes.
   skills/<id>/        skill directories: SKILL.md + assets       v1
   state.json          generated-artifact hashes                  generated
   backup/             pre-overwrite copies                       generated
+  .gitignore          keeps backup/ out of git (from init)       v1
 ```
 
 `rules/` may nest: `rules/frontend/react.md` is valid and yields the rule id
@@ -55,7 +56,11 @@ format makes.
 
 Everything under `.rulegate/` except `state.json` and `backup/` is hand-authored and
 belongs in version control. `state.json` is also committed — `rulegate check` needs it
-to detect hand-edits in CI — but see §10 on merge conflicts.
+to detect hand-edits in CI — but see §10 on merge conflicts. `backup/` is not: it holds
+copies of what git already has, and of any credential an imported file carried, so
+`rulegate init` writes a `.gitignore` here that ignores it. That file is the user's from then
+on — `sync` and `check` never read or write it — and `rulegate restore` reads the backups
+from the machine that made them.
 
 ## 4. `rulegate.yaml`
 
