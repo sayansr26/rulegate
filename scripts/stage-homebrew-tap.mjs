@@ -12,6 +12,7 @@
 // network: fetching the tarball and pushing the tap are the workflow's.
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const [target, version, sha256, ...flags] = process.argv.slice(2);
 const check = flags.includes('--check');
@@ -30,7 +31,9 @@ if (!/^[0-9a-f]{64}$/.test(sha256)) {
   process.exit(2);
 }
 
-const root = new URL('..', import.meta.url).pathname;
+// `fileURLToPath`, not `.pathname`: on Windows the latter is `/D:/a/…`, which `join` turns
+// into `D:\D:\a\…` and every read fails.
+const root = fileURLToPath(new URL('..', import.meta.url));
 const cli = JSON.parse(readFileSync(join(root, 'packages/cli/package.json'), 'utf8'));
 
 const files = renderTap({ version, sha256, license: cli.license });

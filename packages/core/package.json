@@ -1,6 +1,6 @@
 {
   "name": "@rulegate/core",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Canonical model, parser, deterministic renderer, state, and pipeline for Rulegate.",
   "type": "module",
   "license": "MIT",

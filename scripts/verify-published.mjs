@@ -20,6 +20,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const version = process.argv[2];
 const wantAttestations = process.argv.includes('--attestations');
@@ -36,7 +37,7 @@ if (
   process.exit(2);
 }
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 const dirs = [
   ...readdirSync(join(root, 'packages'))
     .filter((d) => d !== 'adapters')

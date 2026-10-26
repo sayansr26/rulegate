@@ -28,7 +28,7 @@ Claude Code plugin.
 
 > **Status: pre-release.** The adapter API is frozen (`docs/adapter-api-v1.md`), thirteen
 > adapters ship, and this repository generates its own agent config with them. `rulegate` is
-> on npm and the commands below work — but `0.4.1` is an early release, not an announced one:
+> on npm and the commands below work — but `0.5.0` is an early release, not an announced one:
 > it has not yet been through an unaided first run on somebody else's repository. Expect the
 > docs and the CLI's rough edges to move before `1.0.0`.
 
@@ -74,6 +74,19 @@ npx rulegate check    # verify they match — exit 1 on drift. Put this in CI.
 `init` writes nothing without `--yes`, backs up every file it takes ownership of into
 `.rulegate/backup/`, and `rulegate restore` puts them back.
 
+### What goes in `.rulegate/`
+
+| Path                          | What it holds                                         | Generated as                                                             |
+| ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| `rules/*.md`                  | Instructions, Markdown with YAML frontmatter          | `CLAUDE.md`, `AGENTS.md`, `.cursor/rules/*.mdc` and the rest             |
+| `mcp/servers.yaml`            | MCP servers, secrets as `env:NAME` references         | `.mcp.json`, `.codex/config.toml`, each tool's own format                |
+| `skills/<name>/`              | Agent Skills: a `SKILL.md` plus any files             | `.claude/skills/`, `.agents/skills/` — the fewest folders that reach all |
+| `commands/<name>.md`          | Prompts run as `/<name>`, with `$ARGUMENTS`           | `.claude/commands/`, `.github/prompts/`, Gemini CLI's TOML, …            |
+| `agents/<name>.md`            | Subagents; a tool that can't keep a restriction skips | `.claude/agents/`, Codex TOML, …                                         |
+| `rulegate.yaml`, `state.json` | Enabled tools; what Rulegate generated                |                                                                          |
+
+`init` imports all five from the tools you already use. RFC-0001 has the full format.
+
 On macOS or Linux with Homebrew, `brew install sayansr26/rulegate/rulegate` installs the same
 release npm serves — about a day after it reaches npm, since Homebrew refuses newer npm
 dependencies — and then it is `rulegate init` without `npx`.
@@ -93,6 +106,10 @@ npx rulegate claude settings --scope project --apply   # write it; each file bac
 `init --plugin` also installs **auto-route**, a mod from the same marketplace that picks the
 model and effort level for each turn from what the prompt asks for (`/route` pins a tier or
 turns it off). `--no-auto-route` leaves it out.
+
+The plugin's seven agents (`rulegate:builder`, `reviewer`, `feature-cartographer` and the rest)
+are short role descriptions. With Rulegate Pro running, each fetches its full playbook from
+Pro at the start of a task; without it, each works from its short version and says so.
 
 `rulegate doctor` shows the plugin's installed and latest version, and names the settings file
 when one turns it off.
@@ -241,7 +258,7 @@ With [pre-commit](https://pre-commit.com):
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/sayansr26/rulegate
-    rev: v0.4.1
+    rev: v0.5.0
     hooks:
       - id: rulegate-check
 ```

@@ -1,1 +1,0 @@
-- [Architecture map](_architecture.md) — system-level map: packages, CLI entry to plan/apply/verify, state.json ownership, network edge, plugin, CI — mapped 2026-10-26

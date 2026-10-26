@@ -12,6 +12,7 @@
 import { Buffer } from 'node:buffer';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const [target, ...flags] = process.argv.slice(2);
 const check = flags.includes('--check');
@@ -20,7 +21,7 @@ if (!target) {
   process.exit(2);
 }
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 const read = (p) => readFileSync(join(root, p));
 
 // The bundle is ESM, and a `.js` file is CommonJS unless the nearest package.json says

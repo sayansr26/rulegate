@@ -5,6 +5,8 @@ All notable changes to this project are recorded here. This project follows
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-26
+
 ### Added
 
 - **Canonical skills.** `.rulegate/skills/<name>/` holds a skill in the
@@ -72,6 +74,12 @@ All notable changes to this project are recorded here. This project follows
 
 ### Changed
 
+- **The plugin's agents are short, and fetch their full playbooks from Rulegate Pro.** Each of
+  the seven (`rulegate:builder`, `reviewer`, `feature-cartographer` and the rest) now carries a
+  short role description: its essentials, its memory protocol and, for the cartographer, the map
+  format. At the start of a task it calls Rulegate Pro's `get_playbook` and follows the full
+  playbook it returns. Without Pro running it works from the short version and says so in its
+  report. The full playbooks are the ones these agents shipped with until now.
 - **`init`'s dry run shows what changes in each file it would rewrite.** Under "then `rulegate
 sync` would write", every existing file now gets the same diff `check` prints — `+` lines are
   what `--yes` writes — or "content unchanged". Before, it only named the files, and the real
@@ -96,7 +104,7 @@ sync` would write", every existing file now gets the same diff `check` prints �
   auto-route is disabled too, and says to run `rulegate init --plugin --yes` for
   `auto-route@rulegate` in its place. A project that still uses auto-handoff, which Rulegate does
   not ship, keeps `sayan-plugins` for good, and that counts as set up rather than as something
-  missing.
+  missing. When both agent-os and its auto-route are still on, one line names both disables.
 
 ### Fixed
 
@@ -156,6 +164,14 @@ sync` would write", every existing file now gets the same diff `check` prints �
   stopped. It now imports the rules, and enables the tools they name in their `targets` — and
   those in `rulesync.jsonc` when there is one. When no rule names a tool, it says to list them
   in `.rulegate/rulegate.yaml`.
+
+### Internal
+
+- Release scripts resolve the repository root with `fileURLToPath`, so the Homebrew tap test
+  passes on Windows (it read `D:\D:\…`). Agent memory under `.claude/agent-memory/` is
+  git-ignored, like the other maintainer notes, and out of the Prettier gate.
+- `rulegate adapter new` also registers the tsconfig path and the release smoke list, and its
+  output passes `prettier --check` unedited; `pnpm verify` runs the bundle checks.
 
 ## [0.4.1] — 2026-09-29
 
@@ -479,7 +495,8 @@ never will be.
 - `AGENTS.md` sits at Windsurf's per-file cap with no headroom; the lint rule reports it, the
   adapter does not yet do anything about it.
 
-[unreleased]: https://github.com/sayansr26/rulegate/compare/v0.4.1...HEAD
+[unreleased]: https://github.com/sayansr26/rulegate/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/sayansr26/rulegate/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/sayansr26/rulegate/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/sayansr26/rulegate/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sayansr26/rulegate/compare/v0.2.0...v0.3.0

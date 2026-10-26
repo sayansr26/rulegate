@@ -39,3 +39,5 @@ docs/adapters.md
 # `skills/` are hand-written project automation and stay formatted.
 .claude/.headroom_wrap_*
 .claude/settings.local.json
+.claude/agent-memory/
+.claude/agent-memory-local/

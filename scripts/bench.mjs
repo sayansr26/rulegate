@@ -23,9 +23,10 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { performance } from 'node:perf_hooks';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const json = process.argv.includes('--json');
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 const cli = join(root, 'packages/cli/dist/bin.js');
 if (!existsSync(cli)) {
   process.stderr.write('packages/cli/dist/bin.js is missing: run `pnpm build` first\n');

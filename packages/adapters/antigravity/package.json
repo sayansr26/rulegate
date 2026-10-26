@@ -1,6 +1,6 @@
 {
   "name": "@rulegate/adapter-antigravity",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Rulegate adapter for antigravity.",
   "type": "module",
   "license": "MIT",

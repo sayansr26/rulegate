@@ -38,6 +38,11 @@ coverage/
 #
 # protects, because a reader of this file would not think to look for one there.
 task-breakdown.md
+# Agent memory is the same kind of maintainer note (CLAUDE.md, "Maintainer working notes"),
+# rewritten by the agents during a session; it was committed once by a bare `git add -A` and
+# then failed the prettier gate.
+.claude/agent-memory/
+.claude/agent-memory-local/
 docs/PRD.md
 docs/reserch-report.md
 
