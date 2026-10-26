@@ -164,6 +164,14 @@ describe('interop — T048', () => {
     }
   });
 
+  it("never calls a competing tool's own source directory a nested level (T153, T109 preflight)", async () => {
+    // a real project's shape: agent-os's untouched `.agent-os/AGENTS.md` placeholder is not
+    // imported, and Codex's nested AGENTS.md pattern matches it — but it is agent-os's
+    // input, which init is migrating, not a file Codex reads for `.agent-os/`.
+    const plan = await init('agent-os-import-scaffold');
+    expect(plan.warnings.filter((w) => w.code === 'W_NESTED_NOT_IMPORTED')).toEqual([]);
+  });
+
   it('reports what it found and did not import, rather than dropping it silently', async () => {
     const repoRoot = path.join(fixtures, 'rulesync-import/input');
     const found = await rulesync.read({

@@ -15,6 +15,7 @@ import {
   enabledFlag,
   planScope,
   type MarketplaceState,
+  type PluginScope,
   type Scope,
 } from './settings.js';
 
@@ -142,7 +143,7 @@ export async function setupState(
   let taskRuleOk = true;
   let taskRuleFile = '';
   let taskRuleFix = '/rulegate:init settings';
-  let marketplace: { state: MarketplaceState; user: string | undefined; fix: string } | undefined;
+  let marketplace: { state: MarketplaceState; users: readonly string[]; fix: string } | undefined;
   // An item the writer refuses is not the settings pass's to fix: sending it back there
   // would loop, refusing again on every run. It names the refusal instead, which says what
   // to do by hand — the writer's own reasons, from the same check.
@@ -161,7 +162,7 @@ export async function setupState(
     ) {
       marketplace = {
         state: p.settings.marketplace,
-        user: p.settings.marketplaceUser,
+        users: p.settings.marketplaceBlockers ?? [],
         fix:
           settingsRefused === undefined
             ? '/rulegate:init settings'
@@ -247,11 +248,7 @@ export async function setupState(
       'legacy-marketplace',
       `.claude/settings.json declares ${MARKETPLACE_NAME}, not ${LEGACY_MARKETPLACE}`,
       false,
-      marketplace.state === 'retire'
-        ? marketplace.fix
-        : marketplace.user === LEGACY_AUTO_ROUTE_ID
-          ? `claude plugin disable ${LEGACY_AUTO_ROUTE_ID} --scope project, then rulegate init --plugin --yes (installs ${AUTO_ROUTE_ID}), then ${marketplace.fix}`
-          : `${disableCommand(legacy.plugin ?? 'project')}, then ${marketplace.fix}`,
+      marketplace.state === 'retire' ? marketplace.fix : blockedFix(marketplace, legacy.plugin),
     );
   }
 
@@ -279,4 +276,23 @@ export function describeState(st: SetupState): string[] {
     lines.push(`  ${i.ok ? 'ok     ' : 'MISSING'} ${i.label}${i.ok ? '' : `  → ${i.fix}`}`);
   }
   return lines;
+}
+
+/**
+ * Every disable that stands between this project and retiring `sayan-plugins`, in one line,
+ * so a project with agent-os and its auto-route both enabled is not sent round twice (T109).
+ */
+function blockedFix(
+  m: { readonly users: readonly string[]; readonly fix: string },
+  agentOsScope: PluginScope | undefined,
+): string {
+  const users = m.users.length > 0 ? m.users : [LEGACY_PLUGIN_ID];
+  const steps: string[] = [];
+  if (users.includes(LEGACY_PLUGIN_ID)) steps.push(disableCommand(agentOsScope ?? 'project'));
+  if (users.includes(LEGACY_AUTO_ROUTE_ID)) {
+    steps.push(
+      `claude plugin disable ${LEGACY_AUTO_ROUTE_ID} --scope project, then rulegate init --plugin --yes (installs ${AUTO_ROUTE_ID})`,
+    );
+  }
+  return [...steps, m.fix].join(', then ');
 }

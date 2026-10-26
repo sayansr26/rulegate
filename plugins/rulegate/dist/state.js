@@ -208,7 +208,11 @@ function planSettings(text, { todo = true, retireMarketplace, marketplaceUsers, 
   const marketplace = retire === void 0 || markets === void 0 || !(LEGACY_MARKETPLACE in markets) ? void 0 : user === LEGACY_AUTO_HANDOFF_ID ? "kept" : retire ? "retire" : "blocked";
   const local = flagLocalMarketplace === true ? localMarketplace(settings) : void 0;
   const withMarket = {
-    ...marketplace === void 0 ? {} : { marketplace, ...user === void 0 ? {} : { marketplaceUser: user } },
+    ...marketplace === void 0 ? {} : {
+      marketplace,
+      ...user === void 0 ? {} : { marketplaceUser: user },
+      ...marketplace === "blocked" && marketplaceUsers !== void 0 ? { marketplaceBlockers: [...marketplaceUsers] } : {}
+    },
     ...local === void 0 ? {} : { localMarketplace: local }
   };
   const perms = isRecord(settings.permissions) ? settings.permissions : {};
@@ -950,7 +954,7 @@ async function setupState(root, claudeDir, { expect } = {}) {
     if (scope === "project" && p.settings.marketplace !== void 0 && p.settings.marketplace !== "kept") {
       marketplace = {
         state: p.settings.marketplace,
-        user: p.settings.marketplaceUser,
+        users: p.settings.marketplaceBlockers ?? [],
         fix: settingsRefused === void 0 ? "/rulegate:init settings" : byHand(settingsRefused.reason)
       };
     }
@@ -1024,7 +1028,7 @@ async function setupState(root, claudeDir, { expect } = {}) {
       "legacy-marketplace",
       `.claude/settings.json declares ${MARKETPLACE_NAME}, not ${LEGACY_MARKETPLACE}`,
       false,
-      marketplace.state === "retire" ? marketplace.fix : marketplace.user === LEGACY_AUTO_ROUTE_ID ? `claude plugin disable ${LEGACY_AUTO_ROUTE_ID} --scope project, then rulegate init --plugin --yes (installs ${AUTO_ROUTE_ID}), then ${marketplace.fix}` : `${disableCommand(legacy.plugin ?? "project")}, then ${marketplace.fix}`
+      marketplace.state === "retire" ? marketplace.fix : blockedFix(marketplace, legacy.plugin)
     );
   }
   const setUp = legacy.found || AGENTS_SECTION.test(claudeMd ?? "") || ls(join6(root, ".claude/agent-memory")).some((d) => d.startsWith("rulegate-")) || read(join6(root, ".claude/rulegate.json")) !== void 0;
@@ -1040,6 +1044,17 @@ function describeState(st) {
     lines.push(`  ${i.ok ? "ok     " : "MISSING"} ${i.label}${i.ok ? "" : `  \u2192 ${i.fix}`}`);
   }
   return lines;
+}
+function blockedFix(m, agentOsScope) {
+  const users = m.users.length > 0 ? m.users : [LEGACY_PLUGIN_ID];
+  const steps = [];
+  if (users.includes(LEGACY_PLUGIN_ID)) steps.push(disableCommand(agentOsScope ?? "project"));
+  if (users.includes(LEGACY_AUTO_ROUTE_ID)) {
+    steps.push(
+      `claude plugin disable ${LEGACY_AUTO_ROUTE_ID} --scope project, then rulegate init --plugin --yes (installs ${AUTO_ROUTE_ID})`
+    );
+  }
+  return [...steps, m.fix].join(", then ");
 }
 
 // src/lib/entry.ts

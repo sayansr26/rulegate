@@ -172,6 +172,14 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   const interopTools = new Set<string>();
   const skillSources: string[] = [];
   const interopFound: string[] = [];
+  // The directories a competing tool keeps its own source in — `.agent-os/` and the like —
+  // read off what each importer reported, so core names no tool. A file in one is that tool's
+  // input, not an instruction file a tool reads from a subdirectory (T153).
+  const interopDirs = new Set<string>();
+  const interopDirOf = (path: string): void => {
+    const slash = path.indexOf('/');
+    if (slash > 0) interopDirs.add(path.slice(0, slash));
+  };
   for (const importer of input.interop ?? []) {
     const ctx = {
       repoRoot,
@@ -183,7 +191,12 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
     if (!(await importer.detect(ctx))) continue;
     const found = await importer.read(ctx);
     interopRules.push(...found.rules);
-    for (const rule of found.rules) importedFrom.add(rule.source.file);
+    for (const rule of found.rules) {
+      importedFrom.add(rule.source.file);
+      interopDirOf(rule.source.file);
+    }
+    for (const path of found.notImported) interopDirOf(path);
+    for (const note of found.notes ?? []) interopDirOf(note.path);
     for (const path of found.generated) generated.set(path, importer.displayName);
     for (const path of found.inferred ?? []) inferred.add(path);
     skillSources.push(...(found.skillSources ?? []));
@@ -332,7 +345,7 @@ export async function computeInitPlan(input: InitInput): Promise<InitPlan> {
   };
   warnings.push(...unimported.map((file) => unimportedWarning(file, inferredBy(file))));
   warnings.push(...(await formatterWarnings({ fs: probe, generated: generatedPaths })));
-  warnings.push(...(await nestedLeftAlone(probe, adapters, detected)));
+  warnings.push(...(await nestedLeftAlone(probe, adapters, detected, interopDirs)));
   // `.rulegate/.gitignore` keeps the backups out of every commit (T151) unless the user
   // already has one that says otherwise, so the warning is only for that case.
   const backupIgnored = (await fs.tryReadFile(BACKUP_IGNORE_PATH)) === undefined;
@@ -628,6 +641,7 @@ async function nestedLeftAlone(
   fs: ReadOnlyFileSystem,
   adapters: readonly Adapter[],
   detected: readonly ToolId[],
+  interopDirs: ReadonlySet<string>,
 ): Promise<RulegateError[]> {
   const readers = new Map<string, Set<string>>();
   for (const adapter of adapters) {
@@ -639,6 +653,7 @@ async function nestedLeftAlone(
       for (const path of await fs.glob(repoPattern(entry))) {
         // The root copy is init's to import; anything under a `.rulegate/` is Rulegate's own.
         if (!path.includes('/') || /(^|\/)\.rulegate\//.test(path)) continue;
+        if (interopDirs.has(path.slice(0, path.indexOf('/')))) continue;
         const tools = readers.get(path) ?? new Set<string>();
         tools.add(adapter.name);
         readers.set(path, tools);

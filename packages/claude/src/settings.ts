@@ -195,6 +195,8 @@ export interface SettingsPlan {
   readonly marketplace?: MarketplaceState;
   /** The enabled plugin that makes the marketplace `blocked` or `kept`. */
   readonly marketplaceUser?: string;
+  /** Every enabled plugin that blocks retiring it, so one pass names all of them (T109). */
+  readonly marketplaceBlockers?: readonly string[];
   /** The local path a project file's `rulegate` marketplace points at (T144). Never changed. */
   readonly localMarketplace?: string;
   /** The merged file, when `status` is `changed`. The writer writes exactly this. */
@@ -279,7 +281,13 @@ export function planSettings(
   const withMarket = {
     ...(marketplace === undefined
       ? {}
-      : { marketplace, ...(user === undefined ? {} : { marketplaceUser: user }) }),
+      : {
+          marketplace,
+          ...(user === undefined ? {} : { marketplaceUser: user }),
+          ...(marketplace === 'blocked' && marketplaceUsers !== undefined
+            ? { marketplaceBlockers: [...marketplaceUsers] }
+            : {}),
+        }),
     ...(local === undefined ? {} : { localMarketplace: local }),
   };
   const perms = isRecord(settings.permissions) ? settings.permissions : {};
@@ -489,9 +497,9 @@ export function describeScope(
       );
     } else if (s.marketplace === 'blocked') {
       lines.push(
-        `  extraKnownMarketplaces  ${LEGACY_MARKETPLACE} (agent-os) kept while ${s.marketplaceUser ?? LEGACY_PLUGIN_ID} is enabled here or in this file — disable it first`,
+        `  extraKnownMarketplaces  ${LEGACY_MARKETPLACE} (agent-os) kept while ${(s.marketplaceBlockers ?? [s.marketplaceUser ?? LEGACY_PLUGIN_ID]).join(' and ')} ${(s.marketplaceBlockers?.length ?? 1) > 1 ? 'are' : 'is'} enabled here or in this file — disable ${(s.marketplaceBlockers?.length ?? 1) > 1 ? 'them' : 'it'} first`,
       );
-      if (s.marketplaceUser === LEGACY_AUTO_ROUTE_ID) {
+      if ((s.marketplaceBlockers ?? [s.marketplaceUser]).includes(LEGACY_AUTO_ROUTE_ID)) {
         lines.push(
           `    then \`rulegate init --plugin --yes\` installs ${AUTO_ROUTE_ID} in its place`,
         );

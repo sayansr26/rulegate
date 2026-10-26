@@ -211,6 +211,21 @@ describe('setupState (T098)', () => {
     ]);
   });
 
+  it('names every plugin holding the marketplace in one fix, as a real project needs (T109)', async () => {
+    await healthy();
+    await sb.put('.claude/settings.json', {
+      ...(JSON.parse(planSettings(undefined).next!) as object),
+      extraKnownMarketplaces: { 'sayan-plugins': { source: { source: 'github', repo: 'x/y' } } },
+      enabledPlugins: { 'agent-os@sayan-plugins': true, 'auto-route@sayan-plugins': true },
+    });
+    const fix = (await setupState(sb.root, sb.claudeDir)).missing.find(
+      (i) => i.key === 'legacy-marketplace',
+    )?.fix;
+    expect(fix).toContain('claude plugin disable agent-os@sayan-plugins');
+    expect(fix).toContain('claude plugin disable auto-route@sayan-plugins');
+    expect(fix).toContain('rulegate init --plugin --yes');
+  });
+
   it('counts a marketplace kept for auto-handoff as settled, not missing (T162)', async () => {
     await healthy();
     await sb.put('.claude/settings.json', {

@@ -209,7 +209,11 @@ function planSettings(text, { todo = true, retireMarketplace, marketplaceUsers, 
   const marketplace = retire === void 0 || markets === void 0 || !(LEGACY_MARKETPLACE in markets) ? void 0 : user === LEGACY_AUTO_HANDOFF_ID ? "kept" : retire ? "retire" : "blocked";
   const local = flagLocalMarketplace === true ? localMarketplace(settings) : void 0;
   const withMarket = {
-    ...marketplace === void 0 ? {} : { marketplace, ...user === void 0 ? {} : { marketplaceUser: user } },
+    ...marketplace === void 0 ? {} : {
+      marketplace,
+      ...user === void 0 ? {} : { marketplaceUser: user },
+      ...marketplace === "blocked" && marketplaceUsers !== void 0 ? { marketplaceBlockers: [...marketplaceUsers] } : {}
+    },
     ...local === void 0 ? {} : { localMarketplace: local }
   };
   const perms = isRecord(settings.permissions) ? settings.permissions : {};
@@ -355,9 +359,9 @@ function describeScope(p, { dry, refused: refused2 = [], backups = [] }) {
       );
     } else if (s.marketplace === "blocked") {
       lines.push(
-        `  extraKnownMarketplaces  ${LEGACY_MARKETPLACE} (agent-os) kept while ${s.marketplaceUser ?? LEGACY_PLUGIN_ID} is enabled here or in this file \u2014 disable it first`
+        `  extraKnownMarketplaces  ${LEGACY_MARKETPLACE} (agent-os) kept while ${(s.marketplaceBlockers ?? [s.marketplaceUser ?? LEGACY_PLUGIN_ID]).join(" and ")} ${(s.marketplaceBlockers?.length ?? 1) > 1 ? "are" : "is"} enabled here or in this file \u2014 disable ${(s.marketplaceBlockers?.length ?? 1) > 1 ? "them" : "it"} first`
       );
-      if (s.marketplaceUser === LEGACY_AUTO_ROUTE_ID) {
+      if ((s.marketplaceBlockers ?? [s.marketplaceUser]).includes(LEGACY_AUTO_ROUTE_ID)) {
         lines.push(
           `    then \`rulegate init --plugin --yes\` installs ${AUTO_ROUTE_ID} in its place`
         );
