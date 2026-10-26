@@ -74,12 +74,6 @@ All notable changes to this project are recorded here. This project follows
 
 ### Changed
 
-- **The plugin's agents are short, and fetch their full playbooks from Rulegate Pro.** Each of
-  the seven (`rulegate:builder`, `reviewer`, `feature-cartographer` and the rest) now carries a
-  short role description: its essentials, its memory protocol and, for the cartographer, the map
-  format. At the start of a task it calls Rulegate Pro's `get_playbook` and follows the full
-  playbook it returns. Without Pro running it works from the short version and says so in its
-  report. The full playbooks are the ones these agents shipped with until now.
 - **`init`'s dry run shows what changes in each file it would rewrite.** Under "then `rulegate
 sync` would write", every existing file now gets the same diff `check` prints — `+` lines are
   what `--yes` writes — or "content unchanged". Before, it only named the files, and the real

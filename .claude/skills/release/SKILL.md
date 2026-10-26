@@ -5,8 +5,9 @@ description: Decide whether Rulegate is due a release and prepare it — version
 
 # Release
 
-A release is a `v*` tag pushed to GitHub: `release.yml` re-runs every CI gate, checks the
-tag against `packages/cli/package.json`, and publishes all workspace packages to npm. The
+A release is run by hand from the maintainer's machine — this repository has no GitHub
+Actions. The maintainer runs every gate locally, tags, pushes, and publishes all workspace
+packages to npm with `pnpm publish -r`. The
 plugin ships the same way — Claude Code reads `.claude-plugin/marketplace.json` from the
 pushed repository — so **the tag is the release for both the CLI and the plugin**. npm
 versions are immutable: a mistake found after the push costs a version number.
@@ -36,7 +37,7 @@ that CI is green on HEAD (ask the maintainer, or `gh run list --branch master --
 
 ## 2. First-time npm names
 
-`release.yml` publishes every non-private workspace package (`pnpm publish -r`). A package
+`pnpm publish -r` publishes every non-private workspace package. A package
 that has never been published needs the maintainer to confirm the name is theirs to take.
 Compare the manifest list from step 1 against the previous release tag
 (`git show <lastTag>:packages/...` or `git diff --stat <lastTag> -- packages/*/package.json packages/adapters/*/package.json`)
@@ -101,32 +102,47 @@ the date and what it contains, and mark any task whose completion was the releas
 
 ## 7. Hand off
 
-Print, for the maintainer to run:
+Print, for the maintainer to run, in order. Every gate in step 5 must be green on this exact
+commit first: nothing re-runs them after this point.
 
 ```bash
 git add -A
 git commit -m "release: v<x.y.z>"
+git status --short                    # must be empty: publish from a clean tree
+node -p "require('./packages/cli/package.json').version"   # must print <x.y.z>
 git tag v<x.y.z>
 git push origin master
 git push origin v<x.y.z>
+npm whoami                            # signed in as the package owner; else `npm login`
+pnpm publish -r --access public
+node scripts/verify-published.mjs <x.y.z>
 ```
 
-Push the tag by name. `git tag` without `-a` makes a lightweight tag, and `--follow-tags`
-pushes only annotated ones, so it leaves the tag behind and `release.yml` never starts
-(v0.4.0 hit exactly this). Confirm with `git ls-remote --tags origin v<x.y.z>`.
+Push the tag by name: `--follow-tags` pushes only annotated tags and leaves a lightweight one
+behind. Confirm with `git ls-remote --tags origin v<x.y.z>`.
 
-and what follows the push:
+`pnpm publish -r` rewrites `workspace:*` to the version and refuses from a dirty tree or
+another branch — never pass `--no-git-checks` locally; it is how a tarball gets cut from a
+tree no commit matches. If it stops part-way, re-run it: it skips versions already on npm.
+Local publishes carry no provenance attestation (that needs a CI provider's OIDC token), so
+`verify-published.mjs` runs without `--attestations`.
 
-- Watch the `Release` workflow; it re-runs every gate before uploading. A red run uploads
-  nothing, so fix forward with a new commit and re-tag only if nothing was published.
-- After it succeeds: `npm view rulegate version` shows `<x.y.z>`; in Claude Code,
-  `/plugin marketplace update rulegate` then `/plugin update rulegate@rulegate` picks up the
-  plugin; draft a GitHub Release from the CHANGELOG section (T111).
-- Homebrew (T061) follows about a day later, not at release time: Homebrew refuses npm
-  dependencies younger than a day, so the scheduled `Homebrew` workflow (every 6 hours, or run
-  it by hand) moves `sayansr26/homebrew-rulegate` to `<x.y.z>` once every package has been on
-  npm for 25 hours, then installs, audits and tests it on macOS. A red run never touches npm:
-  fix `scripts/stage-homebrew-tap.mjs` or the `HOMEBREW_TAP_TOKEN` secret and run it again.
-  Until then `brew info sayansr26/rulegate/rulegate` still shows the previous version.
-- Provenance: `verify-published.mjs --attestations` fails the run unless every package has a
-  signed attestation (T092, since v0.4.1). A green run means the release is signed.
+After it succeeds:
+
+- `npm view rulegate version` shows `<x.y.z>`. Cold-install check in an empty folder:
+  `git init -q && printf '# P\n' > CLAUDE.md && npx -y rulegate@<x.y.z> init --yes && npx -y rulegate@<x.y.z> check`.
+- In Claude Code, `/plugin marketplace update rulegate` then `/plugin update rulegate@rulegate`
+  picks up the plugin; draft a GitHub Release from the CHANGELOG section (T111).
+- Homebrew (T061), **25 hours later or more**: Homebrew refuses npm dependencies younger than a
+  day. With a clone of `sayansr26/homebrew-rulegate` at `../homebrew-rulegate`:
+
+  ```bash
+  node scripts/verify-published.mjs <x.y.z> --settled 25      # exit 3: not yet, wait
+  curl -fsSL https://registry.npmjs.org/rulegate/-/rulegate-<x.y.z>.tgz -o /tmp/rulegate.tgz
+  npm view rulegate@<x.y.z> dist.integrity                    # must equal the next line
+  echo "sha512-$(openssl dgst -sha512 -binary /tmp/rulegate.tgz | base64 | tr -d '\n')"
+  node scripts/stage-homebrew-tap.mjs ../homebrew-rulegate <x.y.z> "$(shasum -a 256 /tmp/rulegate.tgz | cut -d' ' -f1)"
+  (cd ../homebrew-rulegate && git add -A && git commit -m "rulegate <x.y.z>" && git push)
+  brew update && brew upgrade sayansr26/rulegate/rulegate || brew install sayansr26/rulegate/rulegate
+  brew audit --formula sayansr26/rulegate/rulegate && brew test sayansr26/rulegate/rulegate
+  ```

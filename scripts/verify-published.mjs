@@ -12,10 +12,10 @@
 //
 // --settled <hours> also requires every package to have been on npm for at least <hours>, and
 // exits 3 — not 1 — while one is younger: not a failure, just not yet. Homebrew refuses npm
-// dependencies published less than a day ago (`--min-release-age`), so homebrew.yml asks this
+// dependencies published less than a day ago (`--min-release-age`), so the Homebrew step asks this
 // before pointing the tap at a version its users could not yet install (T061).
 //
-// Repo tooling, run by release.yml and homebrew.yml: it is the one place in the repository
+// Repo tooling, run by hand after a release (see the release skill): it is the one place in the repository
 // allowed to reach the network, and it only reads.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';

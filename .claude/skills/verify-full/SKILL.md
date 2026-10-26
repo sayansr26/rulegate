@@ -1,12 +1,13 @@
 ---
 name: verify-full
-description: Run the full local equivalent of CI — verify, the dist lane, the dogfood check, and the three staleness gates — and report exactly which gate failed and its fix command.
+description: Run the full release gate locally (this repo has no CI) — verify, the dist lane, the dogfood check, and the three staleness gates — and report exactly which gate failed and its fix command.
 disable-model-invocation: true
 ---
 
 # Full verification
 
-`pnpm verify` is **not** the CI gate. CI additionally runs the built-binary lane, this
+This repository has no CI: this skill **is** the gate, run by hand before every push and
+release. `pnpm verify` is not enough on its own; the gate adds the built-binary lane, this
 repository's own `rulegate check`, and three staleness gates over committed generated
 output. Committed and stale is worse than absent: a stale Action bundle keeps working while
 reporting an older commit's behaviour, and a stale `docs/tools/` page is the project's most
@@ -33,7 +34,7 @@ node action/build.mjs --check           # committed Action bundle is current
 node scripts/generate-docs.mjs --check  # docs/tools/ and docs/adapters.md are current
 ```
 
-Optionally, matching CI's symlink cell:
+Optionally, the symlink suite as a hard failure:
 
 ```bash
 RULEGATE_REQUIRE_SYMLINKS=1 pnpm test   # turns the symlink suite's self-skip into a failure
@@ -52,10 +53,11 @@ RULEGATE_REQUIRE_SYMLINKS=1 pnpm test   # turns the symlink suite's self-skip in
 Remember exit codes are contractual: `0` ok · `1` drift or failure · `2` usage. A usage
 error reported as drift is itself a bug.
 
-Note that CI runs a 6-cell matrix (ubuntu/macos/windows × node 20/22) because both
-properties this project sells — byte-identical output and a trustworthy exit code — are
-platform-sensitive. A green local run on macOS is not evidence about Windows path
-separators or CRLF.
+Both properties this project sells — byte-identical output and a trustworthy exit code — are
+platform-sensitive, and nothing runs this on Windows or Linux any more. A green run on macOS is
+not evidence about Windows path separators or CRLF; before a release that touches paths or
+line endings, run the gate on a Windows machine too. Also run `node scripts/smoke.mjs`
+(packs every package, then init → sync → check) and `node scripts/bench.mjs` before a release.
 
 ## Hand off
 

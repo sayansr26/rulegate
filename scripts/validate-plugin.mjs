@@ -2,7 +2,7 @@
 /**
  * Structural validation for the Claude Code plugins under `plugins/` (T095, T162).
  *
- * Offline and unauthenticated, so CI can gate every push; `claude plugin validate` needs
+ * Offline and unauthenticated, so it can gate every push; `claude plugin validate` needs
  * the Claude Code CLI installed and is the maintainer's local complement, not a
  * replacement. Every check below is ported from agent-os's validator, where each one
  * exists because the thing it catches actually shipped broken:

@@ -14,7 +14,7 @@ invariants hold for it too: zero network, and its scripts spawn only read-only g
 
 `.claude-plugin/marketplace.json`, `plugins/rulegate/.claude-plugin/plugin.json` and
 `packages/cli/package.json` carry one version, and `node scripts/validate-plugin.mjs`
-fails CI when they disagree. Hook scripts are TypeScript in `plugins/rulegate/src/`,
+fails `/verify-full` when they disagree. Hook scripts are TypeScript in `plugins/rulegate/src/`,
 bundled into the committed `plugins/rulegate/dist/` — Claude Code runs a plugin from its
-cache with no install step — and `node plugins/rulegate/build.mjs --check` fails CI on a
+cache with no install step — and `node plugins/rulegate/build.mjs --check` fails it on a
 stale bundle, as `action/build.mjs --check` does for the Action.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SessionStart: say when a release is due, and what still blocks it.
 //
-// A release here is a tag push that `release.yml` turns into 18 npm packages and a
+// A release here is a tag push plus a local `pnpm publish -r` of 18 npm packages and a
 // marketplace version, and npm versions are immutable — so the two failure modes are
 // releasing too early (before a milestone gate like T109 has passed) and forgetting to
 // release at all while CHANGELOG's [Unreleased] grows. This reports both, offline: it

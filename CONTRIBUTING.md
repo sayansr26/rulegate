@@ -57,21 +57,20 @@ a regressed exit code would stay invisible until publish day. This lane has alre
 one real regression: a rewrite of `program.ts` dropped commander's `exitOverride`, and usage
 errors began exiting 1, which is the code that means _drift_.
 
-## What CI runs
+## Before you push
 
-`.github/workflows/ci.yml`, on every push and pull request:
+This repository has no CI, so nothing checks a push for you. Run the full gate locally —
+`/verify-full` in Claude Code, or by hand:
 
-- **Six cells** — macOS, Linux and Windows × Node 20 and 22, `fail-fast: false`. Windows is
-  why the matrix exists: path separators and CRLF are where deterministic rendering breaks,
-  so a green Linux run is not evidence. Every cell reports; a Windows-only failure hidden
-  behind a cancelled matrix is the failure the matrix is for.
-- Each cell runs install ▸ **lint before build** (ESLint must resolve the workspace from
-  source on a clean clone, which is the state the runner is in) ▸ build ▸ typecheck ▸ test ▸
-  the dist lane ▸ **`rulegate check` on this repository**.
-- **A packaging smoke** (`scripts/smoke.mjs`) that packs every workspace package and
+- install ▸ **lint before build** (ESLint must resolve the workspace from source on a clean
+  clone) ▸ build ▸ typecheck ▸ test ▸ the dist lane ▸ **`rulegate check` on this repository**
+  ▸ `node action/build.mjs --check`, `node plugins/rulegate/build.mjs --check`,
+  `node scripts/generate-docs.mjs --check`, `node scripts/validate-plugin.mjs` ▸ `pnpm format`.
+- **A packaging smoke** (`node scripts/smoke.mjs`) that packs every workspace package and
   installs the CLI from the tarballs, then runs `init`, `sync`, `check` clean, `check`
   against a hand-edited file (exit 1), `doctor`, and an unknown command (exit 2).
-- **Prettier**, on one cell.
+- Path separators and CRLF are where deterministic rendering breaks, so a change touching
+  paths or line endings needs a run on Windows as well; a green macOS run is not evidence.
 
 ## The pre-commit hook
 

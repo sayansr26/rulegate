@@ -6,7 +6,7 @@
 // Prints the change set and writes nothing without --yes, like every other command in this
 // repository that touches files. Versions are edited in place with a string replace rather
 // than JSON.stringify, so each manifest keeps its bytes apart from the one value; the
-// validator and release.yml's tag check then hold because every manifest moved together.
+// validator and the release skill's version check then hold because every manifest moved together.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { manifests, root, status } from '../../hooks/release-status.mjs';

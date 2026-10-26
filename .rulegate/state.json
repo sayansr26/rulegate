@@ -140,7 +140,7 @@
     },
     {
       "adapter": "claude-code",
-      "hash": "sha256:495de78fcc00701b1fbd3b03011b344d9163a51f62da8f934c5221d825785d0e",
+      "hash": "sha256:a3d731e1202f8e1537dbc791289eb88b7123050e5d83c37c627a88be4ec7e8a5",
       "kind": "rules",
       "path": "CLAUDE.md"
     },

@@ -107,10 +107,6 @@ npx rulegate claude settings --scope project --apply   # write it; each file bac
 model and effort level for each turn from what the prompt asks for (`/route` pins a tier or
 turns it off). `--no-auto-route` leaves it out.
 
-The plugin's seven agents (`rulegate:builder`, `reviewer`, `feature-cartographer` and the rest)
-are short role descriptions. With Rulegate Pro running, each fetches its full playbook from
-Pro at the start of a task; without it, each works from its short version and says so.
-
 `rulegate doctor` shows the plugin's installed and latest version, and names the settings file
 when one turns it off.
 

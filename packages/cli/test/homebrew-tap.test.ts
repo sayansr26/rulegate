@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 /**
  * T061: the Homebrew tap is one script's output. What it writes is pinned byte for byte, because
- * the release workflow pushes it unreviewed to a repository users install from.
+ * the maintainer pushes it to a repository users install from.
  */
 
 const run = promisify(execFile);
