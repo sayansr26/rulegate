@@ -28,7 +28,7 @@ Claude Code plugin.
 
 > **Status: pre-release.** The adapter API is frozen (`docs/adapter-api-v1.md`), thirteen
 > adapters ship, and this repository generates its own agent config with them. `rulegate` is
-> on npm and the commands below work — but `0.5.0` is an early release, not an announced one:
+> on npm and the commands below work — but `0.5.1` is an early release, not an announced one:
 > it has not yet been through an unaided first run on somebody else's repository. Expect the
 > docs and the CLI's rough edges to move before `1.0.0`.
 
@@ -109,6 +109,13 @@ turns it off). `--no-auto-route` leaves it out.
 
 `rulegate doctor` shows the plugin's installed and latest version, and names the settings file
 when one turns it off.
+
+Inside Claude Code the plugin **denies any edit to a file Rulegate generated**, pointing at the
+`.rulegate/rules/` source instead, and adds seven agents (`rulegate:feature-cartographer`,
+`builder`, `reviewer` and the rest) and the `/rulegate:init`, `/rulegate:map` and
+`/rulegate:memory` skills. Everything it does is in
+[`docs/claude-code-plugin.md`](docs/claude-code-plugin.md). Moving from agent-os:
+[`docs/migrating-from.md`](docs/migrating-from.md#agent-os).
 
 ### What `check` catches
 
@@ -254,7 +261,7 @@ With [pre-commit](https://pre-commit.com):
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/sayansr26/rulegate
-    rev: v0.5.0
+    rev: v0.5.1
     hooks:
       - id: rulegate-check
 ```
@@ -275,16 +282,20 @@ being told it could not be verified.
 
 ## How it compares
 
-|                                                               | ruler   | rulesync | symlinks / `@import` | **Rulegate**  |
-| ------------------------------------------------------------- | ------- | -------- | -------------------- | ------------- |
-| Generate rules for many tools                                 | ✅      | ✅       | crude                | ✅            |
-| MCP servers, skills                                           | ✅      | ✅       | ❌                   | planned       |
-| **Verify — fail CI on drift**                                 | ❌      | ❌       | ❌                   | ✅ `check`    |
-| **Inspect — what does each tool load, and what does it cost** | ❌      | ❌       | ❌                   | ✅ `doctor`   |
-| Never overwrites a file it did not generate                   | partial | partial  | n/a                  | ✅ enforced   |
-| Tools supported                                               | 30+     | 30+      | —                    | 5, API frozen |
+|                                                               | ruler   | rulesync | symlinks / `@import` | **Rulegate**                 |
+| ------------------------------------------------------------- | ------- | -------- | -------------------- | ---------------------------- |
+| Generate rules for many tools                                 | ✅      | ✅       | crude                | ✅                           |
+| MCP servers, skills, commands, subagents                      | ✅      | ✅       | ❌                   | ✅                           |
+| **Verify — fail CI on drift**                                 | ❌      | ❌       | ❌                   | ✅ `check`                   |
+| **Inspect — what does each tool load, and what does it cost** | ❌      | ❌       | ❌                   | ✅ `doctor`                  |
+| **Enforce inside the agent — Claude Code can't hand-edit**    | ❌      | ❌       | ❌                   | ✅ plugin                    |
+| Never overwrites a file it did not generate                   | partial | partial  | n/a                  | ✅ enforced                  |
+| Imports an existing setup                                     | —       | —        | —                    | ✅ ruler, rulesync, agent-os |
+| Tools supported                                               | 30+     | 30+      | —                    | 13, API frozen               |
 
-Incumbents are generators. Rulegate is a control plane: **generate ▸ verify ▸ inspect**.
+Incumbents are generators. Rulegate is a control plane: **generate ▸ verify ▸ inspect ▸
+enforce**. Coming from one of them? `rulegate init` imports it — see
+[`docs/migrating-from.md`](docs/migrating-from.md).
 The tool count is the honest gap, and it is the one thing outside contributors can close
 fastest — which is why the scaffold below exists.
 
@@ -316,7 +327,7 @@ its own generated paths in `.prettierignore` for exactly that reason.
 
 ## Guarantees
 
-These are tests, not intentions, and they run on macOS, Linux and Windows across Node 20
+These are tests, not intentions, written to hold on macOS, Linux and Windows across Node 20
 and 22:
 
 - **Never writes over a file it did not generate.** `state.json` is the only record of
@@ -334,6 +345,8 @@ and 22:
 
 ## Documentation
 
+- `docs/claude-code-plugin.md` — the Claude Code plugin: hooks, agents, skills, settings
+- `docs/migrating-from.md` — importing from ruler, rulesync or agent-os
 - `CONTRIBUTING.md` — setup, the commands, the invariants a PR must not break
 - `docs/writing-an-adapter.md` — the adapter walkthrough, start to finish
 - `docs/rfc-0001-canonical-format.md` — the canonical format

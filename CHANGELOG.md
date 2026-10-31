@@ -5,6 +5,27 @@ All notable changes to this project are recorded here. This project follows
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-31
+
+### Changed
+
+- **Releases no longer carry npm provenance attestations.** This repository dropped GitHub
+  Actions, and releases are now published from the maintainer's machine, where npm cannot
+  sign a provenance statement. The tarballs are unchanged; `npm audit signatures` still
+  checks the registry signature. 0.4.1 and 0.5.0 remain signed.
+
+### Documentation
+
+- **`docs/claude-code-plugin.md`** describes the Claude Code plugin end to end: installing
+  it, the two hooks (the session snapshot and the edit guard on generated files), the seven
+  agents, the `/rulegate:init`, `/rulegate:map` and `/rulegate:memory` skills, auto-route,
+  `rulegate claude settings`, and what `doctor` reports.
+- **Migrating from agent-os** has its own section in `docs/migrating-from.md`: what `init`
+  imports from `.agent-os/`, what `/rulegate:init` moves inside Claude Code, and the order to
+  do it in.
+- The README's comparison table now reflects what ships: thirteen tools, MCP, skills,
+  commands and subagents, enforcement inside Claude Code, and importing an existing setup.
+
 ## [0.5.0] — 2026-10-26
 
 ### Added
@@ -489,7 +510,8 @@ never will be.
 - `AGENTS.md` sits at Windsurf's per-file cap with no headroom; the lint rule reports it, the
   adapter does not yet do anything about it.
 
-[unreleased]: https://github.com/sayansr26/rulegate/compare/v0.5.0...HEAD
+[unreleased]: https://github.com/sayansr26/rulegate/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/sayansr26/rulegate/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/sayansr26/rulegate/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/sayansr26/rulegate/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/sayansr26/rulegate/compare/v0.3.0...v0.4.0

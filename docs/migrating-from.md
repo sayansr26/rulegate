@@ -1,8 +1,8 @@
-# Migrating from ruler or rulesync
+# Migrating from ruler, rulesync or agent-os
 
-`rulegate init` reads an existing **ruler** or **rulesync** setup and imports it into
+`rulegate init` reads an existing **ruler**, **rulesync** or **agent-os** setup and imports it into
 `.rulegate/`. Nothing about it is one-directional in the other sense: Rulegate never
-writes a `.ruler/` or `.rulesync/` config, and never will. Interop is a way in, not a
+writes a `.ruler/`, `.rulesync/` or `.agent-os/` config, and never will. Interop is a way in, not a
 two-way sync.
 
 Run it the way you would on any repository:
@@ -56,8 +56,44 @@ Rulegate imports **rules**. Anything else is reported by name and left alone:
 before you delete the old directory — being told now is the point of the warning, rather
 than finding out when an MCP server stops working.
 
-Skills and subagents are canonical models Rulegate has not built yet (T051–T054). When they
-land, these importers gain them.
+Rulegate now has canonical skills, commands and subagents of its own (`.rulegate/skills/`,
+`commands/`, `agents/`); importing them from ruler and rulesync is not built yet.
+
+## agent-os
+
+agent-os is Rulegate's predecessor for Claude Code, and its successor is the Rulegate CLI
+plus the [Claude Code plugin](claude-code-plugin.md). Migrating is two steps: the files, then
+Claude Code.
+
+```
+npx rulegate init                  # preview
+npx rulegate init --plugin --yes   # import, sync, install the plugin and auto-route
+```
+
+Then open a Claude Code session in the project and run `/rulegate:init`. It turns agent-os
+off, moves each agent's memory to its `rulegate-*` name, migrates the settings, and removes
+agent-os's reminder hook — each with a preview first.
+
+What `init` does with `.agent-os/`:
+
+- `rules/*.md` become canonical rules, keeping their `paths:` scope (a quoted scalar `paths:`
+  is read too). An empty rule is imported under its name, not dropped.
+- `AGENTS.md` becomes the `agents` rule — unless it is still agent-os's untouched
+  placeholder, which is skipped with a note.
+- The `claude` block of `config.json` is not a rule: it is printed as the
+  `.claude/rulegate.json` the plugin reads.
+- A rule whose fence agent-os could not parse — a CRLF file, a BOM, an unterminated
+  frontmatter fence — stays unscoped, exactly as agent-os compiled it.
+- When two importers produce the same rule name, both are kept, as `<importer>-<name>`
+  (with `-N` added if that is taken).
+- Files agent-os generated (they carry its banner) are not imported a second time.
+
+Memory: where both an agent-os and a Rulegate memory index exist, the agent-os one is kept
+beside it as `MEMORY.agent-os.md`, and any file the migration overwrites is copied to
+`<file>.rulegate.bak` first.
+
+agent-os refuses to run in a repository that has `.rulegate/`, so the two never fight over
+the same files. Once `rulegate check` is clean, delete `.agent-os/`.
 
 ## After importing
 
